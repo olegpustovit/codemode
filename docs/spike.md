@@ -13,8 +13,8 @@ Primary measurements below are on `oracle-vm` (aarch64, Ubuntu glibc 2.35, kerne
 | 1 | 50 gathered 100 ms calls overlap | 141.9 ms on Oracle with fan-out 50, results in original order | Pass on Oracle |
 | 2 | Stop an infinite loop in 100 independent runs | 100/100 `PoolError::Timeout` at a configured 20 ms per-turn deadline; worst checkout + execution + cleanup total 26.4 ms | Pass on Oracle |
 | 3 | Memory excess ends only its worker | Request for a 256 MiB string rejected at the 64 MiB interpreter limit; supervisor then terminates and reaps that worker; an already-paused neighbour returns 42 | Pass on Oracle |
-| 4 | Deep recursion affects only its worker | `RecursionError` at the default depth, offending process terminated and reaped, subsequent run returns 42 | Pass on Oracle |
-| 5 | Worker killed during execution yields a clean error and replacement | SIGKILL becomes `PoolError::Crashed`, a different PID is checked out and the next execution succeeds | Pass on Oracle |
+| 4 | Deep recursion affects only its worker | `RecursionError` at the default depth, offending process terminated and reaped; a neighbouring paused execution and a subsequent run both return 42 | Pass on Oracle |
+| 5 | Worker killed during execution yields a clean error and replacement | SIGKILL becomes `PoolError::Crashed`; automatic refill creates a new PID before any new checkout; a neighbouring execution and a subsequent run both succeed | Pass on Oracle |
 | 6 | Flat gateway memory over 10,000 runs | After 200 warmups: RSS 7,096 → 7,228 KiB, +132 KiB, flat after the second sample; 10,000 runs in 2.31 s; full series in `soak.json` | Pass on Oracle |
 | 7 | Warm start below 5 ms on arm64 | 100 starts: median 263 μs, p95 1,497 μs, maximum 2,233 μs | Pass on Oracle |
 | 8 | Snapshot survives a gateway restart; tampering rejected | Separate write/read gateway processes, fresh pool and worker; result 42, preserved output, signed dump about 7.5 KiB. Flipping a dump byte yields `Snapshot` before checkout/restore | Pass on Oracle |
@@ -103,12 +103,13 @@ Reviewed all eight [rmcp advisories](https://github.com/modelcontextprotocol/rus
 
 Verification so far:
 
-- Initial fast tier: 10 cases, 0 failures. Final fast tier: 11 cases, 0 failures, 5.03 s including the 4.55 s warm build.
+- Initial fast tier: 10 cases, 0 failures. Latest fast tier: 11 cases, 0 failures, 2.25 s including the 1.67 s warm build.
 - Slow qualification: 12 cases, 0 failures, 5.93 s including the warm build. Slowest: 10,000-run soak 2.557 s; 100 deadlines 2.333 s.
 - `cargo clippy --workspace --all-targets`: passed, 43.84 s on its first dependency check.
 - `cargo t --touch crates/spike/src/server.rs --budget 5 -p codemode-spike`: **4.16 s**, budget passes. `mold` fixes the slow GNU link. Cold dependency builds still take minutes on this VM.
-- Final allocator-matched local qualification: 13 cases, 0 failures. The 10,000-run RSS series grew 320 KiB initially, then remained exactly flat at 10,700 KiB; warm starts max 663 μs.
+- Final allocator-matched local qualification: 13 cases, 0 failures. The 10,000-run RSS series grew 320 KiB initially, then remained exactly flat at 10,700 KiB; latest local warm-start check max 3,222 μs.
 - Oracle qualification: **13 cases, 0 failures**, 37.10 s including 27.18 s of local build and remote staging. Slowest cases including SSH overhead: soak 3.408 s; 100 deadlines 3.154 s; concurrency 1.249 s. The table uses timings measured inside the Oracle process, excluding SSH.
+- Follow-up qualification strengthened the kill test to distinguish automatic pool refill from checking out an existing idle worker, and the recursion test now preserves an already-paused neighbour. All 4 affected worker cases pass on Oracle, 38.29 s including build/staging, and all 11 fast cases pass locally. No production code or thresholds changed.
 - `cargo t --manifest-path tools/t/Cargo.toml`: the test runner's argument regression passes, 0.79 s.
 - Final `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets` and dependency checks pass.
 

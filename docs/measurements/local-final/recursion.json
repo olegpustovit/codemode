@@ -1,5 +1,7 @@
 {
   "error": "Traceback (most recent call last):\n  File \"<python-input-0>\", line 3, in <module>\n    recurse()\n    ~~~~~~~~~\n  File \"<python-input-0>\", line 2, in recurse\n    return recurse()\n           ~~~~~~~~~\n  File \"<python-input-0>\", line 2, in recurse\n    return recurse()\n           ~~~~~~~~~\n  File \"<python-input-0>\", line 2, in recurse\n    return recurse()\n           ~~~~~~~~~\n  [Previous line repeated 997 more times]\nRecursionError: maximum recursion depth exceeded",
+  "neighbour_pid": 4117295,
+  "neighbour_result": 42,
   "pool_result_after": 42,
   "worker_gone": true
 }

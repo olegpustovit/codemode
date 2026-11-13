@@ -162,6 +162,14 @@ async fn memory_limit_discards_only_its_worker() {
 #[tokio::test]
 async fn deep_recursion_discards_only_its_worker() {
     let sb = sandbox(Duration::from_secs(1)).await;
+    let (healthy, step) = sb
+        .start("r = await tools.stub.echo(value=42)\nreturn r['value']")
+        .await
+        .unwrap();
+    let Step::Calls(calls) = step else {
+        panic!("expected suspended neighbour")
+    };
+    let healthy_pid = healthy.worker.as_ref().unwrap().pid().unwrap();
     let mut abusive = sb.checkout().await.unwrap();
     let pid = abusive.pid().unwrap();
     let err = abusive
@@ -177,13 +185,21 @@ async fn deep_recursion_discards_only_its_worker() {
     assert!(err.to_string().contains("RecursionError"), "{err}");
     abusive.terminate().await;
     assert!(!PathBuf::from(format!("/proc/{pid}")).exists());
+    let (_, done) = sb
+        .resume(healthy, sandbox::dispatch_stub(calls).await)
+        .await
+        .unwrap();
+    let Step::Done { result, .. } = done else {
+        panic!("unfinished neighbour")
+    };
+    assert_eq!(result.get(), "42");
     let Step::Done { result, .. } = sandbox::execute(&sb, "return 42").await.unwrap() else {
         panic!()
     };
     assert_eq!(result.get(), "42");
     record(
         "recursion",
-        json!({"error":err.to_string(),"worker_gone":true,"pool_result_after":42}),
+        json!({"error":err.to_string(),"worker_gone":true,"neighbour_pid":healthy_pid,"neighbour_result":42,"pool_result_after":42}),
     );
     sb.pool.close().await;
 }
@@ -191,8 +207,17 @@ async fn deep_recursion_discards_only_its_worker() {
 #[tokio::test]
 async fn killed_worker_is_reported_and_replaced() {
     let sb = sandbox(Duration::from_secs(1)).await;
+    let (healthy, step) = sb
+        .start("r = await tools.stub.echo(value=42)\nreturn r['value']")
+        .await
+        .unwrap();
+    let Step::Calls(calls) = step else {
+        panic!("expected suspended neighbour")
+    };
+    let healthy_pid = healthy.worker.as_ref().unwrap().pid().unwrap();
     let mut worker = sb.checkout().await.unwrap();
     let pid = worker.pid().unwrap();
+    assert_eq!(sb.pool.idle_workers(), 0);
     let start = Instant::now();
     let mut printer = on_print_sync(|_, _| {});
     let (result, _) = tokio::join!(
@@ -212,13 +237,35 @@ async fn killed_worker_is_reported_and_replaced() {
     );
     let error = result.unwrap_err();
     assert!(matches!(error, PoolError::Crashed { .. }), "{error}");
+    let replacement_pids = tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            let pids = sb.pool.idle_worker_pids();
+            if !pids.is_empty() {
+                break pids;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the pool must refill without another checkout");
+    assert_eq!(replacement_pids.len(), 1);
+    assert_ne!(replacement_pids[0], pid);
+    assert_ne!(replacement_pids[0], healthy_pid);
     let replacement = sb.checkout().await.unwrap();
-    assert_ne!(replacement.pid(), Some(pid));
+    assert_eq!(replacement.pid(), Some(replacement_pids[0]));
     replacement.finish().await.unwrap();
+    let (_, done) = sb
+        .resume(healthy, sandbox::dispatch_stub(calls).await)
+        .await
+        .unwrap();
+    let Step::Done { result, .. } = done else {
+        panic!("unfinished neighbour")
+    };
+    assert_eq!(result.get(), "42");
     assert!(sandbox::execute(&sb, "return 42").await.is_ok());
     record(
         "kill",
-        json!({"error":error.to_string(),"replacement":true,"elapsed_ms":start.elapsed().as_secs_f64()*1000.0}),
+        json!({"error":error.to_string(),"killed_pid":pid,"automatic_replacement_pid":replacement_pids[0],"neighbour_pid":healthy_pid,"neighbour_result":42,"replacement":true,"elapsed_ms":start.elapsed().as_secs_f64()*1000.0}),
     );
     sb.pool.close().await;
 }

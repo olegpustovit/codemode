@@ -1,5 +1,9 @@
 {
-  "elapsed_ms": 136.527865,
+  "automatic_replacement_pid": 4117315,
+  "elapsed_ms": 30.693997,
   "error": "monty worker crashed while waiting for a reply (signal: 9 (SIGKILL))",
+  "killed_pid": 4117297,
+  "neighbour_pid": 4117298,
+  "neighbour_result": 42,
   "replacement": true
 }

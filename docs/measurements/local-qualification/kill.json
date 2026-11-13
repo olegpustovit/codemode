@@ -1,0 +1,5 @@
+{
+  "elapsed_ms": 13.90066,
+  "error": "monty worker crashed while waiting for a reply (signal: 9 (SIGKILL))",
+  "replacement": true
+}

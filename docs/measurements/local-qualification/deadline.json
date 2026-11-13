@@ -1,0 +1,6 @@
+{
+  "deadline_ms": 20,
+  "stopped": 100,
+  "trials": 100,
+  "worst_total_ms": 42.883736999999996
+}

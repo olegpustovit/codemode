@@ -1,0 +1,10 @@
+# Agentpack project manifest — direct dependencies only. Run `agentpack lock` to refresh pack.lock.
+
+name = "codemode"
+version = "0.0.1"
+
+[dependencies]
+"github.com/olegpustovit/agent-configs/skills/build-rust-stack" = "dev"
+"github.com/dietrichgebert/ponytail" = {}
+"github.com/olegpustovit/agent-configs/skills/smdctl-deploy" = "dev"
+# "github.com/owner/repo/path" = {}

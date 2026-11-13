@@ -1,0 +1,7 @@
+{
+  "ToolError_alias": "RuntimeError",
+  "await": true,
+  "result": 42,
+  "return": "wrapped async function",
+  "tools.source.tool": true
+}

@@ -1,0 +1,10 @@
+{
+  "elapsed_ms": 4.84056,
+  "error": "Traceback (most recent call last):\n  File \"<python-input-0>\", line 1, in <module>\n    a = 'x' * (256 * 1024 * 1024)\n        ~~~~~~~~~~~~~~~~~~~~~~~~~\nMemoryError: memory limit exceeded: 268478850 bytes > 67108864 bytes",
+  "limit_bytes": 67108864,
+  "neighbour_pid": 4067656,
+  "neighbour_result": 42,
+  "requested_bytes": 268435456,
+  "terminated_status": "Some(ExitStatus(unix_wait_status(9)))",
+  "worker_gone": true
+}

@@ -1,0 +1,7 @@
+{
+  "architecture": "aarch64",
+  "max_us": 2233,
+  "median_us": 263,
+  "p95_us": 1497,
+  "samples": 100
+}

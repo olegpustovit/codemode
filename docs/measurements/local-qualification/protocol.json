@@ -1,0 +1,10 @@
+{
+  "elapsed_ms": 18.670514,
+  "rmcp": "3.10.0",
+  "stateless": true,
+  "tool_calls": 2,
+  "versions": [
+    "2026-07-28",
+    "2025-11-25"
+  ]
+}

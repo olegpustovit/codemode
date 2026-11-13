@@ -1,0 +1,6 @@
+{
+  "calls": 50,
+  "elapsed_ms": 116.06016600000001,
+  "fanout": 50,
+  "stub_delay_ms": 100
+}

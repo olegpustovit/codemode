@@ -1,0 +1,40 @@
+lockfile_version = 3
+
+[meta]
+name = 'codemode'
+version = '0.0.1'
+
+[[packages]]
+module = 'github.com/dietrichgebert/ponytail'
+direct = true
+kind = 'plugin'
+url = 'https://github.com/DietrichGebert/ponytail/tree/HEAD'
+owner = 'dietrichgebert'
+repo = 'ponytail'
+commit = '96608e078b2d5ea607c5c3b8b5a54d1c1fba6846'
+cache_key = '7ae494108cad437234445be08170165738913f689f6a68d0550b31f8edcb41d6'
+content_hash = 'sha256-tree-v1:34f4356d0a3a2fe9bd51b051844d171bd9125f9c6fc36e9d784694183e45e71d'
+
+[[packages]]
+module = 'github.com/olegpustovit/agent-configs/skills/build-rust-stack'
+direct = true
+kind = 'skill'
+url = 'https://github.com/olegpustovit/agent-configs/tree/dev/skills/build-rust-stack'
+owner = 'olegpustovit'
+repo = 'agent-configs'
+path = 'skills/build-rust-stack'
+commit = '2722af1e33794b28f31f37ed07a2468f68118398'
+cache_key = '0d3b528fa15b4c4e67fd6d1c00f0c64ba046b712a4da7c7d2287faa7eb5d4b85'
+content_hash = 'sha256-tree-v1:ee8e487b811fc8be74dfa6627a3a1108584e1b36007aabe4613ea14634836ead'
+
+[[packages]]
+module = 'github.com/olegpustovit/agent-configs/skills/smdctl-deploy'
+direct = true
+kind = 'skill'
+url = 'https://github.com/olegpustovit/agent-configs/tree/dev/skills/smdctl-deploy'
+owner = 'olegpustovit'
+repo = 'agent-configs'
+path = 'skills/smdctl-deploy'
+commit = '2722af1e33794b28f31f37ed07a2468f68118398'
+cache_key = 'e641dc4ad7cb79716af050eb4c0b29dea2c76296b1b31f580fc5ef5172a6c068'
+content_hash = 'sha256-tree-v1:a40a0bd33c8ebeb1244c380f6398eb0e372d186ad83feb559e9b9728bc306c73'

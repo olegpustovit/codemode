@@ -1,0 +1,332 @@
+[
+  {
+    "code": "r = await tools.nudge.get_access_context()\nassert r['data']['canWrite'] == False\nreturn {'workspace': r['data']['workspaceId'], 'name': r['data']['name']}",
+    "elapsed_ms": 519.270951,
+    "error": null,
+    "name": "nudge: identify the test caller",
+    "output": "",
+    "result": {
+      "name": "Codemode Trial",
+      "workspace": "workspace_default"
+    },
+    "success": true
+  },
+  {
+    "code": "r = await tools.nudge.list_issues(limit=50)\nissues = r['data']['items'] or []\nreturn {'count': len(issues), 'priorities': {str(p): len([i for i in issues if i['priority'] == p]) for p in [1, 2, 3]}}",
+    "elapsed_ms": 533.3932460000001,
+    "error": null,
+    "name": "nudge: summarize issue priorities",
+    "output": "",
+    "result": {
+      "count": 3,
+      "priorities": {
+        "1": 1,
+        "2": 1,
+        "3": 1
+      }
+    },
+    "success": true
+  },
+  {
+    "code": "items = []\ncursor = None\nwhile True:\n    args = {'limit': 2}\n    if cursor: args['cursor'] = cursor\n    page = (await tools.nudge.list_issues(**args))['data']\n    items.extend(page['items'] or [])\n    cursor = page.get('nextCursor')\n    if not cursor: break\nreturn [x['identifier'] for x in items]",
+    "elapsed_ms": 1240.504383,
+    "error": null,
+    "name": "nudge: page all issues",
+    "output": "",
+    "result": [
+      "CM-1",
+      "CM-2",
+      "CM-3"
+    ],
+    "success": true
+  },
+  {
+    "code": "page = (await tools.nudge.list_issues(limit=10))['data']\nitems = page['items'] or []\ndetails = await asyncio.gather(*[tools.nudge.get_issue(id=x['id']) for x in items])\nreturn [{'id': x['data']['identifier'], 'title': x['data']['title']} for x in details]",
+    "elapsed_ms": 1154.063661,
+    "error": null,
+    "name": "nudge: fetch issue details concurrently",
+    "output": "",
+    "result": [
+      {
+        "id": "CM-1",
+        "title": "Worker isolation"
+      },
+      {
+        "id": "CM-2",
+        "title": "Snapshot restore"
+      },
+      {
+        "id": "CM-3",
+        "title": "OAuth linking"
+      }
+    ],
+    "success": true
+  },
+  {
+    "code": "p, t = await asyncio.gather(tools.nudge.list_projects(), tools.nudge.list_teams())\nreturn {'projects': [x['name'] for x in p['data']['items'] or []], 'teams': [x['name'] for x in t['data']['items'] or []]}",
+    "elapsed_ms": 467.994371,
+    "error": null,
+    "name": "nudge: list projects and teams together",
+    "output": "",
+    "result": {
+      "projects": [
+        "Gateway"
+      ],
+      "teams": [
+        "Codemode"
+      ]
+    },
+    "success": true
+  },
+  {
+    "code": "r = await tools.nudge.list_actors(limit=100)\nitems = r['data']['items'] or []\nreturn {kind: [x['name'] for x in items if x['kind'] == kind] for kind in ['user', 'service_account']}",
+    "elapsed_ms": 465.58125099999995,
+    "error": null,
+    "name": "nudge: group actors by kind",
+    "output": "",
+    "result": {
+      "service_account": [
+        "Codemode Trial"
+      ],
+      "user": [
+        "Codemode Trial"
+      ]
+    },
+    "success": true
+  },
+  {
+    "code": "try:\n    await tools.nudge.get_issue(id='missing-codemode-fixture')\nexcept ToolError as e:\n    return {'caught': True, 'message': str(e)}\nreturn {'caught': False}",
+    "elapsed_ms": 436.300638,
+    "error": null,
+    "name": "nudge: recover from a missing issue",
+    "output": "",
+    "result": {
+      "caught": true,
+      "message": "Resource not found in the credential workspace. Resolve its identifier with the corresponding list tool."
+    },
+    "success": true
+  },
+  {
+    "code": "r = await tools.nudge.list_issues(projectId='trial-project', limit=10)\nreturn sorted([i['title'] for i in r['data']['items'] or []])",
+    "elapsed_ms": 514.160652,
+    "error": null,
+    "name": "nudge: filter gateway issues",
+    "output": "",
+    "result": [
+      "OAuth linking",
+      "Snapshot restore",
+      "Worker isolation"
+    ],
+    "success": true
+  },
+  {
+    "code": "r = await tools.researcher.search_venues(applying=True, limit=20)\nreturn [{'key': v['key'], 'name': v['name'], 'tracks': len(v['tracks'] or [])} for v in r['venues'] or []]",
+    "elapsed_ms": 482.142678,
+    "error": null,
+    "name": "researcher: summarize applying venues",
+    "output": "",
+    "result": [
+      {
+        "key": "trial-conf",
+        "name": "Codemode Test Conference",
+        "tracks": 1
+      }
+    ],
+    "success": true
+  },
+  {
+    "code": "r = await tools.researcher.search_venues(q='Codemode', limit=10)\nrows = await asyncio.gather(*[tools.researcher.get_venue(key=v['key']) for v in r['venues'] or []])\nreturn [{'name': v['name'], 'tracks': len(v['tracks'] or [])} for v in rows]",
+    "elapsed_ms": 1011.934463,
+    "error": null,
+    "name": "researcher: search then read venue details",
+    "output": "",
+    "result": [
+      {
+        "name": "Codemode Test Conference",
+        "tracks": 1
+      }
+    ],
+    "success": true
+  },
+  {
+    "code": "r = await tools.researcher.list_inventory(kind='talk', limit=20)\nreturn [{'code': x['code'], 'title': x['title'], 'uses': x['use_count']} for x in r['items'] or []]",
+    "elapsed_ms": 452.618395,
+    "error": null,
+    "name": "researcher: summarize talk inventory",
+    "output": "",
+    "result": [
+      {
+        "code": "gateway-demo",
+        "title": "Gateway sandbox demo",
+        "uses": 0
+      }
+    ],
+    "success": true
+  },
+  {
+    "code": "r = await tools.researcher.get_inventory(code='gateway-demo')\nreturn {'title': r['item']['title'], 'uses': len(r['uses'] or [])}",
+    "elapsed_ms": 419.054352,
+    "error": null,
+    "name": "researcher: inventory detail and use history",
+    "output": "",
+    "result": {
+      "title": "Gateway sandbox demo",
+      "uses": 0
+    },
+    "success": true
+  },
+  {
+    "code": "r = await tools.researcher.list_deadlines(status='upcoming', limit=20)\nreturn [{'venue': x['venue_name'], 'kind': x['kind']} for x in r['items'] or []]",
+    "elapsed_ms": 248.70141800000002,
+    "error": null,
+    "name": "researcher: find upcoming deadlines",
+    "output": "",
+    "result": [],
+    "success": true
+  },
+  {
+    "code": "r = await tools.researcher.search_corpus(q='sandbox', limit=10)\nreturn {'status': r['status'], 'count': len(r['items'] or [])}",
+    "elapsed_ms": 286.65038799999996,
+    "error": null,
+    "name": "researcher: retrieve corpus search status",
+    "output": "",
+    "result": {
+      "count": 0,
+      "status": "ok"
+    },
+    "success": true
+  },
+  {
+    "code": "p, d = await asyncio.gather(tools.researcher.overview(), tools.researcher.list_deadlines(status='all'))\nreturn {'pieces': len(p['pieces'] or []), 'deadlines': len(d['items'] or [])}",
+    "elapsed_ms": 225.289964,
+    "error": null,
+    "name": "researcher: summarize pieces and tracked deadlines",
+    "output": "",
+    "result": {
+      "deadlines": 0,
+      "pieces": 0
+    },
+    "success": true
+  },
+  {
+    "code": "try:\n    await tools.researcher.get_venue(key='not-a-real-fixture-venue')\nexcept ToolError as e:\n    print(str(e))\nreturn {'continued': True}",
+    "elapsed_ms": 361.96234300000003,
+    "error": null,
+    "name": "researcher: catch a missing venue and continue",
+    "output": "record not found; use search or list tools to discover an identifier\n",
+    "result": {
+      "continued": true
+    },
+    "success": true
+  },
+  {
+    "code": "r = await tools.artifacts.artifact_list(scope='mine', limit=20)\nreturn sorted([a['title'] for a in r['artifacts']])",
+    "elapsed_ms": 3576.291807,
+    "error": null,
+    "name": "artifacts: list and sort test documents",
+    "output": "",
+    "result": [
+      "Gateway deployment checklist",
+      "Snapshot restore plan",
+      "Worker isolation notes"
+    ],
+    "success": true
+  },
+  {
+    "code": "r = await tools.artifacts.artifact_search(query='snapshot', limit=10)\nreturn [a['title'] for a in r['artifacts']]",
+    "elapsed_ms": 2279.501066,
+    "error": null,
+    "name": "artifacts: search snapshot notes",
+    "output": "",
+    "result": [
+      "Snapshot restore plan"
+    ],
+    "success": true
+  },
+  {
+    "code": "r = await tools.artifacts.artifact_list(scope='mine', limit=20)\ndocs = await asyncio.gather(*[tools.artifacts.doc_read(id=a['id']) for a in r['artifacts']])\nreturn [{'title': d['document']['title'], 'characters': len(d['document']['markdown'])} for d in docs]",
+    "elapsed_ms": 5438.0907799999995,
+    "error": null,
+    "name": "artifacts: read all documents concurrently",
+    "output": "",
+    "result": [
+      {
+        "characters": 40,
+        "title": "Snapshot restore plan"
+      },
+      {
+        "characters": 47,
+        "title": "Gateway deployment checklist"
+      },
+      {
+        "characters": 41,
+        "title": "Worker isolation notes"
+      }
+    ],
+    "success": true
+  },
+  {
+    "code": "r = await tools.artifacts.artifact_list(scope='mine', q='Worker', limit=10)\nassert len(r['artifacts']) == 1\nd = await tools.artifacts.artifact_read(id=r['artifacts'][0]['id'], format='markdown')\nreturn [line for line in d['markdown'].splitlines() if line.startswith('#')]",
+    "elapsed_ms": 4091.1575840000005,
+    "error": null,
+    "name": "artifacts: summarize Markdown headings",
+    "output": "",
+    "result": [
+      "# Worker isolation notes"
+    ],
+    "success": true
+  },
+  {
+    "code": "r = await tools.artifacts.artifact_list(scope='mine', limit=20)\nfiles = await asyncio.gather(*[tools.artifacts.artifact_read(id=a['id']) for a in r['artifacts']])\nreturn [len(x['files']) for x in files]",
+    "elapsed_ms": 5163.328582,
+    "error": null,
+    "name": "artifacts: inspect file manifests",
+    "output": "",
+    "result": [
+      1,
+      1,
+      1
+    ],
+    "success": true
+  },
+  {
+    "code": "f, i = await asyncio.gather(tools.artifacts.folder_list(), tools.artifacts.artifact_inbox(wait=0, limit=10))\nreturn {'folder_count': len(f['folders'] or []), 'inbox_keys': sorted(i.keys())}",
+    "elapsed_ms": 1383.9680759999999,
+    "error": null,
+    "name": "artifacts: inspect folders and recent inbox events",
+    "output": "",
+    "result": {
+      "folder_count": 0,
+      "inbox_keys": [
+        "events",
+        "next"
+      ]
+    },
+    "success": true
+  },
+  {
+    "code": "try:\n    await tools.artifacts.doc_read(id='missing-codemode-doc')\nexcept ToolError as e:\n    return {'caught': True, 'message': str(e)}\nreturn {'caught': False}",
+    "elapsed_ms": 1421.833353,
+    "error": null,
+    "name": "artifacts: catch a missing document",
+    "output": "",
+    "result": {
+      "caught": true,
+      "message": "find artifact: artifact record not found"
+    },
+    "success": true
+  },
+  {
+    "code": "n, a, r = await asyncio.gather(tools.nudge.list_issues(limit=20), tools.artifacts.artifact_list(scope='mine', limit=20), tools.researcher.list_inventory(kind='talk'))\nreturn {'issues': len(n['data']['items'] or []), 'documents': len(a['artifacts']), 'talks': len(r['items'] or [])}",
+    "elapsed_ms": 3571.237037,
+    "error": null,
+    "name": "cross-source: summarize test workspace and documents",
+    "output": "",
+    "result": {
+      "documents": 3,
+      "issues": 3,
+      "talks": 1
+    },
+    "success": true
+  }
+]

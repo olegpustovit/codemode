@@ -1,0 +1,98 @@
+[
+  {
+    "name": "nudge: identify the test caller",
+    "code": "r = await tools.nudge.get_access_context()\nassert r['data']['canWrite'] == False\nreturn {'workspace': r['data']['workspaceId'], 'name': r['data']['name']}"
+  },
+  {
+    "name": "nudge: summarize issue priorities",
+    "code": "r = await tools.nudge.list_issues(limit=50)\nissues = r['data']['items'] or []\nreturn {'count': len(issues), 'priorities': {str(p): len([i for i in issues if i['priority'] == p]) for p in [1, 2, 3]}}"
+  },
+  {
+    "name": "nudge: page all issues",
+    "code": "items = []\ncursor = None\nwhile True:\n    args = {'limit': 2}\n    if cursor: args['cursor'] = cursor\n    page = (await tools.nudge.list_issues(**args))['data']\n    items.extend(page['items'] or [])\n    cursor = page.get('nextCursor')\n    if not cursor: break\nreturn [x['identifier'] for x in items]"
+  },
+  {
+    "name": "nudge: fetch issue details concurrently",
+    "code": "page = (await tools.nudge.list_issues(limit=10))['data']\nitems = page['items'] or []\ndetails = await asyncio.gather(*[tools.nudge.get_issue(id=x['id']) for x in items])\nreturn [{'id': x['data']['identifier'], 'title': x['data']['title']} for x in details]"
+  },
+  {
+    "name": "nudge: list projects and teams together",
+    "code": "p, t = await asyncio.gather(tools.nudge.list_projects(), tools.nudge.list_teams())\nreturn {'projects': [x['name'] for x in p['data']['items'] or []], 'teams': [x['name'] for x in t['data']['items'] or []]}"
+  },
+  {
+    "name": "nudge: group actors by kind",
+    "code": "r = await tools.nudge.list_actors(limit=100)\nitems = r['data']['items'] or []\nreturn {kind: [x['name'] for x in items if x['kind'] == kind] for kind in ['user', 'service_account']}"
+  },
+  {
+    "name": "nudge: recover from a missing issue",
+    "code": "try:\n    await tools.nudge.get_issue(id='missing-codemode-fixture')\nexcept ToolError as e:\n    return {'caught': True, 'message': str(e)}\nreturn {'caught': False}"
+  },
+  {
+    "name": "nudge: filter gateway issues",
+    "code": "r = await tools.nudge.list_issues(projectId='trial-project', limit=10)\nreturn sorted([i['title'] for i in r['data']['items'] or []])"
+  },
+  {
+    "name": "researcher: summarize applying venues",
+    "code": "r = await tools.researcher.search_venues(applying=True, limit=20)\nreturn [{'key': v['key'], 'name': v['name'], 'tracks': len(v['tracks'] or [])} for v in r['venues'] or []]"
+  },
+  {
+    "name": "researcher: search then read venue details",
+    "code": "r = await tools.researcher.search_venues(q='Codemode', limit=10)\nrows = await asyncio.gather(*[tools.researcher.get_venue(key=v['key']) for v in r['venues'] or []])\nreturn [{'name': v['name'], 'tracks': len(v['tracks'] or [])} for v in rows]"
+  },
+  {
+    "name": "researcher: summarize talk inventory",
+    "code": "r = await tools.researcher.list_inventory(kind='talk', limit=20)\nreturn [{'code': x['code'], 'title': x['title'], 'uses': x['use_count']} for x in r['items'] or []]"
+  },
+  {
+    "name": "researcher: inventory detail and use history",
+    "code": "r = await tools.researcher.get_inventory(code='gateway-demo')\nreturn {'title': r['item']['title'], 'uses': len(r['uses'] or [])}"
+  },
+  {
+    "name": "researcher: find upcoming deadlines",
+    "code": "r = await tools.researcher.list_deadlines(status='upcoming', limit=20)\nreturn [{'venue': x['venue_name'], 'kind': x['kind']} for x in r['items'] or []]"
+  },
+  {
+    "name": "researcher: retrieve corpus search status",
+    "code": "r = await tools.researcher.search_corpus(q='sandbox', limit=10)\nreturn {'status': r['status'], 'count': len(r['items'] or [])}"
+  },
+  {
+    "name": "researcher: summarize pieces and tracked deadlines",
+    "code": "p, d = await asyncio.gather(tools.researcher.overview(), tools.researcher.list_deadlines(status='all'))\nreturn {'pieces': len(p['pieces'] or []), 'deadlines': len(d['items'] or [])}"
+  },
+  {
+    "name": "researcher: catch a missing venue and continue",
+    "code": "try:\n    await tools.researcher.get_venue(key='not-a-real-fixture-venue')\nexcept ToolError as e:\n    print(str(e))\nreturn {'continued': True}"
+  },
+  {
+    "name": "artifacts: list and sort test documents",
+    "code": "r = await tools.artifacts.artifact_list(scope='mine', limit=20)\nreturn sorted([a['title'] for a in r['artifacts']])"
+  },
+  {
+    "name": "artifacts: search snapshot notes",
+    "code": "r = await tools.artifacts.artifact_search(query='snapshot', limit=10)\nreturn [a['title'] for a in r['artifacts']]"
+  },
+  {
+    "name": "artifacts: read all documents concurrently",
+    "code": "r = await tools.artifacts.artifact_list(scope='mine', limit=20)\ndocs = await asyncio.gather(*[tools.artifacts.doc_read(id=a['id']) for a in r['artifacts']])\nreturn [{'title': d['document']['title'], 'characters': len(d['document']['markdown'])} for d in docs]"
+  },
+  {
+    "name": "artifacts: summarize Markdown headings",
+    "code": "r = await tools.artifacts.artifact_list(scope='mine', q='Worker', limit=10)\nassert len(r['artifacts']) == 1\nd = await tools.artifacts.artifact_read(id=r['artifacts'][0]['id'], format='markdown')\nreturn [line for line in d['markdown'].splitlines() if line.startswith('#')]"
+  },
+  {
+    "name": "artifacts: inspect file manifests",
+    "code": "r = await tools.artifacts.artifact_list(scope='mine', limit=20)\nfiles = await asyncio.gather(*[tools.artifacts.artifact_read(id=a['id']) for a in r['artifacts']])\nreturn [len(x['files']) for x in files]"
+  },
+  {
+    "name": "artifacts: inspect folders and recent inbox events",
+    "code": "f, i = await asyncio.gather(tools.artifacts.folder_list(), tools.artifacts.artifact_inbox(wait=0, limit=10))\nreturn {'folder_count': len(f['folders'] or []), 'inbox_keys': sorted(i.keys())}"
+  },
+  {
+    "name": "artifacts: catch a missing document",
+    "code": "try:\n    await tools.artifacts.doc_read(id='missing-codemode-doc')\nexcept ToolError as e:\n    return {'caught': True, 'message': str(e)}\nreturn {'caught': False}"
+  },
+  {
+    "name": "cross-source: summarize test workspace and documents",
+    "code": "n, a, r = await asyncio.gather(tools.nudge.list_issues(limit=20), tools.artifacts.artifact_list(scope='mine', limit=20), tools.researcher.list_inventory(kind='talk'))\nreturn {'issues': len(n['data']['items'] or []), 'documents': len(a['artifacts']), 'talks': len(r['items'] or [])}"
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "code": "items = []\ncursor = None\nwhile True:\n    args = {'limit': 2}\n    if cursor: args['cursor'] = cursor\n    page = (await tools.nudge.list_issues(**args))['data']\n    items.extend(page['items'] or [])\n    cursor = page.get('nextCursor')\n    if not cursor: break\nreturn [x['identifier'] for x in items]",
+    "elapsed_ms": 1216.5498770000002,
+    "error": null,
+    "name": "nudge: page all issues",
+    "output": "",
+    "result": [
+      "CM-1",
+      "CM-2",
+      "CM-3"
+    ],
+    "success": true
+  },
+  {
+    "code": "r = await tools.researcher.get_inventory(code='gateway-demo')\nreturn {'title': r['item']['title'], 'uses': len(r['uses'] or [])}",
+    "elapsed_ms": 317.78673200000003,
+    "error": null,
+    "name": "researcher: inventory detail and use history",
+    "output": "",
+    "result": {
+      "title": "Gateway sandbox demo",
+      "uses": 0
+    },
+    "success": true
+  },
+  {
+    "code": "r = await tools.artifacts.artifact_list(scope='mine', limit=20)\ndocs = await asyncio.gather(*[tools.artifacts.doc_read(id=a['id']) for a in r['artifacts']])\nreturn [{'title': d['document']['title'], 'characters': len(d['document']['markdown'])} for d in docs]",
+    "elapsed_ms": 5806.467004,
+    "error": null,
+    "name": "artifacts: read all documents concurrently",
+    "output": "",
+    "result": [
+      {
+        "characters": 40,
+        "title": "Snapshot restore plan"
+      },
+      {
+        "characters": 47,
+        "title": "Gateway deployment checklist"
+      },
+      {
+        "characters": 41,
+        "title": "Worker isolation notes"
+      }
+    ],
+    "success": true
+  },
+  {
+    "code": "n, a, r = await asyncio.gather(tools.nudge.list_issues(limit=20), tools.artifacts.artifact_list(scope='mine', limit=20), tools.researcher.list_inventory(kind='talk'))\nreturn {'issues': len(n['data']['items'] or []), 'documents': len(a['artifacts']), 'talks': len(r['items'] or [])}",
+    "elapsed_ms": 3789.727433,
+    "error": null,
+    "name": "cross-source: summarize test workspace and documents",
+    "output": "",
+    "result": {
+      "documents": 3,
+      "issues": 3,
+      "talks": 1
+    },
+    "success": true
+  }
+]

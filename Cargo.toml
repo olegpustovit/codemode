@@ -1,0 +1,52 @@
+[workspace]
+resolver = "3"
+members = ["crates/spike"]
+exclude = ["tools/t"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.96"
+
+[workspace.dependencies]
+anyhow = "1.0.100"
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
+futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"] }
+hmac = "0.12"
+mimalloc = { version = "0.1", default-features = false }
+monty-pool = "=1.5.0"
+monty-types = "=1.5.0"
+rmcp = { version = "=3.10.0", default-features = false, features = ["server", "client", "macros", "transport-streamable-http-server", "transport-streamable-http-client-reqwest"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "signal", "net", "time", "sync", "process", "fs", "test-util"] }
+tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
+tower-http = { version = "0.6", default-features = false, features = ["timeout", "limit"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+await_holding_lock = "deny"
+
+[profile.dev]
+opt-level = 0
+debug = 0
+incremental = true
+codegen-units = 256
+overflow-checks = true
+
+[profile.dev.package."*"]
+opt-level = 1
+debug = 0
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "thin"
+strip = "symbols"
+panic = "unwind"

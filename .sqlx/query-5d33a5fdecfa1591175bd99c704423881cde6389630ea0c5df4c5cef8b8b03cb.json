@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO accounts(source_id,kind,ciphertext,nonce,key_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT(source_id) DO UPDATE SET kind=EXCLUDED.kind,ciphertext=EXCLUDED.ciphertext,nonce=EXCLUDED.nonce,key_id=EXCLUDED.key_id,expires_at=NULL,updated_at=now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bytea",
+        "Bytea",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5d33a5fdecfa1591175bd99c704423881cde6389630ea0c5df4c5cef8b8b03cb"
+}

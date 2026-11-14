@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS(SELECT 1 FROM source_import) AS \"imported!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "imported!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "44392113c744eed90f3041b85b1c0c23c81f7b335c94cd31463542ef13f67e3f"
+}

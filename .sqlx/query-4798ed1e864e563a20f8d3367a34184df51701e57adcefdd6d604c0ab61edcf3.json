@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM oauth_clients c WHERE updated_at<now()-interval '30 days' AND NOT EXISTS(SELECT 1 FROM oauth_grants g WHERE g.client_id=c.client_id)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "4798ed1e864e563a20f8d3367a34184df51701e57adcefdd6d604c0ab61edcf3"
+}

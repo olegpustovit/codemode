@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE executions SET status='failed',error='Gateway restarted during execution',finished_at=now() WHERE status='running'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "97108b1cf00905380e6c719d67e31a33b558793a0ef59c959ba21573b5a7bb02"
+}

@@ -1,0 +1,71 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.id,e.slug AS name,e.all_sources,e.all_tools,\n            ARRAY(SELECT source_id FROM endpoint_sources WHERE endpoint_id=e.id ORDER BY source_id) AS \"source_ids!\"\n            FROM endpoints e WHERE e.id=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "endpoints",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "endpoints",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "all_sources",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "endpoints",
+            "name": "all_sources"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "all_tools",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "endpoints",
+            "name": "all_tools"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "source_ids!",
+        "type_info": "UuidArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "6fab04825173f4d119b0f54a2e391209cf11574e77d806f8c022940ed1d1ef77"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT oauth_grant FROM access_tokens WHERE id=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "oauth_grant",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "oauth_grant"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "68aae066f466cc8e8d08a50dd47440dd7417dae8a5de35b9bf684f3dae6c95e8"
+}

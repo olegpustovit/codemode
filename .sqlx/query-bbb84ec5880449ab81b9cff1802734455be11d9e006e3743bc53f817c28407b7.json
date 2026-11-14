@@ -1,0 +1,71 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id,client_id,scope,refresh_allowed,expires_at>now() AND revoked_at IS NULL AS \"valid!\" FROM oauth_grants WHERE id=$1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "oauth_grants",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "client_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "oauth_grants",
+            "name": "client_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "scope",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "oauth_grants",
+            "name": "scope"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "refresh_allowed",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "oauth_grants",
+            "name": "refresh_allowed"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "valid!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "bbb84ec5880449ab81b9cff1802734455be11d9e006e3743bc53f817c28407b7"
+}

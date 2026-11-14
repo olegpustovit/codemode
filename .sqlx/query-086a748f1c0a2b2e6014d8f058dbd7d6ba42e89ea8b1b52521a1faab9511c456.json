@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT python_name AS \"python_name!\" FROM sources WHERE python_name IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "python_name!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "python_name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "086a748f1c0a2b2e6014d8f058dbd7d6ba42e89ea8b1b52521a1faab9511c456"
+}

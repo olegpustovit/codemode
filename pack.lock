@@ -16,6 +16,29 @@ cache_key = '7ae494108cad437234445be08170165738913f689f6a68d0550b31f8edcb41d6'
 content_hash = 'sha256-tree-v1:34f4356d0a3a2fe9bd51b051844d171bd9125f9c6fc36e9d784694183e45e71d'
 
 [[packages]]
+module = 'github.com/olegpustovit/agent-configs/plugins/react-dev'
+direct = true
+kind = 'plugin'
+url = 'https://github.com/olegpustovit/agent-configs/tree/dev/plugins/react-dev'
+owner = 'olegpustovit'
+repo = 'agent-configs'
+path = 'plugins/react-dev'
+commit = '2722af1e33794b28f31f37ed07a2468f68118398'
+cache_key = 'fc970eb87a9b0758a94dac533e9acd637d1f28221ae618dbb4811a5f0634ac6c'
+content_hash = 'sha256-tree-v1:4a79fb764c59bf52226aa054e5dd8fa2c7cd96cfb7927e9ef35fc7f7e2d7a2c6'
+
+[[packages]]
+module = 'github.com/olegpustovit/agent-configs/skills/build-go-stack'
+kind = 'skill'
+url = 'https://github.com/olegpustovit/agent-configs/tree/dev/skills/build-go-stack'
+owner = 'olegpustovit'
+repo = 'agent-configs'
+path = 'skills/build-go-stack'
+commit = '2722af1e33794b28f31f37ed07a2468f68118398'
+cache_key = 'c262fcd6cc8cfda01278295462db442f4c40b3a0099c50904063fd9df3c61062'
+content_hash = 'sha256-tree-v1:00b15fa88566e2c189b4c27d75e86351d5298542292eeb4802eef19811a0e18c'
+
+[[packages]]
 module = 'github.com/olegpustovit/agent-configs/skills/build-rust-stack'
 direct = true
 kind = 'skill'
@@ -38,3 +61,79 @@ path = 'skills/smdctl-deploy'
 commit = '2722af1e33794b28f31f37ed07a2468f68118398'
 cache_key = 'e641dc4ad7cb79716af050eb4c0b29dea2c76296b1b31f580fc5ef5172a6c068'
 content_hash = 'sha256-tree-v1:a40a0bd33c8ebeb1244c380f6398eb0e372d186ad83feb559e9b9728bc306c73'
+
+[[packages]]
+module = 'github.com/pbakaus/impeccable'
+kind = 'plugin'
+url = 'https://github.com/pbakaus/impeccable/tree/HEAD'
+owner = 'pbakaus'
+repo = 'impeccable'
+commit = 'c4cd1924c389f68d37c687d9c2bbf13f12547c41'
+cache_key = '951cf3d583d627b61dea390c69fb295035c3c13ff12ecb23e1c9fbe6b65e0a37'
+content_hash = 'sha256-tree-v1:a03334ceff1f2dca8403c22f50fdd20ea0dee2dd74495cea48ee9bddf80baf7b'
+
+[[packages]]
+module = 'github.com/shadcn-ui/ui/skills/shadcn'
+kind = 'skill'
+url = 'https://github.com/shadcn-ui/ui/tree/HEAD/skills/shadcn'
+owner = 'shadcn-ui'
+repo = 'ui'
+path = 'skills/shadcn'
+commit = 'e62c9435fff729a175f38983dee73b2cb4f6a069'
+cache_key = '07c79e4987f4d95009a1f9f34d8e338002b2b85c54e0efdb6f096acfc27a33a0'
+content_hash = 'sha256-tree-v1:ed6e635dd7c1471a2e4c90b86b5a39946af17d104b0b6e2af74ea8e1090e87f1'
+
+[[packages]]
+module = 'github.com/tanstack/router/packages/react-router/skills/compositions/router-query'
+kind = 'skill'
+url = 'https://github.com/tanstack/router/tree/HEAD/packages/react-router/skills/compositions/router-query'
+owner = 'tanstack'
+repo = 'router'
+path = 'packages/react-router/skills/compositions/router-query'
+commit = '0b6d4f3f6b42e704555d9ff0014ddbf8b44f8e09'
+cache_key = '7e1463066f615bef410c4c533e2b954cf4da3ed8093b18debd31ea55d66948a9'
+content_hash = 'sha256-tree-v1:cde7c6baa20aa8ed03d5f45ca0c69173f03f921d9ae187a6035169cb8b23d687'
+
+[[packages]]
+module = 'github.com/tanstack/router/packages/react-router/skills/react-router'
+kind = 'skill'
+url = 'https://github.com/tanstack/router/tree/HEAD/packages/react-router/skills/react-router'
+owner = 'tanstack'
+repo = 'router'
+path = 'packages/react-router/skills/react-router'
+commit = '0b6d4f3f6b42e704555d9ff0014ddbf8b44f8e09'
+cache_key = '2ea0f1f7ff1dbcd937d4eb3deccf30005481b13b450fdf033941a20dc0680649'
+content_hash = 'sha256-tree-v1:33ac9cb27033b55a4f38a97d5c81f224b8c20d38639278578341e9e01fc681b5'
+
+[[packages]]
+module = 'github.com/tanstack/router/packages/router-core/skills/router-core'
+kind = 'skill'
+url = 'https://github.com/tanstack/router/tree/HEAD/packages/router-core/skills/router-core'
+owner = 'tanstack'
+repo = 'router'
+path = 'packages/router-core/skills/router-core'
+commit = '0b6d4f3f6b42e704555d9ff0014ddbf8b44f8e09'
+cache_key = '9f1b95ca10c17ad6cdac042205013550f54e3c6a178e66eeff2f2276af3ef47c'
+content_hash = 'sha256-tree-v1:f6054d22939f3550908494cfb05e9619b540a73f44108e72820fa21ab3174f97'
+
+[[packages]]
+module = 'github.com/vercel-labs/agent-skills/skills/composition-patterns'
+kind = 'skill'
+url = 'https://github.com/vercel-labs/agent-skills/tree/HEAD/skills/composition-patterns'
+owner = 'vercel-labs'
+repo = 'agent-skills'
+path = 'skills/composition-patterns'
+commit = '1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62'
+cache_key = 'c64488561c2c99b1fc80591ebdb30a0b5074d538fc363fed98208eb24067537a'
+content_hash = 'sha256-tree-v1:caa49c02279519fba9ef55d92c256c52f1cad177216060865ec2b9590ba8b719'
+
+[[packages]]
+module = 'github.com/vercel-labs/agent-skills/skills/react-best-practices'
+kind = 'skill'
+url = 'https://github.com/vercel-labs/agent-skills/tree/HEAD/skills/react-best-practices'
+owner = 'vercel-labs'
+repo = 'agent-skills'
+path = 'skills/react-best-practices'
+commit = '1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62'
+cache_key = '9fcf58127901bf2b57888a34ef2b6d465a29be49ed80c81d6cd19feda641f7cb'
+content_hash = 'sha256-tree-v1:5a01ac4e21769ea41c11d319d3dfb0709e35f7f3abbf0f071c20ef632e49bdb2'

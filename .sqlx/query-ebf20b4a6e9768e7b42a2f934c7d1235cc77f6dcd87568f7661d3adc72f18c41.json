@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT CASE WHEN NOT e.all_tools AND NOT EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=$2 AND scope.upstream_name=$3) THEN 'block' ELSE COALESCE(p.action,$4) END AS \"action!: Action\" FROM endpoints e LEFT JOIN tool_policies p ON p.endpoint_id=e.id AND p.source_id=$2 AND p.upstream_name=$3 WHERE e.id=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "action!: Action",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ebf20b4a6e9768e7b42a2f934c7d1235cc77f6dcd87568f7661d3adc72f18c41"
+}

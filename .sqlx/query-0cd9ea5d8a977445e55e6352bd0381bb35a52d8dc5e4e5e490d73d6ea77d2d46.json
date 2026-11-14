@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO tools(source_id,upstream_name,path,description,input_schema,output_schema,stub_brief,stub_full,read_only,destructive,search) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,setweight(to_tsvector('simple',$11),'A') || setweight(to_tsvector('simple',$4),'B'))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Text",
+        "Text",
+        "Bool",
+        "Bool",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0cd9ea5d8a977445e55e6352bd0381bb35a52d8dc5e4e5e490d73d6ea77d2d46"
+}

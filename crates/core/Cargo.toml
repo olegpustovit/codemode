@@ -1,0 +1,56 @@
+[package]
+name = "codemode-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+doctest = false
+
+[features]
+isolation-tests = []
+
+[[test]]
+name = "isolation"
+path = "tests/isolation/main.rs"
+required-features = ["isolation-tests"]
+
+[dependencies]
+apollo-parser.workspace = true
+argon2.workspace = true
+chacha20poly1305.workspace = true
+secrecy.workspace = true
+base64.workspace = true
+futures-util.workspace = true
+hmac.workspace = true
+jsonschema.workspace = true
+monty-pool.workspace = true
+monty-types.workspace = true
+rand.workspace = true
+reqwest.workspace = true
+sse-stream.workspace = true
+rmcp.workspace = true
+oauth2.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+subtle.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+toml.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+allocation-counter.workspace = true
+axum.workspace = true
+monty-proto.workspace = true
+mimalloc.workspace = true
+
+[lints]
+workspace = true

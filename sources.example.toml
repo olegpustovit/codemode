@@ -1,0 +1,18 @@
+# Credential values stay in the service environment. Never put them in this file.
+[[sources]]
+slug = "nudge"
+kind = "mcp_http"
+url = "https://nudge.microapps.space/mcp/readonly"
+bearer_env = "CODEMODE_NUDGE_TOKEN"
+
+[[sources]]
+slug = "researcher"
+kind = "mcp_http"
+url = "https://researcher.microapps.space/mcp/ro"
+bearer_env = "CODEMODE_RESEARCHER_TOKEN"
+
+[[sources]]
+slug = "artifacts"
+kind = "mcp_http"
+url = "https://artifacts.microapps.space/mcp"
+bearer_env = "CODEMODE_ARTIFACTS_TOKEN"

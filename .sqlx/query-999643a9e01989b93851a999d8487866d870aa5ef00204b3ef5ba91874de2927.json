@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO endpoints(slug,hostname,all_sources) VALUES('All sources',$1,true) ON CONFLICT(tenant_id) WHERE all_sources DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "999643a9e01989b93851a999d8487866d870aa5ef00204b3ef5ba91874de2927"
+}

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.code FROM saved_scripts s JOIN endpoints e ON e.id=s.endpoint_id WHERE e.id=$1 AND s.id=$2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "saved_scripts",
+            "name": "code"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "065d3ae3878f221c2a851e1c1670220b0fd0dada4c2178e89a33035f843eb60a"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT metadata AS \"metadata!: sqlx::types::Json<ClientMetadata>\" FROM oauth_clients WHERE client_id=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "metadata!: sqlx::types::Json<ClientMetadata>",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "oauth_clients",
+            "name": "metadata"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7b2e2b4f2ff70e679be016d159a39acb50a05c06de94880b09f3b846e5a06bf2"
+}

@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(max(version),0)::bigint AS \"version!\" FROM _sqlx_migrations WHERE success",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c62b371bd159f330a5997e31fd556293e9eb2ed7012bbb49d1d5684a7c818b1c"
+}

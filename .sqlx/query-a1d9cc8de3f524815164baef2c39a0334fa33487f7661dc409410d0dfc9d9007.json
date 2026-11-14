@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE executions SET status='paused',tool_calls=$2,error=NULL,finished_at=NULL WHERE id=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a1d9cc8de3f524815164baef2c39a0334fa33487f7661dc409410d0dfc9d9007"
+}

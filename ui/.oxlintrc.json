@@ -1,0 +1,1 @@
+{"plugins":["react","jsx-a11y"],"rules":{"react/rules-of-hooks":"error","react/exhaustive-deps":"warn"},"ignorePatterns":["src/routeTree.gen.ts","dist"]}

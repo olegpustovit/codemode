@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO oauth_clients(client_id,metadata,secret_hash) VALUES($1,$2,$3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "99bab8e2c28e3455b79f2486276410ecc826970f4499756070855c75cbabd620"
+}

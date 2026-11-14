@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT redirect_uri,challenge,consumed_at IS NOT NULL AS \"consumed!\",expires_at>now() AS \"valid!\" FROM oauth_codes WHERE code_hash=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "redirect_uri",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "oauth_codes",
+            "name": "redirect_uri"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "challenge",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "oauth_codes",
+            "name": "challenge"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "consumed!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "valid!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "ee29383098db472dda68536f3658856d7e88451626d5437165d9a59b68163433"
+}

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT execution_id FROM paused_runs WHERE execution_id=$1 AND pause_id=$2 AND signature=$3 AND expires_at>now() FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "execution_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "paused_runs",
+            "name": "execution_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e12e9721f747616daafc17514b6d27c87035105b48fdc4a941e371d0a2ed3636"
+}

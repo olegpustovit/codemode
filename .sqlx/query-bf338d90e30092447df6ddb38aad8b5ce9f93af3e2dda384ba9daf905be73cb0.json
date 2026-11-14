@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM endpoint_sources WHERE endpoint_id=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bf338d90e30092447df6ddb38aad8b5ce9f93af3e2dda384ba9daf905be73cb0"
+}

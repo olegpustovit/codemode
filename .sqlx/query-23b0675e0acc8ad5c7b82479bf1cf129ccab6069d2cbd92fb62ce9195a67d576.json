@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT consumed_at IS NOT NULL AS \"consumed!\" FROM oauth_tokens WHERE token_hash=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "consumed!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "23b0675e0acc8ad5c7b82479bf1cf129ccab6069d2cbd92fb62ce9195a67d576"
+}

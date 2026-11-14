@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.source_id FROM tools t JOIN sources s ON s.id=t.source_id JOIN endpoints e ON e.id=$1 WHERE s.id=$2 AND s.revision=$3 AND t.upstream_name=$4 AND (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=t.source_id)) FOR SHARE OF s",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "tools",
+            "name": "source_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ffb204ff08067777269b1a91587ba0e647a0bf2c610286b02257f6b04e8000a5"
+}

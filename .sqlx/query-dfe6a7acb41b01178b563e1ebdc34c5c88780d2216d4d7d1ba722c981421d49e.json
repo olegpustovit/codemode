@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM accounts WHERE source_id=$1 AND kind='oauth' AND nonce=$2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dfe6a7acb41b01178b563e1ebdc34c5c88780d2216d4d7d1ba722c981421d49e"
+}

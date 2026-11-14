@@ -1,0 +1,610 @@
+use std::{collections::BTreeMap, path::Path, sync::Mutex, time::Duration};
+use uuid::Uuid;
+
+use hmac::{Hmac, Mac};
+use monty_pool::{
+    Checkout, Pool, PoolConfig, PoolError, ReplConfig, ResumeValue, TurnEvent, on_print_sync,
+};
+use monty_types::{ExcType, MontyException, MontyObject, ResourceLimits};
+use serde_json::value::RawValue;
+use sha2::Sha256;
+
+pub const MEMORY: usize = 64 * 1024 * 1024;
+pub const OUTPUT: usize = 32 * 1024;
+const MAX_SNAPSHOT: usize = 72 * 1024 * 1024;
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("{0}")]
+    Worker(#[source] PoolError),
+    #[error("invalid worker message: {0}")]
+    Invalid(String),
+    #[error("snapshot authentication failed")]
+    Snapshot,
+    #[error("source exceeds 64 KB")]
+    Source,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct PendingCall {
+    pub id: u32,
+    pub path: String,
+    pub args: Box<RawValue>,
+}
+
+#[derive(Debug)]
+pub enum Step {
+    Done {
+        result: Box<RawValue>,
+        output: String,
+        output_dropped_bytes: usize,
+    },
+    Calls(Vec<PendingCall>),
+}
+
+pub type CallResult = Result<Box<RawValue>, String>;
+
+pub trait Sandbox {
+    type Run: Send;
+    fn start(
+        &self,
+        code: &str,
+        prelude: &str,
+    ) -> impl Future<Output = Result<(Self::Run, Step), Error>> + Send;
+    fn resume(
+        &self,
+        run: Self::Run,
+        results: Vec<(u32, CallResult)>,
+    ) -> impl Future<Output = Result<(Self::Run, Step), Error>> + Send;
+    fn start_for(
+        &self,
+        _caller: Uuid,
+        code: &str,
+        prelude: &str,
+    ) -> impl Future<Output = Result<(Self::Run, Step), Error>> + Send {
+        self.start(code, prelude)
+    }
+    fn restore_for(
+        &self,
+        _caller: Uuid,
+        snapshot: &[u8],
+    ) -> impl Future<Output = Result<(Self::Run, Vec<u32>), Error>> + Send {
+        self.restore(snapshot)
+    }
+    fn snapshot(&self, run: Self::Run) -> impl Future<Output = Result<Vec<u8>, Error>> + Send;
+    fn restore(
+        &self,
+        snapshot: &[u8],
+    ) -> impl Future<Output = Result<(Self::Run, Vec<u32>), Error>> + Send;
+}
+
+pub struct MontySandbox {
+    pub pool: Pool,
+    repl: ReplConfig,
+    key: [u8; 32],
+    output_budget: usize,
+    turn_deadline: Duration,
+    owners: Mutex<Owners>,
+}
+
+#[derive(Default)]
+struct Owners {
+    latest: Option<u64>,
+    callers: BTreeMap<u64, Uuid>,
+}
+impl Owners {
+    fn accept(&mut self, worker: u64, caller: Uuid) -> bool {
+        if let Some(owner) = self.callers.get(&worker) {
+            return *owner == caller;
+        }
+        // Evicted or out-of-order IDs are discarded, never mistaken for clean processes.
+        if self.latest.is_some_and(|latest| worker <= latest) {
+            return false;
+        }
+        self.latest = Some(worker);
+        self.callers.insert(worker, caller);
+        if self.callers.len() > 64 {
+            self.callers.pop_first();
+        }
+        true
+    }
+}
+
+pub struct Run {
+    pub worker: Option<Checkout>,
+    output: Capture,
+    calls: usize,
+}
+
+impl MontySandbox {
+    pub async fn new(
+        binary: &Path,
+        deadline: Duration,
+        key: [u8; 32],
+        output_budget: usize,
+    ) -> Result<Self, Error> {
+        let mut config = PoolConfig::subprocess(binary);
+        config.min_processes = 2;
+        config.max_processes = 8;
+        // Configure includes cold process isolation; execution turns keep their own hard deadline.
+        config.request_timeout = Some(deadline.max(Duration::from_secs(1)));
+        config.checkout_timeout = Some(Duration::from_secs(1));
+        // Valid results and snapshots can approach the worker's memory ceiling.
+        config.max_decode_bytes = MAX_SNAPSHOT;
+        let pool = Pool::new(config).await?;
+        let repl = ReplConfig {
+            script_name: "execution.py".into(),
+            limits: Some(
+                ResourceLimits::default()
+                    .max_memory(MEMORY)
+                    .max_suspensions(110),
+            ),
+            ..Default::default()
+        };
+        Ok(Self {
+            pool,
+            repl,
+            key,
+            output_budget,
+            turn_deadline: deadline,
+            owners: Mutex::new(Owners::default()),
+        })
+    }
+
+    // Erase SDK command futures at this boundary to keep incremental code generation bounded.
+    fn turn<'a, T: Send + 'a>(
+        &'a self,
+        operation: impl Future<Output = Result<T, PoolError>> + Send + 'a,
+    ) -> futures_util::future::BoxFuture<'a, Result<T, Error>> {
+        Box::pin(async move {
+            tokio::time::timeout(self.turn_deadline, operation)
+                .await
+                .map_err(|_| {
+                    Error::Worker(PoolError::Timeout {
+                        timeout: self.turn_deadline,
+                    })
+                })?
+                .map_err(Error::Worker)
+        })
+    }
+
+    pub async fn checkout(&self) -> Result<Checkout, Error> {
+        self.checkout_for(Uuid::nil()).await
+    }
+    async fn checkout_for(&self, caller: Uuid) -> Result<Checkout, Error> {
+        loop {
+            let worker = self.pool.checkout(&self.repl).await?;
+            let id = worker
+                .worker_id()
+                .ok_or_else(|| Error::Invalid("worker has no process identity".into()))?;
+            if self
+                .owners
+                .lock()
+                .map_err(|_| Error::Invalid("worker ownership state unavailable".into()))?
+                .accept(id, caller)
+            {
+                return Ok(worker);
+            }
+            drop(worker);
+        }
+    }
+
+    async fn advance(&self, mut run: Run, mut event: TurnEvent) -> Result<(Run, Step), Error> {
+        let mut pending = Vec::new();
+        loop {
+            let mut printer = on_print_sync(|_, text| run.output.append(text));
+            let worker = run
+                .worker
+                .as_mut()
+                .ok_or_else(|| Error::Invalid("worker already finished".into()))?;
+            event = match event {
+                TurnEvent::Complete(value) => {
+                    let result = value
+                        .as_ref()
+                        .as_str()
+                        .ok_or_else(|| Error::Invalid("result must be JSON text".into()))?;
+                    let result = RawValue::from_string(result.into())
+                        .map_err(|e| Error::Invalid(e.to_string()))?;
+                    drop(printer);
+                    if let Some(worker) = run.worker.take() {
+                        self.turn(worker.finish()).await?;
+                    }
+                    let output = std::mem::take(&mut run.output);
+                    return Ok((
+                        run,
+                        Step::Done {
+                            result,
+                            output: output.text,
+                            output_dropped_bytes: output.dropped,
+                        },
+                    ));
+                }
+                TurnEvent::FunctionCall {
+                    function_name,
+                    args,
+                    call_id,
+                    object_id,
+                    ..
+                } => {
+                    run.calls += 1;
+                    if run.calls > 100 {
+                        return Err(Error::Invalid(
+                            "execution exceeds its 100 tool-call limit".into(),
+                        ));
+                    }
+                    if function_name != "_call"
+                        || object_id.is_some()
+                        || args.args().len() != 2
+                        || args.kwargs().len() != 0
+                    {
+                        return Err(Error::Invalid("invalid callback".into()));
+                    }
+                    let path = args
+                        .arg(0)
+                        .and_then(|a| a.as_str().map(str::to_owned))
+                        .ok_or_else(|| Error::Invalid("tool path must be text".into()))?;
+                    let text = args
+                        .arg(1)
+                        .and_then(|a| a.as_str().map(str::to_owned))
+                        .ok_or_else(|| Error::Invalid("tool arguments must be JSON text".into()))?;
+                    let args =
+                        RawValue::from_string(text).map_err(|e| Error::Invalid(e.to_string()))?;
+                    if !args.get().starts_with('{') {
+                        return Err(Error::Invalid("arguments must be an object".into()));
+                    }
+                    pending.push(PendingCall {
+                        id: call_id,
+                        path,
+                        args,
+                    });
+                    self.turn(worker.resume(ResumeValue::Future, &mut printer))
+                        .await?
+                }
+                TurnEvent::ResolveFutures {
+                    pending_call_ids, ..
+                } => {
+                    if !pending_matches(&pending, &pending_call_ids) {
+                        return Err(Error::Invalid("unmatched pending calls".into()));
+                    }
+                    drop(printer);
+                    return Ok((run, Step::Calls(pending)));
+                }
+                TurnEvent::OsCall { .. } => {
+                    self.turn(worker.resume(ResumeValue::NotHandled, &mut printer))
+                        .await?
+                }
+                TurnEvent::NameLookup { .. } => {
+                    self.turn(worker.resume_name_lookup(None, &mut printer))
+                        .await?
+                }
+            };
+        }
+    }
+}
+
+// Batches are capped at 100 calls; validate IDs without allocating a second collection.
+fn pending_matches(pending: &[PendingCall], ids: &[u32]) -> bool {
+    pending.len() == ids.len()
+        && pending.iter().enumerate().all(|(i, call)| {
+            ids.contains(&call.id) && pending[..i].iter().all(|other| other.id != call.id)
+        })
+}
+
+impl Sandbox for MontySandbox {
+    type Run = Run;
+
+    async fn start(&self, code: &str, prelude: &str) -> Result<(Run, Step), Error> {
+        self.start_for(Uuid::nil(), code, prelude).await
+    }
+    async fn start_for(
+        &self,
+        caller: Uuid,
+        code: &str,
+        prelude: &str,
+    ) -> Result<(Run, Step), Error> {
+        if code.len() > 64 * 1024 {
+            return Err(Error::Source);
+        }
+        let mut worker = self.checkout_for(caller).await?;
+        let prelude_event = self
+            .turn(worker.feed(
+                prelude.to_owned(),
+                vec![("_call".into(), MontyObject::function("_call", None))],
+                vec![],
+                false,
+                &mut on_print_sync(|_, _| {}),
+            ))
+            .await?;
+        if !matches!(prelude_event, TurnEvent::Complete(_)) {
+            return Err(Error::Invalid("unexpected prelude callback".into()));
+        }
+        let mut source = String::new();
+        source.push_str("async def __codemode_main():\n");
+        if code.trim().is_empty() {
+            source.push_str("    pass\n");
+        }
+        for line in code.lines() {
+            source.push_str("    ");
+            source.push_str(line);
+            source.push('\n');
+        }
+        source.push_str("json.dumps(await __codemode_main())\n");
+        let mut output = Capture {
+            budget: self.output_budget,
+            ..Default::default()
+        };
+        let event = self
+            .turn(worker.feed(
+                source,
+                vec![("_call".into(), MontyObject::function("_call", None))],
+                vec![],
+                false,
+                &mut on_print_sync(|_, text| output.append(text)),
+            ))
+            .await?;
+        self.advance(
+            Run {
+                worker: Some(worker),
+                output,
+                calls: 0,
+            },
+            event,
+        )
+        .await
+    }
+
+    async fn resume(
+        &self,
+        mut run: Run,
+        results: Vec<(u32, CallResult)>,
+    ) -> Result<(Run, Step), Error> {
+        let answers = results
+            .into_iter()
+            .map(|(id, result)| {
+                (
+                    id,
+                    match result {
+                        Ok(value) => ResumeValue::Return(MontyObject::string(value.get())),
+                        Err(message) => ResumeValue::Error(MontyException::new(
+                            ExcType::RuntimeError,
+                            Some(message),
+                        )),
+                    },
+                )
+            })
+            .collect();
+        let worker = run
+            .worker
+            .as_mut()
+            .ok_or_else(|| Error::Invalid("worker already finished".into()))?;
+        let event = self
+            .turn(worker.resume_futures(
+                answers,
+                &mut on_print_sync(|_, text| run.output.append(text)),
+            ))
+            .await?;
+        self.advance(run, event).await
+    }
+
+    async fn snapshot(&self, mut run: Run) -> Result<Vec<u8>, Error> {
+        let worker = run
+            .worker
+            .as_mut()
+            .ok_or_else(|| Error::Invalid("worker already finished".into()))?;
+        let dump = self.turn(worker.dump()).await?;
+        let mut bytes = Vec::with_capacity(48 + run.output.text.len() + dump.len());
+        bytes.extend_from_slice(&[0; 32]);
+        bytes.extend_from_slice(&(run.calls as u32).to_le_bytes());
+        bytes.extend_from_slice(&(run.output.text.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&(run.output.dropped as u64).to_le_bytes());
+        bytes.extend_from_slice(run.output.text.as_bytes());
+        bytes.extend_from_slice(&dump);
+        let mut mac = Hmac::<Sha256>::new_from_slice(&self.key).map_err(|_| Error::Snapshot)?;
+        mac.update(&bytes[32..]);
+        bytes[..32].copy_from_slice(&mac.finalize().into_bytes());
+        if bytes.len() > MAX_SNAPSHOT {
+            return Err(Error::Snapshot);
+        }
+        Ok(bytes)
+    }
+
+    async fn restore(&self, snapshot: &[u8]) -> Result<(Run, Vec<u32>), Error> {
+        self.restore_for(Uuid::nil(), snapshot).await
+    }
+    async fn restore_for(&self, caller: Uuid, snapshot: &[u8]) -> Result<(Run, Vec<u32>), Error> {
+        if snapshot.len() < 48 || snapshot.len() > MAX_SNAPSHOT {
+            return Err(Error::Snapshot);
+        }
+        let mut mac = Hmac::<Sha256>::new_from_slice(&self.key).map_err(|_| Error::Snapshot)?;
+        mac.update(&snapshot[32..]);
+        mac.verify_slice(&snapshot[..32])
+            .map_err(|_| Error::Snapshot)?;
+        let calls =
+            u32::from_le_bytes(snapshot[32..36].try_into().map_err(|_| Error::Snapshot)?) as usize;
+        let output_len =
+            u32::from_le_bytes(snapshot[36..40].try_into().map_err(|_| Error::Snapshot)?) as usize;
+        if output_len > self.output_budget || calls > 100 || 48 + output_len >= snapshot.len() {
+            return Err(Error::Snapshot);
+        }
+        let output = std::str::from_utf8(&snapshot[48..48 + output_len])
+            .map_err(|_| Error::Snapshot)?
+            .to_owned();
+        let mut worker = self.checkout_for(caller).await?;
+        let (event, _) = self
+            .turn(worker.restore(
+                snapshot[48 + output_len..].to_vec(),
+                vec![],
+                &mut on_print_sync(|_, _| {}),
+            ))
+            .await?;
+        let event = event.ok_or_else(|| Error::Invalid("expected suspended snapshot".into()))?;
+        // Restored futures refer to the batch saved by the host, not newly emitted calls.
+        let step = match event {
+            TurnEvent::ResolveFutures {
+                pending_call_ids, ..
+            } if pending_call_ids.len() <= 100
+                && pending_call_ids
+                    .iter()
+                    .enumerate()
+                    .all(|(i, id)| !pending_call_ids[..i].contains(id)) =>
+            {
+                pending_call_ids
+            }
+            other => {
+                return Err(Error::Invalid(format!(
+                    "unexpected restored event: {other:?}"
+                )));
+            }
+        };
+        Ok((
+            Run {
+                worker: Some(worker),
+                output: Capture {
+                    budget: self.output_budget,
+                    text: output,
+                    dropped: u64::from_le_bytes(
+                        snapshot[40..48].try_into().map_err(|_| Error::Snapshot)?,
+                    ) as usize,
+                },
+                calls,
+            },
+            step,
+        ))
+    }
+}
+
+struct Capture {
+    budget: usize,
+    text: String,
+    dropped: usize,
+}
+impl Default for Capture {
+    fn default() -> Self {
+        Self {
+            budget: OUTPUT,
+            text: String::new(),
+            dropped: 0,
+        }
+    }
+}
+impl Capture {
+    fn append(&mut self, text: &str) {
+        let mut n = text.len().min(self.budget.saturating_sub(self.text.len()));
+        while !text.is_char_boundary(n) {
+            n -= 1;
+        }
+        self.text.push_str(&text[..n]);
+        self.dropped = self.dropped.saturating_add(text.len() - n);
+    }
+}
+
+impl From<PoolError> for Error {
+    fn from(error: PoolError) -> Self {
+        Self::Worker(error)
+    }
+}
+
+impl Error {
+    pub fn agent_message(&self) -> String {
+        match self {
+            Self::Worker(PoolError::Runtime(error)) => {
+                let line = error
+                    .traceback()
+                    .iter()
+                    .rev()
+                    .find(|f| f.frame_name.as_deref() == Some("__codemode_main"))
+                    .map(|f| f.start.line.saturating_sub(1));
+                format!(
+                    "{}{}",
+                    error.summary(),
+                    line.map(|n| format!(" (execution.py line {n})"))
+                        .unwrap_or_default()
+                )
+            }
+            Self::Worker(PoolError::Timeout { .. }) => {
+                "execution deadline exceeded; worker terminated".into()
+            }
+            Self::Worker(PoolError::Crashed { .. }) => {
+                "sandbox worker exited unexpectedly; other executions are unaffected".into()
+            }
+            Self::Worker(_) => "sandbox worker failed".into(),
+            _ => self.to_string(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn caller_ownership_cannot_be_reassigned_or_revived_after_cache_eviction() {
+        let mut owners = super::Owners::default();
+        let a = uuid::Uuid::new_v4();
+        let b = uuid::Uuid::new_v4();
+        assert!(owners.accept(0, a));
+        assert!(!owners.accept(0, b));
+        assert!(owners.accept(0, a));
+        for id in 1..1000 {
+            assert!(owners.accept(id, a));
+        }
+        assert_eq!(owners.callers.len(), 64);
+        assert!(!owners.accept(0, a));
+        assert!(!owners.accept(0, b));
+        assert!(!owners.accept(999, b));
+        assert!(owners.accept(1000, b));
+    }
+    use super::*;
+    #[test]
+    fn worker_wire_codec_reuses_buffers_and_enforces_decode_budget() {
+        use monty_proto::{decode_frame_with_budget, encode_framed_into, pb};
+        let frame = pb::Feed {
+            code: "x".repeat(65536),
+            ..Default::default()
+        };
+        let mut buffer = Vec::with_capacity(65552);
+        encode_framed_into(&frame, &mut buffer).unwrap();
+        let encoding = allocation_counter::measure(|| {
+            for _ in 0..100 {
+                encode_framed_into(&frame, &mut buffer).unwrap();
+            }
+        });
+        // The pool uses this exact codec: zero encode allocations after warm-up.
+        assert_eq!(encoding.count_total, 0);
+        let decoding = allocation_counter::measure(|| {
+            let decoded: pb::Feed = decode_frame_with_budget(&buffer[4..], 131072).unwrap();
+            assert_eq!(decoded.code, frame.code);
+        });
+        // One owned string payload, independent of its length; no intermediate tree.
+        assert_eq!(decoding.count_total, 1);
+        assert!(decode_frame_with_budget::<pb::Feed>(&buffer[4..], 8).is_err());
+    }
+    #[test]
+    fn pending_ids_are_a_bijection_without_allocations() {
+        let calls = |ids: &[u32]| {
+            ids.iter()
+                .map(|&id| PendingCall {
+                    id,
+                    path: "example.echo".into(),
+                    args: RawValue::from_string("{}".into()).unwrap(),
+                })
+                .collect::<Vec<_>>()
+        };
+        let valid = calls(&[1, 2]);
+        let allocations = allocation_counter::measure(|| {
+            assert!(pending_matches(&valid, &[2, 1]));
+            assert!(!pending_matches(&valid, &[1, 1]));
+            assert!(!pending_matches(&valid, &[1]));
+            assert!(!pending_matches(&valid, &[1, 3]));
+        });
+        assert_eq!(allocations.count_total, 0);
+        assert!(!pending_matches(&calls(&[1, 1]), &[1, 2]));
+    }
+    #[test]
+    fn captures_utf8_and_counts_every_dropped_byte() {
+        let mut capture = Capture::default();
+        capture.append(&"x".repeat(OUTPUT - 1));
+        capture.append("é");
+        capture.append("abc");
+        assert_eq!(capture.text.len(), OUTPUT);
+        assert_eq!(capture.dropped, 4);
+    }
+}

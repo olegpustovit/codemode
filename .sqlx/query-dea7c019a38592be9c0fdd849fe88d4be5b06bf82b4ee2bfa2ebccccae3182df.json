@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT config AS \"config: sqlx::types::Json<Source>\" FROM sources WHERE id=$1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "config: sqlx::types::Json<Source>",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "config"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "dea7c019a38592be9c0fdd849fe88d4be5b06bf82b4ee2bfa2ebccccae3182df"
+}

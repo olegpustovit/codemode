@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH ranked AS (\n          SELECT path,description,CASE WHEN $2 THEN stub_full ELSE stub_brief END AS signature,\n          CASE WHEN btrim($1)='' THEN 0::real ELSE ts_rank(search,websearch_to_tsquery('simple',$1)) END AS rank\n          FROM tools t WHERE ($5::uuid[] IS NULL OR source_id=ANY($5)) AND (btrim($1)='' OR search @@ websearch_to_tsquery('simple',$1))\n          AND ($6::uuid IS NULL OR NOT EXISTS(SELECT 1 FROM tool_policies p JOIN endpoints e ON e.id=p.endpoint_id WHERE e.id=$6 AND p.source_id=t.source_id AND p.upstream_name=t.upstream_name AND p.action='block'))\n          AND ($6::uuid IS NULL OR NOT EXISTS(SELECT 1 FROM endpoints e WHERE e.id=$6 AND NOT e.all_tools AND NOT EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name)))\n        ) SELECT path,description,signature AS \"signature!\",rank AS \"rank!\" FROM ranked\n          WHERE $3::real IS NULL OR rank < $3 OR (rank=$3 AND path>$4)\n          ORDER BY rank DESC,path LIMIT 21",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tools",
+            "name": "path"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tools",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "signature!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "rank!",
+        "type_info": "Float4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Bool",
+        "Float4",
+        "Text",
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "be7c5fcf52c5f81d43e7e5819e86c1d321cd94ed485a83d1303896e7e27edf09"
+}

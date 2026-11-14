@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO sources(id,slug,kind,config,python_name) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET slug=EXCLUDED.slug,kind=EXCLUDED.kind,config=EXCLUDED.config,revision=sources.revision+1,status='pending',last_error=NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f027efa2d85283766a5e0caa9946857df45d44602359c38adefdcc17c19b1ade"
+}

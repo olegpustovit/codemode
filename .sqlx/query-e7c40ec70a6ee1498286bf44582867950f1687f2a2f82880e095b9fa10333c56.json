@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH workspace AS (SELECT id FROM endpoints WHERE id=$1 FOR KEY SHARE) INSERT INTO access_tokens(name,audience,token_hash,workspace_id,resource) SELECT $2,$3,$4,id,$5 FROM workspace RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Bytea",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e7c40ec70a6ee1498286bf44582867950f1687f2a2f82880e095b9fa10333c56"
+}

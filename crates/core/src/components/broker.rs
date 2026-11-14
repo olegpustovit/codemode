@@ -1,0 +1,493 @@
+mod http;
+use super::{
+    accounts::Accounts,
+    catalogue::Definition,
+    policies::{Action, Policies},
+    workspaces::Workspaces,
+};
+use crate::infrastructure::{
+    postgres::Database,
+    sandbox::{CallResult, PendingCall},
+};
+use rmcp::{
+    model::CallToolRequestParams,
+    service::{Peer, RoleClient},
+};
+use secrecy::{ExposeSecret, SecretString};
+use serde_json::{Value, value::RawValue};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use uuid::Uuid;
+
+#[derive(Debug, thiserror::Error)]
+enum CallError {
+    #[error("{0}")]
+    Blocked(String),
+    #[error("{0}")]
+    Invalid(String),
+    #[error("{0}")]
+    Upstream(String),
+    #[error("upstream call timed out after {0} seconds")]
+    Timeout(u64),
+}
+
+#[derive(Clone)]
+pub(crate) enum Credentials {
+    Http,
+    Stdio(Arc<Vec<SecretString>>),
+}
+
+#[derive(Clone)]
+pub struct Tool {
+    pub(crate) source_id: Uuid,
+    pub revision: i64,
+    pub(crate) binding: [u8; 32],
+    pub definition: Definition,
+    pub(crate) validator: Arc<jsonschema::Validator>,
+    pub(crate) target: Target,
+}
+#[derive(Clone)]
+pub(crate) enum Target {
+    Mcp {
+        peer: Peer<RoleClient>,
+        replies: crate::infrastructure::upstream::Replies,
+        credentials: Credentials,
+    },
+    Graphql {
+        kind: super::graphql::Kind,
+        client: reqwest::Client,
+        url: String,
+        required: bool,
+    },
+    OpenApi {
+        operation: Arc<super::openapi::Operation>,
+        client: reqwest::Client,
+        server: String,
+        required: bool,
+    },
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(crate) struct Prepared {
+    pub call: PendingCall,
+    pub binding: Option<[u8; 32]>,
+    pub error: Option<String>,
+    pub needs_approval: bool,
+}
+
+pub(crate) enum Authority {
+    Unapproved,
+    Approved([u8; 32]),
+    Rejected(String),
+}
+
+#[derive(Clone)]
+pub(crate) struct Broker {
+    db: Database,
+    accounts: Accounts,
+    origin: String,
+    policies: Policies,
+}
+impl Broker {
+    pub fn new(
+        db: Database,
+        accounts: Accounts,
+        endpoints: Workspaces,
+        policies: Policies,
+    ) -> Self {
+        Self {
+            origin: format!("https://{}", endpoints.main_hostname()),
+            db,
+            accounts,
+            policies,
+        }
+    }
+    pub fn http(
+        &self,
+        source: Uuid,
+        required: bool,
+        replies: crate::infrastructure::upstream::Replies,
+    ) -> Result<http::Client, reqwest::Error> {
+        http::Client::new(
+            self.accounts.clone(),
+            source,
+            required,
+            self.account_link(source),
+            replies,
+        )
+    }
+    pub async fn environment(
+        &self,
+        source: Uuid,
+    ) -> Result<std::collections::BTreeMap<String, SecretString>, super::accounts::Error> {
+        self.accounts.environment(source).await
+    }
+    pub(crate) fn account_link(&self, source: Uuid) -> String {
+        format!("{}/sources/{source}/accounts", self.origin)
+    }
+    pub async fn dispatch(
+        &self,
+        execution: Uuid,
+        seq: usize,
+        call: PendingCall,
+        tool: Result<Tool, String>,
+        timeout: Duration,
+        workspace: Uuid,
+        authority: Authority,
+    ) -> (u32, CallResult) {
+        let started = Instant::now();
+        let args: Result<Value, _> = serde_json::from_str(call.args.get());
+        let redacted = args.as_ref().map(redact).unwrap_or(Value::Null);
+        let audit=sqlx::query_scalar!("INSERT INTO tool_calls(execution_id,seq,path,args_redacted,outcome) VALUES($1,$2,$3,$4,'running') ON CONFLICT(execution_id,seq) DO UPDATE SET outcome='running',error=NULL WHERE tool_calls.outcome='awaiting_approval' RETURNING id",execution,seq as i32,call.path,redacted).fetch_one(&self.db.0).await;
+        let Ok(id) = audit else {
+            return (
+                call.id,
+                Err("audit unavailable; tool was not called".into()),
+            );
+        };
+        let result = if let Authority::Rejected(message) = authority {
+            Err(CallError::Blocked(message))
+        } else {
+            match args {
+                Ok(args) => match tool {
+                    Ok(tool) => {
+                        let revision = sqlx::query_scalar!(
+                        "SELECT s.revision FROM sources s JOIN endpoints e ON e.id=$2 WHERE s.id=$1 AND (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.source_id=s.id AND es.endpoint_id=e.id))",
+                        tool.source_id,workspace
+                    )
+                    .fetch_optional(&self.db.0)
+                    .await;
+                        match revision {
+                            Ok(Some(revision)) if revision == tool.revision => {
+                                if let Err(error) = tool.validate(&args) {
+                                    Err(CallError::Invalid(error))
+                                } else {
+                                    match self.policies.effective(workspace,tool.source_id,&tool.definition.upstream_name,tool.definition.read_only,tool.definition.destructive).await {
+                                Ok(Action::Block)=>Err(CallError::Blocked(unavailable(&call.path))),
+                                Ok(action)=>match authority {
+                                    Authority::Approved(binding) if binding!=tool.binding=>Err(CallError::Blocked("tool changed since approval; call was not dispatched".into())),
+                                    Authority::Unapproved if action==Action::Approve=>Err(CallError::Blocked("browser approval required; call was not dispatched".into())),
+                                    _=>tool.call(args,timeout,&self.account_link(tool.source_id),&self.accounts).await,
+                                },
+                                Err(_)=>Err(CallError::Blocked("policy unavailable; tool was not called".into())),
+                            }
+                                }
+                            }
+                            Ok(Some(_)) => Err(CallError::Upstream(format!(
+                                "source changed; search again after synchronization; account: {}",
+                                self.account_link(tool.source_id)
+                            ))),
+                            Ok(None) => Err(CallError::Blocked(unavailable(&call.path))),
+                            Err(_) => Err(CallError::Upstream(
+                                "source state unavailable; tool was not called".into(),
+                            )),
+                        }
+                    }
+                    Err(error) => Err(CallError::Upstream(error)),
+                },
+                Err(_) => Err(CallError::Invalid("tool arguments are invalid JSON".into())),
+            }
+        };
+        let outcome = match &result {
+            Ok(_) => "ok",
+            Err(CallError::Invalid(_)) => "invalid_args",
+            Err(CallError::Blocked(_)) => "blocked",
+            Err(CallError::Timeout(_)) => "timeout",
+            Err(CallError::Upstream(_)) => "tool_error",
+        };
+        let error = result.as_ref().err().map(ToString::to_string);
+        let elapsed = started.elapsed().as_millis().min(i64::MAX as u128) as i64;
+        if sqlx::query!(
+            "UPDATE tool_calls SET outcome=$2,error=$3,duration_ms=$4 WHERE id=$1",
+            id,
+            outcome,
+            error,
+            elapsed
+        )
+        .execute(&self.db.0)
+        .await
+        .is_err()
+        {
+            return (call.id,Err("tool returned but its audit could not be finalized; do not automatically retry".into()));
+        }
+        (call.id, result.map_err(|error| error.to_string()))
+    }
+}
+
+pub fn redact(value: &Value) -> Value {
+    match value {
+        Value::Object(fields) => Value::Object(
+            fields
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        if secret_key(k) {
+                            Value::String("[REDACTED]".into())
+                        } else {
+                            redact(v)
+                        },
+                    )
+                })
+                .collect(),
+        ),
+        Value::Array(values) => Value::Array(values.iter().map(redact).collect()),
+        Value::String(s) if s.len() > 1024 => {
+            Value::String(format!("{}… [{} bytes]", prefix(s, 128), s.len()))
+        }
+        _ => value.clone(),
+    }
+}
+
+pub(crate) fn unavailable(path: &str) -> String {
+    format!("tool {path} is unavailable for this endpoint; use search to find allowed tools")
+}
+
+fn secret_key(key: &str) -> bool {
+    let key = key.to_ascii_lowercase().replace(['-', '_'], "");
+    [
+        "token",
+        "secret",
+        "password",
+        "authorization",
+        "apikey",
+        "cookie",
+    ]
+    .iter()
+    .any(|s| key.contains(s))
+}
+
+pub fn redact_message(message: &str, args: &Value) -> String {
+    fn visit(value: &Value, secret: bool, message: &mut String) {
+        match value {
+            Value::Object(fields) => {
+                for (key, value) in fields {
+                    visit(value, secret || secret_key(key), message);
+                }
+            }
+            Value::Array(values) => {
+                for value in values {
+                    visit(value, secret, message);
+                }
+            }
+            Value::String(value) if secret && !value.is_empty() => {
+                *message = message.replace(value, "[REDACTED]")
+            }
+            _ => {}
+        }
+    }
+    let mut message = message.to_owned();
+    visit(args, false, &mut message);
+    prefix(&message, 4096).to_owned()
+}
+
+fn prefix(value: &str, max: usize) -> &str {
+    let mut n = value.len().min(max);
+    while !value.is_char_boundary(n) {
+        n -= 1;
+    }
+    &value[..n]
+}
+
+impl Tool {
+    pub(crate) fn validate(&self, args: &Value) -> Result<(), String> {
+        if let Some(error) = self.validator.iter_errors(args).next() {
+            // Never render the validation error itself: it includes the supplied secret value.
+            use jsonschema::error::{TypeKind, ValidationErrorKind};
+            let expected = match error.kind() {
+                ValidationErrorKind::Type {
+                    kind: TypeKind::Single(kind),
+                } => format!("expected {kind}"),
+                ValidationErrorKind::Type {
+                    kind: TypeKind::Multiple(kinds),
+                } => format!(
+                    "expected {}",
+                    kinds
+                        .iter()
+                        .map(|kind| kind.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" or ")
+                ),
+                _ => format!("constraint {}", error.schema_path()),
+            };
+            return Err(format!(
+                "{}: invalid argument at {} ({expected})",
+                self.definition.path,
+                error.instance_path()
+            ));
+        }
+        if let Target::Graphql { kind, .. } = &self.target {
+            kind.document(args)?;
+        }
+        Ok(())
+    }
+    async fn call(
+        &self,
+        args: Value,
+        timeout: Duration,
+        link: &str,
+        accounts: &Accounts,
+    ) -> Result<Box<RawValue>, CallError> {
+        if let Target::Graphql {
+            kind,
+            client,
+            url,
+            required,
+        } = &self.target
+        {
+            let document = kind.document(&args).map_err(CallError::Invalid)?;
+            let mut body = serde_json::Map::new();
+            body.insert("query".into(), Value::String(document));
+            for key in ["variables", "operationName"] {
+                if let Some(value) = args.get(key).filter(|v| !v.is_null()) {
+                    body.insert(key.into(), value.clone());
+                }
+            }
+            let call = async {
+                let credential = accounts.rest(self.source_id, url).await.map_err(|_| {
+                    CallError::Upstream(format!("linked credential unavailable; link it at {link}"))
+                })?;
+                if *required && credential.is_none() {
+                    return Err(CallError::Upstream(format!(
+                        "account is not linked; link it at {link}"
+                    )));
+                }
+                let mut request = client
+                    .post(url)
+                    .header(
+                        reqwest::header::ACCEPT,
+                        "application/graphql-response+json, application/json",
+                    )
+                    .json(&body)
+                    .build()
+                    .map_err(|_| {
+                        CallError::Invalid("GraphQL request could not be encoded".into())
+                    })?;
+                if let Some(credential) = &credential {
+                    credential.apply(&mut request).map_err(|_| {
+                        CallError::Upstream(format!(
+                            "linked credential unavailable; link it at {link}"
+                        ))
+                    })?;
+                }
+                let (bytes, status) =
+                    super::graphql::call(client, request)
+                        .await
+                        .map_err(|error| {
+                            CallError::Upstream(format!("{}: {error}", self.definition.path))
+                        })?;
+                super::graphql::result(&bytes, status).map_err(|error| {
+                    let message = error.to_string();
+                    let message = credential
+                        .as_ref()
+                        .map_or_else(|| message.clone(), |c| c.redact(&message));
+                    CallError::Upstream(format!(
+                        "{}: {}",
+                        self.definition.path,
+                        redact_message(&message, &args)
+                    ))
+                })
+            };
+            return tokio::time::timeout(timeout, call)
+                .await
+                .map_err(|_| CallError::Timeout(timeout.as_secs()))?;
+        }
+        let arguments = args
+            .as_object()
+            .cloned()
+            .ok_or_else(|| CallError::Invalid("tool arguments must be an object".into()))?;
+        let Target::Mcp {
+            peer,
+            replies,
+            credentials,
+        } = &self.target
+        else {
+            let Target::OpenApi {
+                operation,
+                client,
+                server,
+                required,
+            } = &self.target
+            else {
+                return Err(CallError::Upstream("invalid tool target".into()));
+            };
+            let call = async {
+                let mut request = operation
+                    .request(client, &arguments)
+                    .map_err(|error| CallError::Invalid(error.to_string()))?;
+                let credential = accounts.rest(self.source_id, server).await.map_err(|_| {
+                    CallError::Upstream(format!("linked credential unavailable; link it at {link}"))
+                })?;
+                if *required && credential.is_none() {
+                    return Err(CallError::Upstream(format!(
+                        "account is not linked; link it at {link}"
+                    )));
+                }
+                if let Some(credential) = credential {
+                    credential.apply(&mut request).map_err(|_| {
+                        CallError::Upstream(format!(
+                            "linked credential unavailable; link it at {link}"
+                        ))
+                    })?;
+                }
+                operation.call(client, request).await.map_err(|error| {
+                    CallError::Upstream(format!(
+                        "{}: {error}; account: {link}",
+                        self.definition.path
+                    ))
+                })
+            };
+            return tokio::time::timeout(timeout, call)
+                .await
+                .map_err(|_| CallError::Timeout(timeout.as_secs()))?;
+        };
+        let result = tokio::time::timeout(
+            timeout,
+            peer.call_tool(
+                CallToolRequestParams::new(self.definition.upstream_name.clone())
+                    .with_arguments(arguments),
+            ),
+        )
+        .await
+        .map_err(|_| CallError::Timeout(timeout.as_secs()))?
+        .map_err(|_| {
+            CallError::Upstream(format!(
+                "upstream connection failed; check the account at {link}"
+            ))
+        })?;
+        replies
+            .take(result)
+            .map_err(CallError::Upstream)?
+            .result()
+            .map_err(|message| {
+                let mut message = redact_message(&message, &args);
+                if let Credentials::Stdio(secrets) = credentials {
+                    for secret in secrets.iter().filter(|s| !s.expose_secret().is_empty()) {
+                        message = message.replace(secret.expose_secret(), "[REDACTED]");
+                    }
+                }
+                CallError::Upstream(format!(
+                    "{}: upstream tool failed: {message}",
+                    self.definition.path
+                ))
+            })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn redacts_nested_secrets_in_arguments_and_error_messages() {
+        let args = json!({"nested":[{"api-key":"sekret","name":"fine"}],"long":"é".repeat(2000)});
+        assert_eq!(redact(&args)["nested"][0]["api-key"], "[REDACTED]");
+        assert_eq!(
+            redact_message("failed with sekret", &args),
+            "failed with [REDACTED]"
+        );
+        assert!(redact(&args)["long"].as_str().unwrap().len() < 160);
+    }
+}

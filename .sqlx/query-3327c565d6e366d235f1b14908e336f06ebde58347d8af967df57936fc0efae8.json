@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM paused_runs WHERE execution_id=$1 AND pause_id=$2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3327c565d6e366d235f1b14908e336f06ebde58347d8af967df57936fc0efae8"
+}

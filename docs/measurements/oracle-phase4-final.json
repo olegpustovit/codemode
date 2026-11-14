@@ -1,0 +1,70 @@
+{
+  "scope": "Phase 4 final boxed-source qualification and deployed release",
+  "date": "2026-11-14",
+  "host": "oracle-vm",
+  "native_fast_cases": 87,
+  "oracle_fast_cases": 87,
+  "oracle_extended_cases": 90,
+  "browser_workflows": 5,
+  "kernel_probe": "eight launcher deaths and one gateway-owner death, stdin held open",
+  "ui_fingerprint": "5fc24f83f212",
+  "limits": {
+    "worker_memory_bytes": 67108864,
+    "worker_tasks": 16,
+    "worker_swap_bytes": 0,
+    "warm_max_us": 5000,
+    "unit_deadline_s": 2,
+    "integration_deadline_s": 5
+  },
+  "metrics": {
+    "latency": {
+      "architecture": "aarch64",
+      "max_us": 2001,
+      "median_us": 341,
+      "p95_us": 473,
+      "samples": 100
+    },
+    "deadline": {
+      "deadline_ms": 20,
+      "stopped": 100,
+      "trials": 100,
+      "worst_total_ms": 79.245327
+    },
+    "soak": {
+      "elapsed_s": 5.188516297,
+      "growth_kib": 400,
+      "rss_kib": [
+        13704,
+        14100,
+        14104,
+        14104,
+        14104,
+        14104,
+        14104,
+        14104,
+        14104,
+        14104,
+        14104
+      ],
+      "runs": 10000,
+      "warmup": 200
+    }
+  },
+  "source_sha256": {
+    "deploy/worker.sh": "d7ab4dbfd859dd41ceffb14741b2aa50cb47e649efe57a5bb4845d4d8380959f",
+    "deploy/worker-guard.py": "11c6a1aa4e5c26e93251d438cdb3b2cde353c2a095f621658128be0c842b037e",
+    "tools/worker-seccomp.py": "ffd2bc298d13ca51dc6e632e2b7c395b6156a44c3e67c95f615593ac32a98e1e",
+    "crates/core/src/infrastructure/sandbox.rs": "007e9d96559d9d1d7c85d8d70d40f892020d8e8b177226b009c0a604e691e77b",
+    "crates/core/src/components/graphql.rs": "c833e4c6935b3442b08e3554e790a8a6564033505a441fcf2e5fbb0cecf537ca",
+    "crates/core/src/components/scripts.rs": "7e181074622e17de743f04ae7e24aed5d8fa74df192b69dbc0769d99d62d8599",
+    "crates/core/src/components/execution.rs": "28dde6dad62aa1cf6bc998aba6825a1824df45ceac30a225c89cce1bb70af986",
+    "crates/gateway/src/server.rs": "d3d8684a49f9cc5351a8465df2d261e270a78afb2dee0350701f3844969229e3",
+    "crates/gateway/src/server/tasks.rs": "4b9a9645e752f308b8b86f10d25754aae2cda0d4c57b005722e365182c90e244"
+  },
+  "kernel_probe_evidence": "target/phase4-guard-owner-probe-final.log; isolation files unchanged since probe",
+  "gateway_sha256": "8d674fef37e9954929a1ef9c19c7276b94bddbc6ead4c31ff7f18656d555a62c",
+  "schema_version": 13,
+  "port": 2093,
+  "optimized_browser_workflows": 5,
+  "public_https_smoke": true
+}

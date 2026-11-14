@@ -138,7 +138,7 @@ fn split_args(args: &[OsString]) -> (Vec<OsString>, Option<String>) {
 }
 
 fn build(cargo_args: &[OsString]) -> Result<Vec<Exe>, u8> {
-    let mut command = Command::new(env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+    let mut command = cargo_command();
     if env::var("T_ZIGBUILD").is_ok_and(|v| v == "1") {
         command.args(["zigbuild", "--tests", "--message-format=json"]);
     } else {
@@ -164,6 +164,11 @@ fn build(cargo_args: &[OsString]) -> Result<Vec<Exe>, u8> {
     };
     let text = reader.join().unwrap_or_default();
     if !ok {
+        for line in text.lines().filter(|line| line.contains("\"reason\":\"compiler-message\"")) {
+            if let Some(rendered) = json_str(line, "\"rendered\":") {
+                eprint!("{rendered}");
+            }
+        }
         return Err(101);
     }
     let mut exes = Vec::new();
@@ -180,6 +185,19 @@ fn build(cargo_args: &[OsString]) -> Result<Vec<Exe>, u8> {
     Ok(exes)
 }
 
+fn cargo_command() -> Command {
+    let mut command = Command::new(env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+    // cargo-run package metadata otherwise invalidates build-script caches in the child Cargo.
+    for (name, _) in env::vars_os().filter(|(name, _)| cargo_run_metadata(name)) {
+        command.env_remove(name);
+    }
+    command
+}
+
+fn cargo_run_metadata(name: &std::ffi::OsStr) -> bool {
+    name.to_str().is_some_and(|name| name == "CARGO_MANIFEST_DIR" || name.starts_with("CARGO_PKG_"))
+}
+
 /// The string value that follows `key` in one line of cargo's JSON. Enough for paths and names.
 fn json_str(line: &str, key: &str) -> Option<String> {
     let rest = &line[line.find(key)? + key.len()..];
@@ -189,7 +207,12 @@ fn json_str(line: &str, key: &str) -> Option<String> {
     while let Some(c) = chars.next() {
         match c {
             '"' => return Some(value),
-            '\\' => value.push(chars.next()?),
+            '\\' => value.push(match chars.next()? {
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                c => c,
+            }),
             c => value.push(c),
         }
     }
@@ -333,9 +356,8 @@ fn touch(args: &[OsString]) -> u8 {
             cargo_args.push(arg.clone());
         }
     }
-    let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
     let build = |quiet: bool| {
-        let mut command = Command::new(&cargo);
+        let mut command = cargo_command();
         command.arg("build").args(&cargo_args);
         if quiet {
             command.stderr(Stdio::null());
@@ -388,5 +410,23 @@ mod tests {
         let (cargo, filter) = split_args(&args);
         assert_eq!(cargo, args[..4]);
         assert_eq!(filter.as_deref(), Some("a_case"));
+    }
+}
+
+#[cfg(test)]
+mod diagnostic_tests {
+    use super::*;
+    #[test]
+    fn compiler_diagnostics_keep_line_breaks_and_quotes() {
+        assert_eq!(json_str(r#"{"rendered":"error: \"bad\"\n\tfile.rs\n"}"#, "\"rendered\":"), Some("error: \"bad\"\n\tfile.rs\n".into()));
+    }
+    #[test]
+    fn child_cargo_drops_only_parent_package_metadata() {
+        for name in ["CARGO_MANIFEST_DIR", "CARGO_PKG_NAME", "CARGO_PKG_VERSION_MAJOR"] {
+            assert!(cargo_run_metadata(std::ffi::OsStr::new(name)));
+        }
+        for name in ["CARGO_TARGET_DIR", "CARGO_HOME", "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG"] {
+            assert!(!cargo_run_metadata(std::ffi::OsStr::new(name)));
+        }
     }
 }

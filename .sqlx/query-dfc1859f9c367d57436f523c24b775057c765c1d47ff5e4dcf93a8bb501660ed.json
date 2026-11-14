@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tool_calls SET outcome='cancelled',error='Execution ended while call was in flight; upstream may have completed' WHERE execution_id=$1 AND outcome IN ('running','awaiting_approval') AND NOT EXISTS(SELECT 1 FROM paused_runs p WHERE p.execution_id=$1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dfc1859f9c367d57436f523c24b775057c765c1d47ff5e4dcf93a8bb501660ed"
+}

@@ -1,0 +1,33 @@
+{
+  "results": [
+    {
+      "provider": "nudge",
+      "discovery": "pass",
+      "registrationMode": "DCR",
+      "pkce": "S256",
+      "resourceBinding": "https://nudge.microapps.space/mcp",
+      "denialAndReplay": "pass",
+      "accountLinked": false
+    },
+    {
+      "provider": "researcher",
+      "discovery": "pass",
+      "registrationMode": "DCR",
+      "pkce": "S256",
+      "resourceBinding": "https://researcher.microapps.space/mcp/ro",
+      "denialAndReplay": "pass",
+      "accountLinked": false
+    },
+    {
+      "provider": "artifacts",
+      "discovery": "pass",
+      "registrationMode": "DCR",
+      "pkce": "S256",
+      "resourceBinding": "https://artifacts.microapps.space/mcp",
+      "denialAndReplay": "pass",
+      "accountLinked": false
+    }
+  ],
+  "productionModified": false,
+  "ownerConsentStillRequired": true
+}

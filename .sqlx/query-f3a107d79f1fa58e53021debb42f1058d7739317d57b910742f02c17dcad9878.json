@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE executions e SET status='expired',error='Approval expired or caller was revoked',finished_at=now() WHERE e.status='paused' AND (NOT EXISTS(SELECT 1 FROM paused_runs p WHERE p.execution_id=e.id AND p.expires_at>now()) OR NOT EXISTS(SELECT 1 FROM access_tokens a JOIN endpoints ep ON ep.id=a.workspace_id WHERE a.id=e.token_id AND a.revoked_at IS NULL AND (a.expires_at IS NULL OR a.expires_at>now()) AND (a.oauth_grant IS NULL OR EXISTS(SELECT 1 FROM oauth_grants g WHERE g.id=a.oauth_grant AND g.endpoint_id=ep.id AND g.revoked_at IS NULL AND g.expires_at>now())))) RETURNING e.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "executions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f3a107d79f1fa58e53021debb42f1058d7739317d57b910742f02c17dcad9878"
+}

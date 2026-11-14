@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO paused_runs(execution_id,pause_id,token_id,audience,expires_at,context,snapshot,signature) VALUES($1,$2,$3,$4,to_timestamp($5::bigint::double precision),$6,$7,$8)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Int8",
+        "Bytea",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c1f4afdada4188fbfdaa03831dd77a745248750f00a224fc9bb0c421533d86b5"
+}

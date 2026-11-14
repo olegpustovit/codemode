@@ -1,0 +1,25 @@
+name: codemode
+description: Codemode MCP Gateway
+command: /home/snowbear/.local/share/codemode/bin/codemode
+workdir: /home/snowbear/.local/share/codemode
+environment:
+  CODEMODE_BIND: "127.0.0.1:2093"
+  CODEMODE_HOSTNAME: "codemode.microapps.space"
+  CODEMODE_DATABASE_URL: "postgresql://snowbear@localhost/codemode?host=/var/run/postgresql"
+  CODEMODE_SOURCES_FILE: "/home/snowbear/.local/share/codemode/sources.toml"
+  CODEMODE_MONTY_BIN: "/home/snowbear/.local/share/codemode/bin/worker.sh"
+  CODEMODE_SNAPSHOT_KEY: ${CODEMODE_SNAPSHOT_KEY}
+  CODEMODE_ENCRYPTION_KEY: ${CODEMODE_ENCRYPTION_KEY}
+  CODEMODE_LOG_JSON: "true"
+restart: always
+no_new_privileges: true
+private_tmp: true
+limit_nofile: 65536
+timeout_stop: 90
+kill_mode: control-group
+tasks:
+  - name: backup
+    command: /home/snowbear/.local/share/codemode/backup.sh
+    schedule:
+      on_calendar: "*-*-* 03:30:00"
+      persistent: true

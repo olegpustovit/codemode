@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sources SET revision=revision+1,status='pending',last_error=NULL WHERE id=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e3f47b6bb08bcc8f812c27c7d1712cec2e49aad59debe27a73944cdc40e6a3e8"
+}

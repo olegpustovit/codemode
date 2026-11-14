@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id,token_hash,audience,tenant_id,workspace_id AS \"workspace_id!\",resource FROM access_tokens WHERE workspace_id IS NOT NULL AND token_hash=$1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "token_hash",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "token_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "audience",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "audience"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "tenant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "tenant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "workspace_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "resource",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "resource"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "129310c026c544106598a4673e0baa281f7bb866cb283dcd6065c482578abc42"
+}

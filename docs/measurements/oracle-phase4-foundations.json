@@ -1,0 +1,60 @@
+{
+  "scope": "Phase 4 foundations and GraphQL; local qualification only, not deployed",
+  "date": "2026-11-14",
+  "host": "oracle-vm",
+  "native_fast_cases": 83,
+  "oracle_fast_cases": 83,
+  "oracle_extended_cases": 86,
+  "browser_workflows": 4,
+  "kernel_probe": "eight launcher deaths and one gateway-owner death, stdin held open",
+  "ui_fingerprint": "6a9732bacbbf",
+  "limits": {
+    "worker_memory_bytes": 67108864,
+    "worker_tasks": 16,
+    "worker_swap_bytes": 0,
+    "warm_max_us": 5000,
+    "unit_deadline_s": 2,
+    "integration_deadline_s": 5
+  },
+  "metrics": {
+    "latency": {
+      "architecture": "aarch64",
+      "max_us": 543,
+      "median_us": 313,
+      "p95_us": 450,
+      "samples": 100
+    },
+    "deadline": {
+      "deadline_ms": 20,
+      "stopped": 100,
+      "trials": 100,
+      "worst_total_ms": 92.849976
+    },
+    "soak": {
+      "elapsed_s": 4.725065232,
+      "growth_kib": 588,
+      "rss_kib": [
+        13544,
+        14132,
+        14132,
+        14132,
+        14132,
+        14132,
+        14132,
+        14132,
+        14132,
+        14132,
+        14132
+      ],
+      "runs": 10000,
+      "warmup": 200
+    }
+  },
+  "source_sha256": {
+    "deploy/worker.sh": "d7ab4dbfd859dd41ceffb14741b2aa50cb47e649efe57a5bb4845d4d8380959f",
+    "deploy/worker-guard.py": "11c6a1aa4e5c26e93251d438cdb3b2cde353c2a095f621658128be0c842b037e",
+    "tools/worker-seccomp.py": "ffd2bc298d13ca51dc6e632e2b7c395b6156a44c3e67c95f615593ac32a98e1e",
+    "crates/core/src/infrastructure/sandbox.rs": "007e9d96559d9d1d7c85d8d70d40f892020d8e8b177226b009c0a604e691e77b",
+    "crates/core/src/components/graphql.rs": "c833e4c6935b3442b08e3554e790a8a6564033505a441fcf2e5fbb0cecf537ca"
+  }
+}

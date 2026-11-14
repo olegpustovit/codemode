@@ -1,0 +1,71 @@
+{
+  "date": "2026-11-14",
+  "schema": 16,
+  "native": {
+    "cases": 90,
+    "failures": 0,
+    "buildSeconds": 33.27,
+    "totalSeconds": 53.25,
+    "slowestSeconds": 1.923
+  },
+  "oracleHardened": {
+    "cases": 90,
+    "failures": 0,
+    "buildAndStageSeconds": 225.7,
+    "totalSeconds": 255.19,
+    "slowestSeconds": 2.139
+  },
+  "browser": {
+    "flows": 7,
+    "failures": 0,
+    "totalSeconds": 30.9
+  },
+  "ui": {
+    "fingerprint": "f22d8e0dde58",
+    "initialJsGzipBytes": 158294,
+    "cssGzipBytes": 14939,
+    "lazyChunkBudgetBytes": 102400
+  },
+  "visualReview": {
+    "disposition": "ship",
+    "materialFixes": 0,
+    "captures": 8,
+    "detectorFindings": 0
+  },
+  "buildLatency": {
+    "status": "over budget",
+    "coreBudgetSeconds": 10,
+    "gatewayBudgetSeconds": 5,
+    "coreSeconds": [
+      10.189,
+      17.007,
+      79.169,
+      30.552
+    ],
+    "gatewaySeconds": 6.76,
+    "notes": "Measurements were noisy on the shared four-CPU host; the 79.169-second run overlapped SQLx preparation and is not an isolated rebuild measurement. The cold-operation boxing trial worsened gateway rebuild time to 7.42 seconds and was reverted. No budget or deadline was raised."
+  },
+  "realProviderConsentPerformed": false,
+  "productionMutationsByTests": false,
+  "releaseQualification": {
+    "buildSeconds": 359,
+    "browserFlows": 7,
+    "browserFailures": 0,
+    "browserSeconds": 33.1,
+    "sha256": "20e07441525c8d2125baa1b3aaaf41d6d4d50bd50d298e98df011b3f8e85390b"
+  },
+  "production": {
+    "schema": 16,
+    "runningBinaryMatches": true,
+    "serviceActive": true,
+    "backupTimerActive": true,
+    "publicSmoke": "pass",
+    "publicAnonymousBrowser": "pass",
+    "usersBefore": 1,
+    "usersAfter": 1,
+    "sourcesAfter": 0,
+    "accountsAfter": 0,
+    "agentCreatedAccounts": 0,
+    "providerConsentPerformed": false
+  }
+}

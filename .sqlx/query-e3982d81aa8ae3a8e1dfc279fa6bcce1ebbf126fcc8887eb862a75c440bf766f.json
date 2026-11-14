@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO tool_calls(execution_id,seq,path,args_redacted,outcome) VALUES($1,$2,$3,$4,'awaiting_approval')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e3982d81aa8ae3a8e1dfc279fa6bcce1ebbf126fcc8887eb862a75c440bf766f"
+}

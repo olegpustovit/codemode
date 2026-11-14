@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO oauth_tokens(token_hash,grant_id) VALUES($1,$2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f4395114007057dd144503acdeadbb5eacea19d9c8d212bf89bd4b3c5285c60b"
+}

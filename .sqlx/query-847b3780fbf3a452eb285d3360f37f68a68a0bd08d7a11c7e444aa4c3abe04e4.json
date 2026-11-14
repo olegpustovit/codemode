@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT all_sources FROM endpoints WHERE id=$1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "all_sources",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "endpoints",
+            "name": "all_sources"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "847b3780fbf3a452eb285d3360f37f68a68a0bd08d7a11c7e444aa4c3abe04e4"
+}

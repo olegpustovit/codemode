@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM saved_scripts WHERE endpoint_id=$1 AND id=$2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b40f633e60cf4f4b71bfc90a5fb2873ead987311d80d2b2941a74a9d8d9ea0ac"
+}

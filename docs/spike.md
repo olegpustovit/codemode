@@ -2,7 +2,9 @@
 
 2026-11-13. Implementation plan [revision 5](https://artifacts.microapps.space/a/saqdh2xm7jcd).
 
-Status: all nine criteria pass on `oracle-vm`, and the real-server Python trial passes after fixture corrections. The owner's reading of this report is the remaining Phase 0 gate. This is the Phase 0 spike, not the completed gateway.
+Status: all nine criteria pass on `oracle-vm`, and the real-server Python trial passes after fixture corrections. The owner has read this report and authorized continuing through manual acceptance gates. This is the historical Phase 0 report, not evidence that the full gateway is complete.
+
+The throwaway `crates/spike` implementation was retired during Phase 1. Its source and original qualification commands remain available at commit `090d7435c871`; current worker regressions exercise the production adapter in `crates/core/tests/it/pool.rs`. The new-pool snapshot regression is separate from the historical cross-process proof; Phase 3 must also verify persisted approval resume after a gateway restart.
 
 ## Measured criteria
 

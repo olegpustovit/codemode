@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS(SELECT 1 FROM oauth_clients WHERE client_id=$1 AND updated_at>now()-interval '5 minutes') AS \"fresh!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fresh!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0b0f66c4e5195ee11b2a6ff2f0849b2e27b4dce09d436f036be8eea7539fde11"
+}

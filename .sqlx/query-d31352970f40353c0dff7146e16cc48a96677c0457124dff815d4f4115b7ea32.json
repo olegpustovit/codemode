@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM endpoint_tools WHERE endpoint_id=$1 AND source_id=$2 AND upstream_name=$3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d31352970f40353c0dff7146e16cc48a96677c0457124dff815d4f4115b7ea32"
+}

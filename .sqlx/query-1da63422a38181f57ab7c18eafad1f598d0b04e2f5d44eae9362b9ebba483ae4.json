@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE access_tokens SET revoked_at=COALESCE(revoked_at,now()) WHERE oauth_grant=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1da63422a38181f57ab7c18eafad1f598d0b04e2f5d44eae9362b9ebba483ae4"
+}

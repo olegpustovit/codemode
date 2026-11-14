@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id,s.config AS \"config: sqlx::types::Json<Source>\",s.status,s.last_error,\n            to_char(s.synced_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS synced_at,\n            (SELECT count(*) FROM tools t WHERE t.source_id=s.id) AS \"tool_count!\",s.revision,s.python_name AS \"python_name!\"\n            FROM sources s ORDER BY s.slug LIMIT 64",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "config: sqlx::types::Json<Source>",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "config"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "last_error",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "last_error"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "synced_at",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "tool_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "revision",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "revision"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "python_name!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "python_name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      null,
+      null,
+      false,
+      true
+    ]
+  },
+  "hash": "d819d97a879eef385c7f3a3d58e7685b0a5870234d9dc1cb7a9c02dd295b5476"
+}

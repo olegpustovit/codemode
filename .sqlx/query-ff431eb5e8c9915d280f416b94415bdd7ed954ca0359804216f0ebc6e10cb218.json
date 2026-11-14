@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.id FROM endpoints e JOIN oauth_grants g ON g.endpoint_id=e.id WHERE g.id=$1 FOR KEY SHARE OF e",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "endpoints",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ff431eb5e8c9915d280f416b94415bdd7ed954ca0359804216f0ebc6e10cb218"
+}

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.revision FROM sources s JOIN endpoints e ON e.id=$2 WHERE s.id=$1 AND (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.source_id=s.id AND es.endpoint_id=e.id))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "revision",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "revision"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c4032ce7870a686713f6f393372d0c3ca4cf460cc7c555490a13d92eeffddfd5"
+}

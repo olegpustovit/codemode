@@ -6,7 +6,7 @@ The [replacement proposal](https://artifacts.microapps.space/a/hkwwwp90n0dt) pha
 
 Qualification: **103 native**, **103 hardened Oracle**, **90 exhaustive core**, **18 UI tests**, **10 optimized-native browser workflows**. The fresh visual reviewer scored eight fixes resolved and returned ship for that fix list. Worker warm-start p95 is **437µs**; 10,000 checkouts grow RSS **268KiB**. These do not establish M-series shader performance. Historical incremental rebuild budget limitations remain.
 
-Owner provider/external-agent/M-series acceptance remains unperformed; Sentry and Nudge discovery return HTTP403. The implementation ledger and `docs/measurements/proposal-qualification.json` retain exact evidence and limits. The following sections are historical; their old schema, approval and daytime UI statements do not describe this release.
+All seven registry discovery checks pass from Oracle after the probe gained an explicit user agent; the default Python user agent caused the earlier Sentry/Nudge Cloudflare 403s. Both focused probe tests pass in 0.010s. Owner provider/external-agent/M-series acceptance remains unperformed. The implementation ledger and `docs/measurements/proposal-qualification.json` retain exact evidence and limits. The following sections are historical; their old schema, approval and daytime UI statements do not describe this release.
 
 Source: [implementation plan, revision 5](https://artifacts.microapps.space/a/saqdh2xm7jcd), reread on 2026-11-14.
 

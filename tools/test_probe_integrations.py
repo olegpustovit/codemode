@@ -34,4 +34,5 @@ class ProbeTests(unittest.TestCase):
             self.assertEqual(payload['method'], 'initialize')
             self.assertEqual(request.full_url, 'https://provider.example/mcp')
             self.assertFalse(request.has_header('Authorization'))
+            self.assertEqual(request.get_header('User-agent'), 'codemode-discovery-probe/1')
             self.assertEqual(send.call_args.kwargs['timeout'], 8)

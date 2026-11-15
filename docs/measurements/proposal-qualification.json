@@ -80,18 +80,22 @@
     "totalSeconds": 0.18
   },
   "discovery": {
-    "overall": "failed",
+    "overall": "passed",
+    "environment": "oracle-vm",
+    "log": "target/proposal-oracle-discovery-fixed.log",
+    "unitCases": 2,
+    "unitSeconds": 0.01,
     "passing": [
       "github authentication challenge",
       "linear",
+      "sentry",
       "notion",
       "deepwiki",
-      "context7"
+      "context7",
+      "nudge"
     ],
-    "failures": {
-      "sentry": "HTTP 403 instead of 401",
-      "nudge": "HTTP 403 instead of 401"
-    },
+    "failures": {},
+    "previousFailure": "The default Python user agent triggered Cloudflare HTTP 403 for Sentry and Nudge; an explicit codemode-discovery-probe/1 user agent restores their expected 401 challenges and metadata discovery.",
     "providerConsentAttempted": false
   },
   "externalAcceptance": {

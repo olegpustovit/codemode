@@ -1,5 +1,13 @@
 # Implementation status
 
+## Current release — final-v5 proposal, schema 19
+
+The [replacement proposal](https://artifacts.microapps.space/a/hkwwwp90n0dt) phases A–E are implemented, merged in [PR #1](https://github.com/olegpustovit/codemode/pull/1) and deployed at https://codemode.microapps.space. Code build **d89531faf9a8**, schema **19**, UI **76b8f0e8e2e9**, running SHA-256 **0df472af2cef4962c7d4a954ec04882c6b7366ef9af1f61817ba066e85f972c3**. The restored-backup preflight preserved 18 existing protected metadata tables. Public HTTPS serves byte-identical copies of all 77 staged files; desktop/mobile sign-in checks and service/backup/security-property checks pass. Deployment created no accounts or provider consent.
+
+Qualification: **103 native**, **103 hardened Oracle**, **90 exhaustive core**, **18 UI tests**, **10 optimized-native browser workflows**. The fresh visual reviewer scored eight fixes resolved and returned ship for that fix list. Worker warm-start p95 is **437µs**; 10,000 checkouts grow RSS **268KiB**. These do not establish M-series shader performance. Historical incremental rebuild budget limitations remain.
+
+Owner provider/external-agent/M-series acceptance remains unperformed; Sentry and Nudge discovery return HTTP403. The implementation ledger and `docs/measurements/proposal-qualification.json` retain exact evidence and limits. The following sections are historical; their old schema, approval and daytime UI statements do not describe this release.
+
 Source: [implementation plan, revision 5](https://artifacts.microapps.space/a/saqdh2xm7jcd), reread on 2026-11-14.
 
 ## Account registration and private tenancy — deployed
@@ -224,7 +232,7 @@ The exact release passed all seven browser workflows before deployment. Build to
 Evidence: `docs/measurements/workspaces-qualification.json`, `.impeccable/review/workspace-verdict.md`, and ignored `target/workspaces-{test,oracle,release,release-browser,deploy,public-smoke,production-browser}.log`. This feature request is implemented and deployed; historical statements above about mandatory wildcard routing are superseded.
 
 
-## Replacement proposal in progress — local checkpoint 2026-11-15
+## Replacement proposal pre-rollout checkpoint — historical
 
 The owner requested the full [control-plane replacement proposal](https://artifacts.microapps.space/a/hkwwwp90n0dt), including its final v5 theme and kit. This supersedes the historical approval/resume and snapshot-persistence requirements above. The deployed schema-16 release is unchanged; no replacement candidate has been deployed.
 

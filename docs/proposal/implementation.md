@@ -5,15 +5,15 @@ Authority: https://artifacts.microapps.space/a/hkwwwp90n0dt (retrieved 2026-11-1
 
 The proposal supersedes the earlier approval/resume requirement and daytime design. Completion requires all items below, not just theme changes.
 
-- [x] A (local): Staged, safe OAuth errors, OAuth-app credentials/static endpoints, GitHub token flow, skip unlinked sync, lowercase new slugs. Verify without granting provider consent.
-- [x] B (local): Allow/block policies, ask-to-allow migration, remove paused storage and approval routes/UI, exactly search/execute on execution MCP, PermissionError with tool/workspace. Update instructions and qualification.
-- [x] C (local): Sessions per token/workspace with 30-minute idle boundary; four-day sliding retention, backfill, stored bounded results/stdout/previews, deterministic titles and rename, tenant RLS, hourly sweep, API and tests.
-- [x] D (local): Exact proposal tokens, self-hosted M PLUS 1p and JetBrains Mono, shader and lifecycle, five-section shell, keyboard list/cursor, tabs, animated pane stack, status bar, URL state, list/timeline Sessions, Workspaces, Scripts, Tokens. Replace old kit treatments throughout, including forms, authentication and errors; preserve accessibility.
-- [x] E (local): Embedded integration registry shared by browser/admin MCP, discovery-only probe, merged vendor/link/tool search, method-specific connection flows and white vendor glyphs.
-- [ ] Qualification: meaningful Rust and browser regressions, tenant isolation, migration/data preservation, rendered desktop/mobile fidelity against prototype, reduced motion and WebGL fallback, build/bundle checks, release/deployment qualification.
+- [x] A (implemented, deployed): Staged, safe OAuth errors, OAuth-app credentials/static endpoints, GitHub token flow, skip unlinked sync, lowercase new slugs. Verify without granting provider consent.
+- [x] B (implemented, deployed): Allow/block policies, ask-to-allow migration, remove paused storage and approval routes/UI, exactly search/execute on execution MCP, PermissionError with tool/workspace. Update instructions and qualification.
+- [x] C (implemented, deployed): Sessions per token/workspace with 30-minute idle boundary; four-day sliding retention, backfill, stored bounded results/stdout/previews, deterministic titles and rename, tenant RLS, hourly sweep, API and tests.
+- [x] D (implemented, deployed): Exact proposal tokens, self-hosted M PLUS 1p and JetBrains Mono, shader and lifecycle, five-section shell, keyboard list/cursor, tabs, animated pane stack, status bar, URL state, list/timeline Sessions, Workspaces, Scripts, Tokens. Replace old kit treatments throughout, including forms, authentication and errors; preserve accessibility.
+- [x] E (implemented, deployed): Embedded integration registry shared by browser/admin MCP, discovery-only probe, merged vendor/link/tool search, method-specific connection flows and white vendor glyphs.
+- [x] Qualification: meaningful Rust and browser regressions, tenant isolation, migration/data preservation, rendered desktop/mobile fidelity against prototype, reduced motion and WebGL fallback, build/bundle checks, release/deployment qualification.
 - [ ] External acceptance: owner links GitHub/Nudge and three vendors; real-agent session grouping; shader 60fps and <5% idle CPU on M-series hardware. Report missing evidence explicitly.
 
-Existing deployed schema is 16. Never edit applied migrations. Preserve user identities, existing credentials and all data outside the explicitly authorized retention/approval changes. Never expose provider secrets or authorize consent for the owner.
+The pre-rollout schema was 16; the deployed replacement is schema 19. Never edit applied migrations. Preserve user identities, existing credentials and all data outside the explicitly authorized retention/approval changes. Never expose provider secrets or authorize consent for the owner.
 
 ## Visual foundation checkpoint — 2026-11-14
 
@@ -161,3 +161,16 @@ The runner needed two cross-platform corrections: test listing must use the remo
 The fresh documenter refreshed only DESIGN.md and its sidecar from source/captures and reported no unresolved material documentation mismatch. A fresh discovery-only probe still **fails** overall: Sentry and Nudge return HTTP403; GitHub challenge, Linear, Notion, DeepWiki and Context7 pass their discovery checks. No registration, provider consent or live authenticated provider call was attempted. Exact structured evidence is in `docs/measurements/proposal-qualification.json`.
 
 Remaining rollout work: commit/merge/push, rebuild the committed ARM64 candidate, execute the actual restored-backup preservation preflight, deploy, check public HTTPS/binary/UI/schema identity and record receipts. Owner provider/external-agent/M-series acceptance remains unperformed, and historical incremental-build budget limits remain visible. Production is still the schema-16 baseline.
+
+
+## Deployed and public verification — 2026-11-15
+
+Committed as **91d337d4e78e4f7ffe4ff5a7c9a3b73e3e2944f6**, pushed on `proposal-control-plane`, and merged through [PR #1](https://github.com/olegpustovit/codemode/pull/1). The deployed code commit is **d89531faf9a8f4fb8919af0cea8249bed389e3e2** on main. The working tree was clean when the release build ID was captured.
+
+The locally cross-built optimized ARM64 binary completed in **5m23s**. SHA-256 **0df472af2cef4962c7d4a954ec04882c6b7366ef9af1f61817ba066e85f972c3** matches the running `/proc/<pid>/exe` exactly. Health reports **build d89531faf9a8 / schema 19 / status ok**. Deployment validated a custom-format backup, restored it to a disposable database and proved **18 pre-existing protected tables unchanged** except the authorized legacy policy conversion before swapping the live binary. The retained backup is `backups/pre-deploy-20261115T022936Z-526550.dump`. Migration 18's removal of paused storage intentionally blocks automatic binary rollback to schema-16 behavior; failure requires forward repair or explicit database-backup restoration.
+
+Both service and daily backup timer are active; actual systemd properties are **NoNewPrivileges=yes** and **PrivateTmp=yes**. No production account, provider link, agent token or fixture was created. The anonymous first-account gate remains **false** before and after rollout, consistent with the exact preserved user records.
+
+Public qualification passes: HTTPS/embedded deep links, GET/HEAD/cache/security headers, JSON errors, reserved-route handling, both protected MCP resources and PWA manifest/icons. Every one of the **77** public staged files, including lazy JS, fonts and icons, matches its local staged SHA-256. Fresh public Chrome renders at **1440×1000** and **390×844**, using M PLUS 1p, square controls and the shader, with no horizontal overflow or page errors. These checks deliberately remain unauthenticated; no consent or owner action is manufactured. Logs: `target/proposal-{deploy,public-smoke,public-verify,public-browser}.log`; structured receipts and public captures remain under `target/`.
+
+**Implementation, qualification, commit, merge, push and deployment are complete.** The only unchecked plan row is owner-only external acceptance: GitHub/Nudge/three vendor links and live calls, a real external-agent session, and M-series shader FPS/idle CPU. Sentry/Nudge discovery still returns HTTP403 from this environment. The owner has been asked for those results; the overall goal remains active until the remaining acceptance is supplied or explicitly waived. No 100% external-acceptance claim is made.

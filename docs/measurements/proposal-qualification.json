@@ -100,8 +100,38 @@
     "MSeries60fpsAndIdleCPU": "unperformed"
   },
   "deployment": {
-    "status": "pending",
-    "preservationPreflight": "implemented, actual restored-backup check pending"
+    "status": "deployed",
+    "date": "2026-11-15",
+    "pullRequest": "https://github.com/olegpustovit/codemode/pull/1",
+    "codeCommit": "d89531faf9a8f4fb8919af0cea8249bed389e3e2",
+    "build": "d89531faf9a8",
+    "schema": 19,
+    "binarySha256": "0df472af2cef4962c7d4a954ec04882c6b7366ef9af1f61817ba066e85f972c3",
+    "uiFingerprint": "76b8f0e8e2e9",
+    "crossReleaseBuild": "5m23s",
+    "preservationPreflight": {
+      "restoredBackupValidated": true,
+      "preExistingProtectedTablesPreserved": 18,
+      "authorizedPolicyNormalization": true,
+      "backup": "backups/pre-deploy-20261115T022936Z-526550.dump"
+    },
+    "serviceActive": true,
+    "backupTimerActive": true,
+    "noNewPrivileges": true,
+    "privateTmp": true,
+    "public": {
+      "byteIdenticalStagedFiles": 77,
+      "registeredAccountGatePreserved": true,
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "pageErrors": 0,
+      "horizontalOverflow": false,
+      "authenticatedActionsPerformed": false
+    },
+    "accountsCreated": 0,
+    "providerConsentGranted": false
   },
   "incrementalBuildBudgets": "historical limitation remains; not claimed passing"
 }

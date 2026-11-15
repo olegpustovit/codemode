@@ -34,18 +34,6 @@
     ]
   },
   {
-    "slug": "sentry",
-    "name": "Sentry",
-    "category": "Development",
-    "description": "Errors, performance and issue triage.",
-    "url": "https://mcp.sentry.dev/mcp",
-    "docs": "https://mcp.sentry.dev/",
-    "icon": "sentry",
-    "methods": [
-      "one_click"
-    ]
-  },
-  {
     "slug": "notion",
     "name": "Notion",
     "category": "Knowledge",

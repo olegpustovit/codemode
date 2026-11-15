@@ -1,0 +1,49 @@
+{
+  "binary": "/home/snowbear/projects/codemode/target/release/codemode",
+  "samples": 15,
+  "clickToPaintMs": {
+    "p95": 407.8999999910593,
+    "values": [
+      388.19999998807907,
+      405.70000000298023,
+      363.90000000596046,
+      401.5,
+      400.70000000298023,
+      402.1000000089407,
+      400.79999999701977,
+      400.20000000298023,
+      407.8999999910593,
+      395.3999999910593,
+      407.30000001192093,
+      400.3999999910593,
+      374.3999999910593,
+      369.29999999701977,
+      405.40000000596046
+    ]
+  },
+  "keyScriptMs": {
+    "p95": 2.5479999999999947,
+    "values": [
+      2.5479999999999947,
+      1.9650000000000014,
+      1.8390000000000004,
+      2.3250000000000006,
+      2.035000000000002,
+      2.010999999999999,
+      1.8849999999999978,
+      2.0930000000000044,
+      1.8729999999999998,
+      1.9559999999999995,
+      1.9899999999999987,
+      2.010999999999999,
+      2.0080000000000027,
+      2.008999999999997,
+      2.0869999999999984
+    ]
+  },
+  "sourceCommit": "692f6fee2d1448d5d474fd59a0d0205feff3dccd",
+  "binarySha256": "0bb41ee0a37321c47a7c43e474c98a60e76b5d44a2333e022cc0d54501c7e068",
+  "environment": "Native Chromium headless, 1440x1000, isolated PostgreSQL fixture, optimized pre-change binary",
+  "method": "DOM click to final 54% pane geometry and detail heading, plus following animation frame; per-key CDP ScriptDuration delta",
+  "workflowNote": "Measurement completed; subsequent mobile assertion initially failed because the measurement left the detail open. Helper now restores the list route."
+}

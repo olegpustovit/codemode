@@ -1,55 +1,100 @@
+import { flushSync } from "react-dom"
+import { BulkPane } from "@/components/bulk-pane"
+import { matches } from "@/lib/match"
+import { MatchText, SearchHint } from "@/components/match-text"
+import {
+  useListCursor,
+  useListSelection,
+  listSearchKeys,
+} from "@/hooks/use-list-navigation"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 import { PythonCode } from "@/components/python-code"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link, getRouteApi } from "@tanstack/react-router"
 import {
   useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query"
-import { Search } from "lucide-react"
-import { workspacesQuery, scriptsQuery, scriptQuery } from "./queries"
+import { Search, FileCode2 } from "lucide-react"
+import {
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty"
+import {
+  workspacesQuery,
+  scriptsQuery,
+  scriptQuery,
+  scriptSchema,
+} from "./queries"
 import { DataList } from "@/components/data-list"
 import { PaneStack } from "@/components/pane-stack"
 import { TabBar } from "@/components/tab-bar"
 import { ShellSlot } from "@/components/shell-slot"
 import { Facts } from "@/components/facts"
-import { ConfirmAction } from "@/components/confirm-action"
 import { useStatus } from "@/components/status-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ErrorNotice, date } from "@/components/common"
-import { nothing, write } from "@/lib/api"
+import { write, bulkResult } from "@/lib/api"
 import { useWorkspace } from "@/components/workspace-context"
 const route = getRouteApi("/_authenticated/scripts")
 export function ScriptLibraryPage() {
   const search = route.useSearch()
   const navigate = route.useNavigate()
+  const [cursor, setCursor] = useListCursor(
+    search.selected,
+    `${search.q ?? ""}:${search.workspace ?? ""}`
+  )
+  const [pane, setPane] = useListCursor(search.detail, search.selected)
   const workspaces = useSuspenseQuery(workspacesQuery).data
   const chosenWorkspace = useWorkspace()
   const workspace =
     workspaces.find((w) => w.id === (search.workspace ?? chosenWorkspace)) ??
     workspaces.find((w) => w.allSources) ??
     workspaces[0]
+  const selection = useListSelection(`${workspace?.id ?? ""}:${search.q ?? ""}`)
   const scripts = useQuery({
     ...scriptsQuery(workspace?.id ?? ""),
     enabled: !!workspace,
   })
   const rows = (scripts.data ?? []).filter((s) =>
-    `${s.name} ${s.description}`
-      .toLowerCase()
-      .includes((search.q ?? "").toLowerCase())
+    matches(search.q ?? "", s.name, s.description)
   )
-  const selected = rows.find((s) => s.id === search.selected) ?? rows[0]
+  const selected = rows.find((s) => s.id === cursor) ?? rows[0]
   const detail = useQuery({
     ...scriptQuery(workspace?.id ?? "", selected?.id ?? ""),
-    enabled: search.detail === "open" && !!workspace && !!selected,
+    enabled: pane === "open" && !!workspace && !!selected,
   })
   const list = useRef<HTMLTableElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const cache = useQueryClient()
   const { report } = useStatus()
+  const [deleting, setDeleting] = useState(false)
+  const selectedScripts = selection.value.allMatching
+    ? rows
+    : rows.filter((script) => selection.value.ids.includes(script.id))
+  const selectedCount = selectedScripts.length || (selected ? 1 : 0)
+  const bulk = selectedScripts.length > 1 || deleting
+  const deleteSelection = selectedScripts.length
+    ? selectedScripts
+    : selected
+      ? [selected]
+      : []
+
   const back = () => {
+    if (selection.value.allMatching || selection.value.ids.length > 1) {
+      selection.set({
+        ids: selected?.id ? [selected?.id] : [],
+        allMatching: false,
+      })
+      return
+    }
+    setDeleting(false)
+    setPane("")
     void navigate({
       search: {
         ...search,
@@ -59,7 +104,10 @@ export function ScriptLibraryPage() {
     })
     requestAnimationFrame(() => list.current?.focus())
   }
-  const choose = (id: string, open = false) =>
+  const choose = (id: string, open = false) => {
+    setCursor(id)
+    if (!open) return
+    flushSync(() => setPane("open"))
     void navigate({
       search: {
         ...search,
@@ -68,6 +116,7 @@ export function ScriptLibraryPage() {
       },
       replace: !open,
     })
+  }
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
       if (
@@ -81,7 +130,13 @@ export function ScriptLibraryPage() {
           ))
       )
         return
-      if (e.key === "/") {
+      if (e.key.toLowerCase() === "n" && workspace) {
+        e.preventDefault()
+        void navigate({
+          to: "/workspaces/$workspaceId/scripts/new",
+          params: { workspaceId: workspace.id },
+        })
+      } else if (e.key === "/") {
         e.preventDefault()
         input.current?.focus()
       } else if (e.key === "Escape") {
@@ -101,6 +156,7 @@ export function ScriptLibraryPage() {
             id="scripts-search"
             ref={input}
             type="search"
+            aria-describedby="list-search-hint"
             aria-label="Search scripts"
             placeholder="Search scripts"
             value={search.q ?? ""}
@@ -113,13 +169,19 @@ export function ScriptLibraryPage() {
                 replace: true,
               })
             }
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault()
-                back()
-              }
-            }}
+            onKeyDown={(event) =>
+              listSearchKeys(
+                event,
+                list.current,
+                () =>
+                  void navigate({
+                    search: { ...search, q: undefined },
+                    replace: true,
+                  })
+              )
+            }
           />
+          <SearchHint />
           <span className="kbd">/</span>
         </label>
       </ShellSlot>
@@ -161,11 +223,12 @@ export function ScriptLibraryPage() {
       <PaneStack
         id="script-panes"
         label="Script"
-        open={search.detail === "open" && !!selected}
+        open={bulk || (pane === "open" && !!selected)}
         list={
           <>
             <ErrorNotice error={scripts.error} />
             <DataList
+              selection={selection}
               label="Scripts"
               listRef={list}
               busy={scripts.isFetching}
@@ -177,103 +240,202 @@ export function ScriptLibraryPage() {
                 group: "Saved scripts",
                 cells: [
                   <span key="name" className="font-mono">
-                    {s.name}
+                    <MatchText query={search.q ?? ""}>{s.name}</MatchText>
                   </span>,
                   s.description || "—",
                   date(s.updatedAt),
                 ],
               }))}
+              onDelete={() => setDeleting(true)}
+              onRename={async (id, name) => {
+                if (!workspace) return
+                const script = await cache.fetchQuery(
+                  scriptQuery(workspace.id, id)
+                )
+                await write(
+                  `/api/workspaces/${workspace.id}/scripts/${id}`,
+                  "PUT",
+                  {
+                    name,
+                    description: script.description,
+                    code: script.code,
+                    revision: script.revision,
+                  },
+                  scriptSchema
+                )
+                await cache.invalidateQueries({
+                  queryKey: ["scripts", workspace.id],
+                })
+                report("Script renamed")
+              }}
               onSelect={choose}
               onOpen={(id) => choose(id, true)}
               onBack={back}
               empty={
-                scripts.isPending
-                  ? "Loading scripts…"
-                  : search.q
-                    ? "No matching scripts. Press Esc to clear."
-                    : "No saved scripts. Save Python from a session or create a script."
+                scripts.isPending ? (
+                  "Loading scripts…"
+                ) : search.q ? (
+                  "No matching scripts. Press Esc to clear."
+                ) : (
+                  <>
+                    <EmptyHeader>
+                      <EmptyMedia>
+                        <FileCode2 strokeWidth={1} aria-hidden="true" />
+                      </EmptyMedia>
+                      <EmptyTitle>No saved scripts</EmptyTitle>
+                      <EmptyDescription>
+                        Keep Python you want to run again. Write a script or
+                        save code from a session.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent className="empty-actions">
+                      {workspace && (
+                        <Button
+                          render={
+                            <Link
+                              to="/workspaces/$workspaceId/scripts/new"
+                              params={{ workspaceId: workspace.id }}
+                            />
+                          }
+                        >
+                          New script
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        render={<Link to="/sessions" />}
+                      >
+                        Open Sessions
+                      </Button>
+                    </EmptyContent>
+                  </>
+                )
               }
             />
           </>
         }
         detail={
-          <>
-            <div className="pane-heading">
-              <span>Script</span>
-              <Button variant="ghost" onClick={back}>
-                Close <span className="kbd">Esc</span>
-              </Button>
-            </div>
-            <div className="pane-body">
-              <ErrorNotice error={detail.error} />
-              {detail.data && workspace && (
-                <>
-                  <h2 className="font-mono">{detail.data.name}</h2>
-                  <p className="pane-meta">{detail.data.description}</p>
-                  <Facts
-                    items={[
-                      { label: "Workspace", value: workspace.name },
-                      { label: "Saved", value: date(detail.data.updatedAt) },
-                      { label: "Revision", value: detail.data.revision },
-                    ]}
-                  />
-                  <h3>Code</h3>
-                  <pre className="code-panel">
-                    <PythonCode code={detail.data.code} />
-                  </pre>
-                  <div className="detail-actions">
-                    <Button
-                      render={
-                        <Link
-                          to="/workspaces/$workspaceId/scripts/$scriptId"
-                          params={{
-                            workspaceId: workspace.id,
-                            scriptId: detail.data.id,
-                          }}
-                        />
-                      }
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() =>
-                        void navigator.clipboard
-                          .writeText(detail.data.code)
-                          .then(() => report("Code copied"))
-                          .catch(() =>
-                            report(
-                              "Copy failed. Select the code and copy it.",
-                              "error"
-                            )
-                          )
-                      }
-                    >
-                      Copy
-                    </Button>
-                    <ConfirmAction
-                      label="Delete script"
-                      description="The script will no longer be available to agents. Its recorded executions remain."
-                      onConfirm={async () => {
-                        if (!detail.data) return
-                        await write(
-                          `/api/workspaces/${workspace.id}/scripts/${detail.data.id}`,
-                          "DELETE",
-                          { revision: detail.data.revision },
-                          nothing
-                        )
-                        await cache.invalidateQueries({
-                          queryKey: ["scripts", workspace.id],
-                        })
-                        back()
-                      }}
+          bulk ? (
+            <BulkPane
+              key={JSON.stringify([selection.value, deleting])}
+              count={selectedCount}
+              names={deleteSelection.map((script) => script.name)}
+              allMatching={selection.value.allMatching}
+              confirmAction={deleting ? "delete" : undefined}
+              actions={[
+                {
+                  id: "delete",
+                  label: "Delete scripts",
+                  confirm:
+                    "The selected scripts will no longer be available to agents. Recorded executions remain.",
+                },
+              ]}
+              onClose={() => {
+                setDeleting(false)
+                selection.set({
+                  ids: selected ? [selected.id] : [],
+                  allMatching: false,
+                })
+              }}
+              onAction={async () => {
+                if (!workspace) return
+                const result = await write(
+                  `/api/workspaces/${workspace.id}/scripts/bulk-delete`,
+                  "POST",
+                  {
+                    selection: selection.value.allMatching
+                      ? { query: search.q ?? "" }
+                      : { ids: deleteSelection.map((script) => script.id) },
+                    expectedCount: selectedCount,
+                    revisions: deleteSelection.map((script) => ({
+                      id: script.id,
+                      revision: script.revision,
+                    })),
+                  },
+                  bulkResult
+                )
+                selection.set({ ids: [], allMatching: false })
+                setDeleting(false)
+                setPane("")
+                void navigate({
+                  search: { ...search, selected: undefined, detail: undefined },
+                  replace: true,
+                })
+                requestAnimationFrame(() => list.current?.focus())
+                await cache.invalidateQueries({
+                  queryKey: ["scripts", workspace.id],
+                })
+                report(`${result.changed} scripts deleted`)
+              }}
+            />
+          ) : (
+            <>
+              <div className="pane-heading">
+                <span>Script</span>
+                <Button variant="ghost" onClick={back}>
+                  Close <span className="kbd">Esc</span>
+                </Button>
+              </div>
+              <div className="pane-body">
+                <ErrorNotice error={detail.error} />
+                {detail.data && workspace && (
+                  <>
+                    <h2 className="font-mono">{detail.data.name}</h2>
+                    <p className="pane-meta">{detail.data.description}</p>
+                    <Facts
+                      items={[
+                        { label: "Workspace", value: workspace.name },
+                        { label: "Saved", value: date(detail.data.updatedAt) },
+                        { label: "Revision", value: detail.data.revision },
+                      ]}
                     />
-                  </div>
-                </>
-              )}
-              {detail.isPending && <p>Loading script…</p>}
-            </div>
-          </>
+                    <h3>Code</h3>
+                    <pre className="code-panel">
+                      <PythonCode code={detail.data.code} />
+                    </pre>
+                    <div className="detail-actions">
+                      <Button
+                        render={
+                          <Link
+                            to="/workspaces/$workspaceId/scripts/$scriptId"
+                            params={{
+                              workspaceId: workspace.id,
+                              scriptId: detail.data.id,
+                            }}
+                          />
+                        }
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() =>
+                          void navigator.clipboard
+                            .writeText(detail.data.code)
+                            .then(() => report("Code copied"))
+                            .catch(() =>
+                              report(
+                                "Copy failed. Select the code and copy it.",
+                                "error"
+                              )
+                            )
+                        }
+                      >
+                        Copy
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setDeleting(true)}
+                      >
+                        Delete script
+                      </Button>
+                    </div>
+                  </>
+                )}
+                {detail.isPending && <p>Loading script…</p>}
+              </div>
+            </>
+          )
         }
       />
       <ShellSlot target="status-keys">

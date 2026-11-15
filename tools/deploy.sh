@@ -69,23 +69,32 @@ name = sys.argv[1]
 tables = ('tenants', 'users', 'sources', 'tools', 'accounts', 'endpoints',
           'endpoint_sources', 'endpoint_tools', 'access_tokens', 'sessions',
           'oauth_clients', 'oauth_grants', 'oauth_codes', 'oauth_tokens',
-          'upstream_oauth_states', 'saved_scripts', 'administration_calls', 'tool_policies', 'oauth_apps')
+          'upstream_oauth_states', 'saved_scripts', 'administration_calls', 'tool_policies', 'oauth_apps', 'control_changes',
+          'agent_sessions', 'executions', 'tool_calls')
 def snapshot(table, legacy=False):
     # Values stay in this process; diagnostics must never print credential rows.
     value = "to_jsonb(r)"
+    if table == 'sources' and source_display_added:
+        value += " - 'name' - 'icon'"
     if legacy and table == 'tool_policies':
         value += " || jsonb_build_object('action',CASE WHEN action IN ('approve','ask') THEN 'allow' ELSE action END)"
     query = f"SELECT COALESCE(jsonb_agg(v ORDER BY v::text),'[]'::jsonb) FROM (SELECT {value} v FROM {table} r) q"
     return json.loads(subprocess.check_output(['psql', '-X', '-v', 'ON_ERROR_STOP=1', '-d', name, '-Atqc', query], text=True))
 present = set(subprocess.check_output(['psql', '-X', '-v', 'ON_ERROR_STOP=1', '-d', name, '-Atqc', "SELECT tablename FROM pg_tables WHERE schemaname='public'"], text=True).splitlines())
 tables = tuple(table for table in tables if table in present)
+source_columns = set(subprocess.check_output(['psql', '-X', '-d', name, '-Atqc', "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='sources'"], text=True).splitlines())
+source_display_added = 'name' not in source_columns
 before = {table: snapshot(table, True) for table in tables}
 env = dict(os.environ, CODEMODE_DATABASE_URL=f'postgresql://snowbear@localhost/{name}?host=/var/run/postgresql')
 subprocess.run(['bin/codemode.new', 'token', 'list'], env=env, stdout=subprocess.DEVNULL, check=True)
 for table in tables:
     if before[table] != snapshot(table):
         raise SystemExit(f'Preflight migration changed protected table: {table}')
-print(f'Preflight migration preserved {len(tables)} protected tables (legacy policies normalized).')
+if source_display_added:
+    invalid = subprocess.check_output(['psql', '-X', '-d', name, '-Atqc', "SELECT count(*) FROM sources WHERE name IS DISTINCT FROM slug OR icon<>'plug'"], text=True).strip()
+    if invalid != '0':
+        raise SystemExit('Preflight display-name/icon backfill did not preserve source identity')
+print(f'Preflight migration preserved {len(tables)} protected tables (legacy policies normalized; source display fields backfilled).')
 PRESERVE
 # Keep deployment credentials on this host; never place them in logs or the repository.
 if [[ ! -f .encryption-key ]]; then

@@ -6,6 +6,8 @@ Implementation plan: https://artifacts.microapps.space/a/saqdh2xm7jcd (revision 
 
 ## Active replacement proposal
 
+The owner also requested full implementation of https://artifacts.microapps.space/a/jqm3ze7az66e. Its schema-20 fixes are implemented; exact scope and qualification evidence are in `docs/control-plane-fixes/implementation.md` and the saved `proposal.html`. Release qualification and deployment are in progress; the production release below remains schema 19 until the deployment receipt is recorded.
+
 The owner requested full implementation of https://artifacts.microapps.space/a/hkwwwp90n0dt, including its final v5 theme and UI kit. The exact reference is `docs/proposal/control-plane.html`; progress/evidence is in `docs/proposal/implementation.md`. This proposal supersedes the historical approval, resume, snapshot persistence and daytime UI requirements below. Changes are deployed only after qualification. The implemented proposal release is now the schema-19 build in Status; owner-only external acceptance remains explicitly unperformed.
 
 Current execution policy is **allow or block**, default allow for every tool. `/mcp` exposes exactly **search and execute**; approval/resume APIs, UI, paused storage and snapshot signing are removed. Migration 0018 converts legacy `approve`/`ask` overrides to allow and finishes old pauses as failed without replay. Workspace scopes and blocks are enforced at dispatch; blocked calls raise Python `PermissionError` naming the tool and workspace. Browser OAuth consent remains required for linking providers.

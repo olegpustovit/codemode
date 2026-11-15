@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-15",
+  "candidateSchema": 20,
+  "deployedSchemaBeforeRollout": 19,
+  "status": "release qualification in progress",
+  "native": {
+    "cases": 111,
+    "failures": 0,
+    "buildSeconds": 24.81,
+    "totalSeconds": 29.27,
+    "slowestSeconds": 2.797
+  },
+  "oracleHardened": {
+    "cases": 111,
+    "failures": 0,
+    "buildAndStageSeconds": 76.3,
+    "totalSeconds": 103.6,
+    "slowestSeconds": 4.63,
+    "concurrency": 4,
+    "unitDeadlineSeconds": 2,
+    "integrationDeadlineSeconds": 5
+  },
+  "oracleCoreSlow": {
+    "cases": 98,
+    "failures": 0,
+    "buildAndStageSeconds": 53.35,
+    "totalSeconds": 85.64,
+    "perCaseDeadlineSeconds": 60,
+    "includesExhaustiveCases": 3
+  },
+  "ui": {
+    "unitCases": 32,
+    "failures": 0,
+    "incumbentLintWarnings": 3
+  },
+  "detector": {
+    "runs": 1,
+    "findings": 0
+  },
+  "externalAcceptance": {
+    "providerConsent": "unperformed",
+    "externalClient": "unperformed",
+    "MSeriesShader": "unperformed",
+    "incrementalBuildBudgets": "historically exceeded; not claimed passing"
+  }
+}

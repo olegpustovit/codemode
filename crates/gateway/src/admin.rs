@@ -10,6 +10,7 @@ use codemode_core::components::{
     accounts::{self, Accounts},
     agent_sessions::{self, AgentSessions},
     auth::Auth,
+    bulk,
     execution::log,
     integrations, policies,
     scripts::{self, Scripts},
@@ -41,6 +42,13 @@ pub struct State {
 
 pub fn router(state: State) -> Router {
     let protected = Router::new()
+        .route("/api/workspaces/{id}/policies/bulk", post(bulk_policies))
+        .route(
+            "/api/workspaces/{id}/scripts/bulk-delete",
+            post(bulk_scripts),
+        )
+        .route("/api/tokens/bulk-revoke", post(bulk_tokens))
+        .route("/api/sources/bulk-sync", post(bulk_sources))
         .route(
             "/api/oauth/authorize",
             get(oauth_consent).post(oauth_decision),
@@ -76,7 +84,10 @@ pub fn router(state: State) -> Router {
         .route("/api/sources", get(sources).post(create_source))
         .route(
             "/api/sources/{id}",
-            get(source).put(update_source).delete(remove_source),
+            get(source)
+                .put(update_source)
+                .patch(update_source_display)
+                .delete(remove_source),
         )
         .route("/api/sources/{id}/sync", axum::routing::post(sync_source))
         .route("/api/tokens", get(tokens).post(create_token))
@@ -211,6 +222,7 @@ impl From<accounts::Error> for ApiError {
 impl From<sources::Error> for ApiError {
     fn from(error: sources::Error) -> Self {
         match error {
+            sources::Error::Display(message) => Self::Message(StatusCode::BAD_REQUEST, message),
             sources::Error::Busy => Self::Message(
                 StatusCode::TOO_MANY_REQUESTS,
                 "OpenAPI document loading is busy; retry shortly",
@@ -418,19 +430,29 @@ pub(crate) fn user_source(source: &sources::Source) -> Result<(), &'static str> 
 
 async fn create_source(
     AxumState(state): AxumState<State>,
-    ApiJson(input): ApiJson<sources::Source>,
+    ApiJson(input): ApiJson<sources::SourceInput>,
 ) -> Result<Response, ApiError> {
-    user_source(&input).map_err(|message| ApiError::Message(StatusCode::FORBIDDEN, message))?;
-    let id = state.sources.save(None, input).await?;
+    user_source(&input.source)
+        .map_err(|message| ApiError::Message(StatusCode::FORBIDDEN, message))?;
+    let id = state.sources.save_input(None, input).await?;
     Ok((StatusCode::CREATED, Json(serde_json::json!({"id":id}))).into_response())
 }
 async fn update_source(
     AxumState(state): AxumState<State>,
     Path(id): Path<Uuid>,
-    ApiJson(input): ApiJson<sources::Source>,
+    ApiJson(input): ApiJson<sources::SourceInput>,
 ) -> Result<StatusCode, ApiError> {
-    user_source(&input).map_err(|message| ApiError::Message(StatusCode::FORBIDDEN, message))?;
-    state.sources.save(Some(id), input).await?;
+    user_source(&input.source)
+        .map_err(|message| ApiError::Message(StatusCode::FORBIDDEN, message))?;
+    state.sources.save_input(Some(id), input).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+async fn update_source_display(
+    AxumState(state): AxumState<State>,
+    Path(id): Path<Uuid>,
+    ApiJson(input): ApiJson<sources::Display>,
+) -> Result<StatusCode, ApiError> {
+    state.sources.set_display(id, input).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 async fn remove_source(
@@ -1141,13 +1163,18 @@ struct SessionQuery {
     #[serde(default)]
     q: String,
     before: Option<Uuid>,
+    #[serde(default)]
+    errors_only: bool,
 }
 async fn agent_session_list(
     AxumState(state): AxumState<State>,
     Query(query): Query<SessionQuery>,
 ) -> Result<Json<agent_sessions::Page>, ApiError> {
     Ok(Json(
-        state.agent_sessions.list(&query.q, query.before).await?,
+        state
+            .agent_sessions
+            .list_filtered(&query.q, query.before, query.errors_only)
+            .await?,
     ))
 }
 async fn agent_session_activity(
@@ -1189,4 +1216,87 @@ impl From<agent_sessions::Error> for ApiError {
             other => unavailable(other),
         }
     }
+}
+
+impl From<bulk::Error> for ApiError {
+    fn from(error: bulk::Error) -> Self {
+        match error {
+            bulk::Error::Invalid => Self::Message(
+                StatusCode::BAD_REQUEST,
+                "choose either distinct IDs or a search query and its exact match count",
+            ),
+            bulk::Error::Changed => Self::Message(
+                StatusCode::CONFLICT,
+                "selection changed or includes unavailable items; reload and select again",
+            ),
+            bulk::Error::Scope => Self::Message(
+                StatusCode::BAD_REQUEST,
+                "switch this workspace to selected tools before changing tool inclusion",
+            ),
+            bulk::Error::Database(error) => unavailable(error),
+        }
+    }
+}
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BulkRequest<T> {
+    selection: bulk::Selection<T>,
+    expected_count: i64,
+}
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BulkPolicyRequest {
+    selection: bulk::Selection<String>,
+    expected_count: i64,
+    action: policies::BulkAction,
+}
+async fn bulk_policies(
+    AxumState(state): AxumState<State>,
+    Path(id): Path<Uuid>,
+    ApiJson(input): ApiJson<BulkPolicyRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let changed = state
+        .sources
+        .policies()
+        .bulk(id, input.selection, input.expected_count, input.action)
+        .await?;
+    Ok(Json(serde_json::json!({"changed":changed})))
+}
+async fn bulk_tokens(
+    AxumState(state): AxumState<State>,
+    ApiJson(input): ApiJson<BulkRequest<Uuid>>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let changed = state
+        .auth
+        .revoke_many(input.selection, input.expected_count)
+        .await?;
+    Ok(Json(serde_json::json!({"changed":changed})))
+}
+async fn bulk_sources(
+    AxumState(state): AxumState<State>,
+    ApiJson(input): ApiJson<BulkRequest<Uuid>>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let changed = state
+        .sources
+        .sync_many(input.selection, input.expected_count)
+        .await?;
+    Ok(Json(serde_json::json!({"changed":changed})))
+}
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BulkScriptRequest {
+    selection: bulk::Selection<Uuid>,
+    expected_count: i64,
+    revisions: Vec<scripts::Revision>,
+}
+async fn bulk_scripts(
+    AxumState(state): AxumState<State>,
+    Path(id): Path<Uuid>,
+    ApiJson(input): ApiJson<BulkScriptRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let changed = state
+        .scripts
+        .remove_many(id, input.selection, input.expected_count, &input.revisions)
+        .await?;
+    Ok(Json(serde_json::json!({"changed":changed})))
 }

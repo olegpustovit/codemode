@@ -1,11 +1,21 @@
+import { flushSync } from "react-dom"
+import { BulkPane } from "@/components/bulk-pane"
+import { useStatus } from "@/components/status-bar"
+import { matches } from "@/lib/match"
+import { MatchText, SearchHint } from "@/components/match-text"
+import {
+  useListCursor,
+  useListSelection,
+  listSearchKeys,
+} from "@/hooks/use-list-navigation"
 import { Breadcrumbs } from "@/components/breadcrumbs"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link, getRouteApi } from "@tanstack/react-router"
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query"
-import { Search } from "lucide-react"
+import { Search, KeyRound } from "lucide-react"
 import { tokensQuery, workspacesQuery } from "./queries"
 import { TokenForm } from "./tokens"
-import { DataList } from "@/components/data-list"
+import { DataList, ListEmpty } from "@/components/data-list"
 import { PaneStack } from "@/components/pane-stack"
 import { TabBar } from "@/components/tab-bar"
 import { ShellSlot } from "@/components/shell-slot"
@@ -14,21 +24,44 @@ import { ConfirmAction } from "@/components/confirm-action"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { date } from "@/components/common"
-import { nothing, write } from "@/lib/api"
+import { nothing, write, bulkResult } from "@/lib/api"
 const route = getRouteApi("/_authenticated/tokens")
 export function TokensPage() {
   const search = route.useSearch()
   const navigate = route.useNavigate()
+  const [cursor, setCursor] = useListCursor(search.selected, search.q)
+  const [pane, setPane] = useListCursor(search.detail, search.selected)
+  const selection = useListSelection(search.q ?? "")
   const tokens = useSuspenseQuery(tokensQuery).data
   const workspaces = useSuspenseQuery(workspacesQuery).data
-  const rows = tokens.filter((t) =>
-    t.name.toLowerCase().includes((search.q ?? "").toLowerCase())
-  )
-  const selected = rows.find((t) => t.id === search.selected) ?? rows[0]
+  const rows = tokens.filter((t) => matches(search.q ?? "", t.name))
+  const selected = rows.find((t) => t.id === cursor) ?? rows[0]
   const list = useRef<HTMLTableElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const cache = useQueryClient()
+  const { report } = useStatus()
+  const [revoking, setRevoking] = useState(false)
+  const selectedTokens = selection.value.allMatching
+    ? rows
+    : rows.filter((token) => selection.value.ids.includes(token.id))
+  const selectedCount = selectedTokens.length || (selected ? 1 : 0)
+  const bulk = selectedTokens.length > 1 || revoking
+  const revokeSelection = selectedTokens.length
+    ? selectedTokens
+    : selected
+      ? [selected]
+      : []
+
   const back = () => {
+    if (selection.value.allMatching || selection.value.ids.length > 1) {
+      selection.set({
+        ids: selected?.id ? [selected?.id] : [],
+        allMatching: false,
+      })
+      return
+    }
+    setRevoking(false)
+    setPane("")
     void navigate({
       search: {
         ...search,
@@ -38,7 +71,10 @@ export function TokensPage() {
     })
     requestAnimationFrame(() => list.current?.focus())
   }
-  const choose = (id: string, open = false) =>
+  const choose = (id: string, open = false) => {
+    setCursor(id)
+    if (!open) return
+    flushSync(() => setPane("open"))
     void navigate({
       search: {
         ...search,
@@ -47,6 +83,7 @@ export function TokensPage() {
       },
       replace: !open,
     })
+  }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
@@ -80,6 +117,7 @@ export function TokensPage() {
             id="tokens-search"
             ref={input}
             type="search"
+            aria-describedby="list-search-hint"
             aria-label="Search agents"
             placeholder="Search agents"
             value={search.q ?? ""}
@@ -89,13 +127,19 @@ export function TokensPage() {
                 replace: true,
               })
             }
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault()
-                back()
-              }
-            }}
+            onKeyDown={(event) =>
+              listSearchKeys(
+                event,
+                list.current,
+                () =>
+                  void navigate({
+                    search: { ...search, q: undefined },
+                    replace: true,
+                  })
+              )
+            }
           />
+          <SearchHint />
           <span className="kbd">/</span>
         </label>
       </ShellSlot>
@@ -104,7 +148,7 @@ export function TokensPage() {
           <Breadcrumbs
             items={[
               { label: "Tokens", onSelect: back },
-              ...(search.detail === "new"
+              ...(pane === "new"
                 ? [{ label: "New personal token" }]
                 : search.detail && selected
                   ? [{ label: selected.name }]
@@ -134,11 +178,10 @@ export function TokensPage() {
       <PaneStack
         id="token-panes"
         label="Token"
-        open={
-          search.detail === "new" || (search.detail === "open" && !!selected)
-        }
+        open={bulk || pane === "new" || (pane === "open" && !!selected)}
         list={
           <DataList
+            selection={selection}
             label="Agents with access"
             listRef={list}
             selectedId={selected?.id}
@@ -149,7 +192,9 @@ export function TokensPage() {
                 label: t.name,
                 group: t.revoked ? "Revoked access" : "Agents with access",
                 cells: [
-                  t.name,
+                  <MatchText key="name" query={search.q ?? ""}>
+                    {t.name}
+                  </MatchText>,
                   t.oauth ? "OAuth" : "Personal token",
                   t.resource === "/mcp-admin"
                     ? "Administration"
@@ -159,90 +204,172 @@ export function TokensPage() {
                 ],
               }))
               .sort((a, b) => a.group.localeCompare(b.group))}
+            onDelete={() => setRevoking(true)}
             onSelect={choose}
             onOpen={(id) => choose(id, true)}
             onBack={back}
             empty={
-              search.q
-                ? "No matching agents. Press Esc to clear."
-                : "No tokens issued. Create a personal token or authorize an OAuth client."
+              search.q ? (
+                <ListEmpty
+                  title="No matching agents"
+                  description="Try another name or pattern. Esc clears your search."
+                >
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void navigate({
+                        search: { ...search, q: undefined },
+                        replace: true,
+                      })
+                    }
+                  >
+                    Clear search
+                  </Button>
+                </ListEmpty>
+              ) : (
+                <ListEmpty
+                  icon={<KeyRound strokeWidth={1} aria-hidden="true" />}
+                  title="No agent access yet"
+                  description="Create a personal token for a headless agent, or connect a client with OAuth."
+                >
+                  <Button
+                    onClick={() => {
+                      setPane("new")
+                      void navigate({ search: { detail: "new" } })
+                    }}
+                  >
+                    New personal token
+                  </Button>
+                </ListEmpty>
+              )
             }
           />
         }
         detail={
-          <>
-            <div className="pane-heading">
-              <span>
-                {search.detail === "new" ? "Personal token" : "Agent access"}
-              </span>
-              <Button variant="ghost" onClick={back}>
-                Close <span className="kbd">Esc</span>
-              </Button>
-            </div>
-            <div className="pane-body">
-              {search.detail === "new" ? (
-                <TokenForm onDone={back} />
-              ) : (
-                selected && (
-                  <>
-                    <h2>{selected.name}</h2>
-                    <p className="pane-meta">
-                      {selected.oauth ? "OAuth" : "Personal token"} ·{" "}
-                      {selected.revoked ? "Revoked" : "Issued"}
-                    </p>
-                    <Facts
-                      items={[
-                        {
-                          label: "Last used",
-                          value: selected.lastUsedAt
-                            ? date(selected.lastUsedAt)
-                            : "Never",
-                        },
-                        { label: "Client", value: selected.name },
-                        { label: "Resource", value: selected.resource },
-                        {
-                          label: "Workspace",
-                          value:
-                            selected.resource === "/mcp-admin"
-                              ? "Administration"
-                              : (workspaces.find(
-                                  (w) => w.id === selected.workspaceId
-                                )?.name ?? "Deleted workspace"),
-                        },
-                      ]}
-                    />
-                    <div className="detail-actions">
-                      <Button
-                        variant="outline"
-                        render={
-                          <Link to="/sessions" search={{ q: selected.name }} />
-                        }
-                      >
-                        Show sessions
-                      </Button>
-                      {!selected.revoked && (
-                        <ConfirmAction
-                          label="Revoke token"
-                          description="The agent loses access on its next request. OAuth refresh access is revoked with its grant."
-                          onConfirm={async () => {
-                            await write(
-                              `/api/tokens/${selected.id}`,
-                              "DELETE",
-                              undefined,
-                              nothing
-                            )
-                            await cache.invalidateQueries({
-                              queryKey: ["tokens"],
-                            })
-                          }}
-                        />
-                      )}
-                    </div>
-                  </>
+          bulk ? (
+            <BulkPane
+              key={JSON.stringify([selection.value, revoking])}
+              count={selectedCount}
+              names={revokeSelection.map((token) => token.name)}
+              allMatching={selection.value.allMatching}
+              confirmAction={revoking ? "revoke" : undefined}
+              actions={[
+                {
+                  id: "revoke",
+                  label: "Revoke tokens",
+                  confirm:
+                    "These agents lose access immediately. Revoking OAuth access also revokes its refresh grant and sibling access tokens.",
+                },
+              ]}
+              onClose={() => {
+                setRevoking(false)
+                selection.set({
+                  ids: selected ? [selected.id] : [],
+                  allMatching: false,
+                })
+              }}
+              onAction={async () => {
+                const result = await write(
+                  "/api/tokens/bulk-revoke",
+                  "POST",
+                  {
+                    selection: selection.value.allMatching
+                      ? { query: search.q ?? "" }
+                      : { ids: revokeSelection.map((token) => token.id) },
+                    expectedCount: selectedCount,
+                  },
+                  bulkResult
                 )
-              )}
-            </div>
-          </>
+                selection.set({ ids: [], allMatching: false })
+                setRevoking(false)
+                setPane("")
+                void navigate({
+                  search: { ...search, selected: undefined, detail: undefined },
+                  replace: true,
+                })
+                requestAnimationFrame(() => list.current?.focus())
+                await cache.invalidateQueries({ queryKey: ["tokens"] })
+                report(`${result.changed} access tokens revoked`)
+              }}
+            />
+          ) : (
+            <>
+              <div className="pane-heading">
+                <span>
+                  {pane === "new" ? "Personal token" : "Agent access"}
+                </span>
+                <Button variant="ghost" onClick={back}>
+                  Close <span className="kbd">Esc</span>
+                </Button>
+              </div>
+              <div className="pane-body">
+                {pane === "new" ? (
+                  <TokenForm onDone={back} />
+                ) : (
+                  selected && (
+                    <>
+                      <h2>{selected.name}</h2>
+                      <p className="pane-meta">
+                        {selected.oauth ? "OAuth" : "Personal token"} ·{" "}
+                        {selected.revoked ? "Revoked" : "Issued"}
+                      </p>
+                      <Facts
+                        items={[
+                          {
+                            label: "Last used",
+                            value: selected.lastUsedAt
+                              ? date(selected.lastUsedAt)
+                              : "Never",
+                          },
+                          { label: "Client", value: selected.name },
+                          { label: "Resource", value: selected.resource },
+                          {
+                            label: "Workspace",
+                            value:
+                              selected.resource === "/mcp-admin"
+                                ? "Administration"
+                                : (workspaces.find(
+                                    (w) => w.id === selected.workspaceId
+                                  )?.name ?? "Deleted workspace"),
+                          },
+                        ]}
+                      />
+                      <div className="detail-actions">
+                        <Button
+                          variant="outline"
+                          render={
+                            <Link
+                              to="/sessions"
+                              search={{ q: selected.name }}
+                            />
+                          }
+                        >
+                          Show sessions
+                        </Button>
+                        {!selected.revoked && (
+                          <ConfirmAction
+                            label="Revoke token"
+                            description="The agent loses access on its next request. OAuth refresh access is revoked with its grant."
+                            onConfirm={async () => {
+                              await write(
+                                `/api/tokens/${selected.id}`,
+                                "DELETE",
+                                undefined,
+                                nothing
+                              )
+                              await cache.invalidateQueries({
+                                queryKey: ["tokens"],
+                              })
+                            }}
+                          />
+                        )}
+                      </div>
+                    </>
+                  )
+                )}
+              </div>
+            </>
+          )
         }
       />
       <ShellSlot target="status-keys">

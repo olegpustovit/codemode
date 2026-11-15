@@ -214,7 +214,7 @@ function WorkspaceEditor({ workspace }: { workspace?: Workspace }) {
                   htmlFor={`include-${source.id}`}
                   className="flex flex-1 items-center justify-between gap-3"
                 >
-                  {source.slug}
+                  {source.name}
                   <StateBadge state={source.status} />
                 </FieldLabel>
               </Field>
@@ -226,7 +226,7 @@ function WorkspaceEditor({ workspace }: { workspace?: Workspace }) {
           <p className="mt-2 text-sm">
             {active.length === 0
               ? "No sources selected. Agents will see no tools."
-              : active.map((source) => source.slug).join(", ")}
+              : active.map((source) => source.name).join(", ")}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
             Tools in these sources:{" "}

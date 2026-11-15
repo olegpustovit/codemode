@@ -117,7 +117,7 @@ fn digest(value: &str) -> Vec<u8> {
     Sha256::digest(value.as_bytes()).to_vec()
 }
 
-async fn revoke_grant(tx: &mut sqlx::PgConnection, id: Uuid) -> Result<(), DbError> {
+pub(super) async fn revoke_grant(tx: &mut sqlx::PgConnection, id: Uuid) -> Result<(), DbError> {
     sqlx::query!(
         "UPDATE oauth_grants SET revoked_at=COALESCE(revoked_at,now()) WHERE id=$1",
         id

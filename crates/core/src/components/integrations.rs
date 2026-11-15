@@ -57,7 +57,7 @@ pub async fn list(managed: &Sources) -> Result<Vec<Integration>, Error> {
             },
             entry: Entry {
                 slug: format!("source-{}", source.id),
-                name: source.source.slug,
+                name: source.name,
                 category: if local { "Local" } else { "Custom" }.into(),
                 description: match source.source.transport {
                     Transport::McpHttp { .. } => "Custom MCP server",
@@ -69,7 +69,7 @@ pub async fn list(managed: &Sources) -> Result<Vec<Integration>, Error> {
                 // Custom connection configuration is available only through the browser source API.
                 url: String::new(),
                 docs: String::new(),
-                icon: "custom".into(),
+                icon: source.icon,
                 oauth: None,
                 methods: if local {
                     vec![Method::Local]
@@ -122,7 +122,8 @@ mod tests {
     fn registry_uses_unique_lowercase_names_and_safe_remote_addresses() {
         let entries = registry().unwrap();
         let mut slugs = std::collections::BTreeSet::new();
-        assert!(!entries.is_empty());
+        assert_eq!(entries.len(), 6);
+        assert!(entries.iter().all(|entry| entry.slug != "sentry"));
         for entry in entries {
             assert!(slugs.insert(entry.slug.clone()));
             assert!(

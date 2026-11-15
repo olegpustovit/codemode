@@ -430,3 +430,60 @@ async fn oauth_confidential_clients_expiry_endpoint_deletion_and_concurrent_exch
     }
     assert!(bounded);
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn bulk_revoke_an_old_oauth_token_revokes_the_refresh_grant_and_active_sibling(
+    pool: sqlx::PgPool,
+) {
+    use codemode_core::components::bulk::Selection;
+    let (db, oauth, _, client, authorization) = setup(&pool).await;
+    let auth = Auth::new(db);
+    let code = oauth.issue_code(&authorization).await.unwrap();
+    let first = oauth.token(&client, &exchange(&code)).await.unwrap();
+    let first_id = auth
+        .authenticate(&first.access_token, "test.example")
+        .await
+        .unwrap()
+        .unwrap()
+        .token_id;
+    let second = oauth
+        .token(&client, &refresh(first.refresh_token.as_deref().unwrap()))
+        .await
+        .unwrap();
+    let second_id = auth
+        .authenticate(&second.access_token, "test.example")
+        .await
+        .unwrap()
+        .unwrap()
+        .token_id;
+    assert_eq!(
+        auth.revoke_many(
+            Selection {
+                ids: Some(vec![first_id]),
+                query: None
+            },
+            1
+        )
+        .await
+        .unwrap(),
+        1
+    );
+    assert!(
+        auth.authenticate(&second.access_token, "test.example")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(matches!(
+        oauth
+            .token(&client, &refresh(second.refresh_token.as_deref().unwrap()))
+            .await,
+        Err(OAuthError::Grant)
+    ));
+    let audited: Vec<String> =
+        sqlx::query_scalar("SELECT item FROM control_changes WHERE kind='token' ORDER BY item")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(audited, vec![second_id.to_string()]);
+}

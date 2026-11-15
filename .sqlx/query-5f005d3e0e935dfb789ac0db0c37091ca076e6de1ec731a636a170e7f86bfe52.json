@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id,s.config AS \"config: sqlx::types::Json<Source>\",s.status,s.last_error,\n            to_char(s.synced_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS synced_at,\n            (SELECT count(*) FROM tools t WHERE t.source_id=s.id) AS \"tool_count!\",s.revision,s.python_name AS \"python_name!\"\n            FROM sources s ORDER BY s.slug LIMIT 64",
+  "query": "SELECT s.id,s.name,s.icon,s.config AS \"config: sqlx::types::Json<Source>\",s.status,s.last_error,\n            to_char(s.synced_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS synced_at,\n            (SELECT count(*) FROM tools t WHERE t.source_id=s.id) AS \"tool_count!\",s.revision,s.python_name AS \"python_name!\"\n            FROM sources s ORDER BY s.slug LIMIT 64",
   "describe": {
     "columns": [
       {
@@ -16,6 +16,28 @@
       },
       {
         "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "icon",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "icon"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
         "name": "config: sqlx::types::Json<Source>",
         "type_info": "Jsonb",
         "origin": {
@@ -26,7 +48,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 4,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -37,7 +59,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 5,
         "name": "last_error",
         "type_info": "Text",
         "origin": {
@@ -48,19 +70,19 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 6,
         "name": "synced_at",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
-        "ordinal": 5,
+        "ordinal": 7,
         "name": "tool_count!",
         "type_info": "Int8",
         "origin": "Expression"
       },
       {
-        "ordinal": 6,
+        "ordinal": 8,
         "name": "revision",
         "type_info": "Int8",
         "origin": {
@@ -71,7 +93,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 9,
         "name": "python_name!",
         "type_info": "Text",
         "origin": {
@@ -89,6 +111,8 @@
       false,
       false,
       false,
+      false,
+      false,
       true,
       null,
       null,
@@ -96,5 +120,5 @@
       true
     ]
   },
-  "hash": "d819d97a879eef385c7f3a3d58e7685b0a5870234d9dc1cb7a9c02dd295b5476"
+  "hash": "5f005d3e0e935dfb789ac0db0c37091ca076e6de1ec731a636a170e7f86bfe52"
 }

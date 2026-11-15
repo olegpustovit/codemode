@@ -7,10 +7,7 @@ use axum::{
     routing::any,
 };
 use codemode_core::components::{
-    auth::Principal,
-    execution::log::Log,
-    integrations,
-    sources::{Source, Transport},
+    auth::Principal, execution::log::Log, integrations, sources::Transport,
 };
 use rmcp::{
     ServerHandler,
@@ -116,13 +113,15 @@ struct SaveWorkspace {
 struct SaveSource {
     #[schemars(with = "Option<String>")]
     id: Option<Uuid>,
-    source: Source,
+    source: codemode_core::components::sources::SourceInput,
 }
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SourceSummary {
     id: Uuid,
     name: String,
+    icon: String,
+    slug: String,
     kind: &'static str,
     status: String,
     tool_count: i64,
@@ -219,7 +218,9 @@ impl Administration {
                     .into_iter()
                     .map(|r| SourceSummary {
                         id: r.id,
-                        name: r.source.slug,
+                        name: r.name,
+                        icon: r.icon,
+                        slug: r.source.slug,
                         status: r.status,
                         tool_count: r.tool_count,
                         requires_account: r.source.requires_account,
@@ -249,8 +250,13 @@ impl Administration {
             "save_source",
             serde_json::json!({"id":input.id,"source":"[redacted]"}),
             async {
-                crate::admin::user_source(&input.source).map_err(SourceError::Input)?;
-                Ok::<_, SourceError>(self.state.sources.save(input.id, input.source).await?)
+                crate::admin::user_source(&input.source.source).map_err(SourceError::Input)?;
+                Ok::<_, SourceError>(
+                    self.state
+                        .sources
+                        .save_input(input.id, input.source)
+                        .await?,
+                )
             },
         )
         .await

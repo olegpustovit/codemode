@@ -33,12 +33,19 @@ pub struct Summary {
     pub failures: i64,
     pub status: String,
     pub sources: Vec<String>,
+    #[serde(skip)]
+    total_matches: i64,
+    #[serde(skip)]
+    error_matches: i64,
 }
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Page {
     pub sessions: Vec<Summary>,
     pub next_cursor: Option<Uuid>,
+    pub total_matches: i64,
+    pub all_matches: i64,
+    pub error_matches: i64,
 }
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -100,16 +107,19 @@ impl AgentSessions {
         id: Option<Uuid>,
         query: &str,
         before: Option<Uuid>,
+        errors_only: bool,
     ) -> Result<Vec<Summary>, Error> {
         if query.len() > 1024 {
             return Err(Error::Invalid);
         }
+        let patterns = super::patterns::sql(query);
         sqlx::query_file_as!(
             Summary,
             "src/components/agent_sessions/summary.sql",
             id,
-            query,
-            before
+            &patterns,
+            before,
+            errors_only
         )
         .fetch_all(&self.db.0)
         .await
@@ -117,7 +127,31 @@ impl AgentSessions {
         .map_err(Error::from)
     }
     pub async fn list(&self, query: &str, before: Option<Uuid>) -> Result<Page, Error> {
-        let mut sessions = self.summaries(None, query, before).await?;
+        self.list_filtered(query, before, false).await
+    }
+    pub async fn list_filtered(
+        &self,
+        query: &str,
+        before: Option<Uuid>,
+        errors_only: bool,
+    ) -> Result<Page, Error> {
+        let mut sessions = self.summaries(None, query, before, errors_only).await?;
+        let (all_matches, error_matches) = match sessions.first() {
+            Some(session) => (session.total_matches, session.error_matches),
+            None if before.is_some() || errors_only => self
+                .summaries(None, query, None, false)
+                .await?
+                .first()
+                .map_or((0, 0), |session| {
+                    (session.total_matches, session.error_matches)
+                }),
+            None => (0, 0),
+        };
+        let total_matches = if errors_only {
+            error_matches
+        } else {
+            all_matches
+        };
         let next_cursor = if sessions.len() > 50 {
             sessions.truncate(50);
             sessions.last().map(|s| s.id)
@@ -127,11 +161,14 @@ impl AgentSessions {
         Ok(Page {
             sessions,
             next_cursor,
+            total_matches,
+            all_matches,
+            error_matches,
         })
     }
     pub async fn detail(&self, id: Uuid, before: Option<Uuid>) -> Result<Detail, Error> {
         let session = self
-            .summaries(Some(id), "", None)
+            .summaries(Some(id), "", None, false)
             .await?
             .pop()
             .ok_or(Error::NotFound)?;

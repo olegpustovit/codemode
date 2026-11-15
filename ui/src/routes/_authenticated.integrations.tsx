@@ -1,7 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { z } from "zod"
 import { IntegrationsPage } from "@/features/integrations"
-import { integrationsQuery } from "@/features/queries"
+import {
+  integrationsQuery,
+  sourcesQuery,
+  accountsQuery,
+  oauthAppsQuery,
+} from "@/features/queries"
 export const Route = createFileRoute("/_authenticated/integrations")({
   validateSearch: z.object({
     q: z.string().max(1024).optional().catch(undefined),
@@ -12,7 +17,12 @@ export const Route = createFileRoute("/_authenticated/integrations")({
     oauth: z.enum(["linked", "denied"]).optional().catch(undefined),
   }),
   loader: ({ context }) =>
-    context.queryClient.query({ ...integrationsQuery, staleTime: "static" }),
+    Promise.all([
+      context.queryClient.prefetchQuery(integrationsQuery),
+      context.queryClient.prefetchQuery(sourcesQuery),
+      context.queryClient.prefetchQuery(accountsQuery),
+      context.queryClient.prefetchQuery(oauthAppsQuery),
+    ]),
   head: () => ({ meta: [{ title: "Integrations · Codemode" }] }),
   component: IntegrationsPage,
 })

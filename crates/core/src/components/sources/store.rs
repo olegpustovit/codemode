@@ -1,10 +1,48 @@
 use super::*;
 use secrecy::SecretString;
 
+#[derive(Deserialize, rmcp::schemars::JsonSchema)]
+pub struct SourceInput {
+    #[serde(flatten)]
+    pub source: Source,
+    pub name: Option<String>,
+    pub icon: Option<String>,
+}
+
+#[derive(Deserialize, rmcp::schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Display {
+    pub name: String,
+    pub icon: String,
+}
+impl Display {
+    fn validate(&self) -> Result<(), Error> {
+        if self.name.trim().is_empty()
+            || self.name.chars().count() > 120
+            || self.name.chars().any(char::is_control)
+        {
+            return Err(Error::Display(
+                "name must contain 1..120 visible characters",
+            ));
+        }
+        if ![
+            "plug", "database", "cloud", "bolt", "chart", "mail", "calendar", "card", "box", "bug",
+            "book", "globe", "terminal", "key", "users", "file", "mono",
+        ]
+        .contains(&self.icon.as_str())
+        {
+            return Err(Error::Display("unknown source icon"));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Record {
     pub id: Uuid,
+    pub name: String,
+    pub icon: String,
     #[serde(flatten)]
     pub source: Source,
     pub status: String,
@@ -18,8 +56,10 @@ pub struct Record {
 impl Sources {
     pub async fn list(&self) -> Result<Vec<Record>, Error> {
         self.ensure_names().await?;
+        let presets = super::super::providers::registry()
+            .map_err(|_| Error::Config("invalid provider registry".into()))?;
         let rows = sqlx::query!(
-            r#"SELECT s.id,s.config AS "config: sqlx::types::Json<Source>",s.status,s.last_error,
+            r#"SELECT s.id,s.name,s.icon,s.config AS "config: sqlx::types::Json<Source>",s.status,s.last_error,
             to_char(s.synced_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS synced_at,
             (SELECT count(*) FROM tools t WHERE t.source_id=s.id) AS "tool_count!",s.revision,s.python_name AS "python_name!"
             FROM sources s ORDER BY s.slug LIMIT 64"#
@@ -38,8 +78,11 @@ impl Sources {
             .into_iter()
             .map(|row| {
                 let needs_link = row.config.0.requires_account && !linked.contains(&row.id);
+                let preset = presets.iter().find(|entry| matches!(&row.config.0.transport,Transport::McpHttp{url,..} if entry.url.trim_end_matches('/') == url.trim_end_matches('/')));
                 Record {
                     id: row.id,
+                    name: preset.map_or(row.name, |entry| entry.name.clone()),
+                    icon: preset.map_or(row.icon, |entry| entry.icon.clone()),
                     source: row.config.0,
                     status: if needs_link {
                         "needs_link".into()
@@ -64,7 +107,36 @@ impl Sources {
             .find(|source| source.id == id))
     }
 
-    pub async fn save(&self, id: Option<Uuid>, mut source: Source) -> Result<Uuid, Error> {
+    pub async fn save(&self, id: Option<Uuid>, source: Source) -> Result<Uuid, Error> {
+        self.save_input(
+            id,
+            SourceInput {
+                source,
+                name: None,
+                icon: None,
+            },
+        )
+        .await
+    }
+
+    pub async fn save_input(&self, id: Option<Uuid>, input: SourceInput) -> Result<Uuid, Error> {
+        let SourceInput {
+            mut source,
+            name,
+            icon,
+        } = input;
+        if (name.is_some() || icon.is_some())
+            && matches!(&source.transport,Transport::McpHttp{url,..} if super::super::providers::registry().map_err(|_| Error::Config("invalid provider registry".into()))?.iter().any(|entry| entry.url.trim_end_matches('/') == url.trim_end_matches('/')))
+        {
+            return Err(Error::Display(
+                "preset names and icons are fixed; add this provider from Integrations",
+            ));
+        }
+        let display = Display {
+            name: name.clone().unwrap_or_else(|| source.slug.clone()),
+            icon: icon.clone().unwrap_or_else(|| "plug".into()),
+        };
+        display.validate()?;
         if id.is_none() {
             source.slug.make_ascii_lowercase();
         }
@@ -107,6 +179,10 @@ impl Sources {
             }
         };
         let id = id.unwrap_or_else(Uuid::new_v4);
+        if let Some(old) = &existing {
+            // Display edits cannot rename a connector's stable Python namespace or slug.
+            source.slug.clone_from(&old.slug);
+        }
         let existing_name = sqlx::query_scalar!("SELECT python_name FROM sources WHERE id=$1", id)
             .fetch_optional(&mut *tx)
             .await
@@ -146,10 +222,39 @@ impl Sources {
             Transport::OpenApi { .. } => "openapi",
             Transport::Graphql { .. } => "graphql",
         };
-        sqlx::query!("INSERT INTO sources(id,slug,kind,config,python_name) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET slug=EXCLUDED.slug,kind=EXCLUDED.kind,config=EXCLUDED.config,revision=sources.revision+1,status='pending',last_error=NULL",id,source.slug,kind,config,python_name).execute(&mut *tx).await.map_err(|error|match error {sqlx::Error::Database(ref e) if e.is_unique_violation()=>Error::Conflict,other=>Error::Database(DbError::from(other))})?;
+        sqlx::query!("INSERT INTO sources(id,slug,kind,config,python_name,name,icon) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET kind=EXCLUDED.kind,config=EXCLUDED.config,name=COALESCE($8,sources.name),icon=COALESCE($9,sources.icon),revision=sources.revision+1,status='pending',last_error=NULL",id,source.slug,kind,config,python_name,display.name,display.icon,name,icon).execute(&mut *tx).await.map_err(|error|match error {sqlx::Error::Database(ref e) if e.is_unique_violation()=>Error::Conflict,other=>Error::Database(DbError::from(other))})?;
         tx.commit().await.map_err(DbError::from)?;
         self.wake();
         Ok(id)
+    }
+
+    pub async fn set_display(&self, id: Uuid, display: Display) -> Result<(), Error> {
+        display.validate()?;
+        let record = self.get(id).await?.ok_or(Error::NotFound)?;
+        if let Transport::McpHttp { url, .. } = &record.source.transport {
+            if super::super::providers::registry()
+                .map_err(|_| Error::Config("invalid provider registry".into()))?
+                .iter()
+                .any(|entry| entry.url.trim_end_matches('/') == url.trim_end_matches('/'))
+            {
+                return Err(Error::Display("preset names and icons are fixed"));
+            }
+        }
+        if sqlx::query!(
+            "UPDATE sources SET name=$2,icon=$3 WHERE id=$1",
+            id,
+            display.name,
+            display.icon
+        )
+        .execute(&self.db.0)
+        .await
+        .map_err(DbError::from)?
+        .rows_affected()
+            == 0
+        {
+            return Err(Error::NotFound);
+        }
+        Ok(())
     }
 
     pub async fn remove(&self, id: Uuid) -> Result<bool, Error> {
@@ -295,4 +400,31 @@ fn available_name(slug: &str, used: &mut std::collections::BTreeSet<String>) -> 
         suffix += 1;
     }
     name
+}
+
+impl Sources {
+    pub async fn sync_many(
+        &self,
+        selection: super::super::bulk::Selection<Uuid>,
+        expected: i64,
+    ) -> Result<u64, super::super::bulk::Error> {
+        use super::super::bulk::Error;
+        selection.validate(expected)?;
+        let patterns = selection.patterns();
+        let vendors: Vec<_> = super::super::providers::registry()
+            .map_err(|_| Error::Invalid)?
+            .into_iter()
+            .map(|entry| entry.url.trim_end_matches('/').to_owned())
+            .collect();
+        let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
+        let targets=sqlx::query_scalar!("SELECT id FROM sources WHERE ($1::uuid[] IS NULL OR id=ANY($1)) AND NOT(kind='mcp_http' AND rtrim(config->>'url','/')=ANY($2)) AND NOT EXISTS(SELECT 1 FROM unnest($3::text[]) terms(pattern) WHERE NOT(name ILIKE pattern)) ORDER BY id FOR UPDATE",selection.ids.as_deref(),&vendors,&patterns).fetch_all(&mut *tx).await.map_err(DbError::from)?;
+        if targets.len() as i64 != expected {
+            return Err(Error::Changed);
+        }
+        let request = Uuid::new_v4();
+        let changed=sqlx::query!("WITH changed AS (UPDATE sources SET revision=revision+1,status='pending',last_error=NULL WHERE id=ANY($1) RETURNING id) INSERT INTO control_changes(request_id,kind,item,action) SELECT $2,'source',id::text,'sync' FROM changed",&targets,request).execute(&mut *tx).await.map_err(DbError::from)?.rows_affected();
+        tx.commit().await.map_err(DbError::from)?;
+        self.wake();
+        Ok(changed)
+    }
 }

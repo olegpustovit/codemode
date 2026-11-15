@@ -116,3 +116,55 @@ impl Auth {
         oauth::revoke_access(&self.db, id).await
     }
 }
+
+impl Auth {
+    pub async fn revoke_many(
+        &self,
+        selection: super::bulk::Selection<Uuid>,
+        expected: i64,
+    ) -> Result<u64, super::bulk::Error> {
+        use super::bulk::Error as BulkError;
+        selection.validate(expected)?;
+        let patterns = selection.patterns();
+        let mut tx = self.db.0.begin().await.map_err(Error::from)?;
+        let selected=sqlx::query!("SELECT id,oauth_grant FROM access_tokens WHERE ($1::uuid[] IS NULL OR id=ANY($1)) AND NOT EXISTS(SELECT 1 FROM unnest($2::text[]) terms(pattern) WHERE NOT(name ILIKE pattern)) ORDER BY id",selection.ids.as_deref(),&patterns).fetch_all(&mut *tx).await.map_err(Error::from)?;
+        if selected.len() as i64 != expected {
+            return Err(BulkError::Changed);
+        }
+        let ids: Vec<_> = selected.iter().map(|token| token.id).collect();
+        let grants: Vec<_> = selected
+            .iter()
+            .filter_map(|token| token.oauth_grant)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        // Match OAuth's endpoint -> grant -> access-token lock order, including refresh siblings.
+        sqlx::query!("SELECT e.id FROM endpoints e WHERE EXISTS(SELECT 1 FROM oauth_grants g WHERE g.endpoint_id=e.id AND g.id=ANY($1)) ORDER BY e.id FOR KEY SHARE",&grants).fetch_all(&mut *tx).await.map_err(Error::from)?;
+        sqlx::query!(
+            "SELECT id FROM oauth_grants WHERE id=ANY($1) ORDER BY id FOR UPDATE",
+            &grants
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(Error::from)?;
+        let changed=sqlx::query!("SELECT id,workspace_id FROM access_tokens WHERE (id=ANY($1) OR oauth_grant=ANY($2)) AND revoked_at IS NULL ORDER BY id FOR UPDATE",&ids,&grants).fetch_all(&mut *tx).await.map_err(Error::from)?;
+        for grant in grants {
+            oauth::revoke_grant(&mut tx, grant)
+                .await
+                .map_err(Error::from)?;
+        }
+        sqlx::query!(
+            "UPDATE access_tokens SET revoked_at=now() WHERE id=ANY($1) AND revoked_at IS NULL",
+            &ids
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(Error::from)?;
+        let request = Uuid::new_v4();
+        for token in &changed {
+            sqlx::query!("INSERT INTO control_changes(request_id,workspace_id,kind,item,action) VALUES($1,$2,'token',$3,'revoke')",request,token.workspace_id,token.id.to_string()).execute(&mut *tx).await.map_err(Error::from)?;
+        }
+        tx.commit().await.map_err(Error::from)?;
+        Ok(changed.len() as u64)
+    }
+}

@@ -24,7 +24,7 @@ use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, path::Path, sync::Arc, time::Duration};
-pub use store::Record;
+pub use store::{Display, Record, SourceInput};
 use tokio::sync::{Notify, RwLock};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -75,6 +75,8 @@ pub struct Config {
 pub enum Error {
     #[error("invalid sources configuration: {0}")]
     Config(String),
+    #[error("{0}")]
+    Display(&'static str),
     #[error("source connection or synchronization failed")]
     Upstream,
     #[error("OpenAPI document loading is busy; retry shortly")]

@@ -13,7 +13,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query"
-import { LogOut, ChevronDown } from "lucide-react"
+import { ChevronDown } from "lucide-react"
+import { AccountMenu } from "@/components/account-menu"
 import { Button } from "@/components/ui/button"
 import { ErrorNotice } from "@/components/common"
 import { ShellTargets } from "@/components/shell-slot"
@@ -74,9 +75,7 @@ export function AppShell() {
     enabled: !!workspace,
   }).data
   const counts = {
-    "/sessions": sessions
-      ? `${sessions.sessions.length}${sessions.nextCursor ? "+" : ""}`
-      : "—",
+    "/sessions": sessions ? String(sessions.totalMatches) : "—",
     "/integrations":
       integrations?.filter((s) => s.state === "ready").length ?? "—",
     "/workspaces": workspaces.length,
@@ -184,14 +183,12 @@ export function AppShell() {
             >
               Copy agent URL
             </Button>
-            <button
-              onClick={() => logout.mutate()}
-              aria-label="Sign out of your account"
-              className="account-avatar"
-              title={session.user?.email}
-            >
-              {session.user?.email?.[0]?.toUpperCase()}
-            </button>
+            <AccountMenu
+              email={session.user?.email ?? ""}
+              onLogout={() => logout.mutate()}
+              busy={logout.isPending}
+            />
+            <ErrorNotice error={logout.error} />
           </header>
           <aside className="section-rail" id="section-navigation">
             <nav className="section-nav" aria-label="Sections">
@@ -256,18 +253,6 @@ export function AppShell() {
                 </button>
               ))}
             </fieldset>
-            <div className="rail-footer">
-              <p>{session.user?.email}</p>
-              <ErrorNotice error={logout.error} />
-              <Button
-                variant="ghost"
-                onClick={() => logout.mutate()}
-                disabled={logout.isPending}
-              >
-                <LogOut data-icon="inline-start" />
-                Sign out
-              </Button>
-            </div>
           </aside>
           <main id="content" className="work-area" tabIndex={-1}>
             <Outlet />

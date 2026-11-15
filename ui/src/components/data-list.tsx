@@ -1,12 +1,49 @@
 /* oxlint-disable jsx-a11y/no-noninteractive-element-to-interactive-role -- The WAI-ARIA grid pattern uses native table cells and one active-descendant focus. */
-import { Fragment, useId, useLayoutEffect, useRef } from "react"
+import { Fragment, useId, useLayoutEffect, useRef, useState } from "react"
 import type { ReactNode, RefObject } from "react"
-import { useListNavigation } from "@/hooks/use-list-navigation"
+import {
+  useListNavigation,
+  useListSelection,
+} from "@/hooks/use-list-navigation"
+import { message } from "@/lib/api"
+import {
+  Empty,
+  EmptyHeader,
+  EmptyDescription,
+  EmptyTitle,
+  EmptyMedia,
+  EmptyContent,
+} from "@/components/ui/empty"
+export function ListEmpty({
+  title,
+  description,
+  icon,
+  children,
+}: {
+  title: string
+  description: string
+  icon?: ReactNode
+  children?: ReactNode
+}) {
+  return (
+    <>
+      <EmptyHeader>
+        {icon && <EmptyMedia>{icon}</EmptyMedia>}
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+      {children && (
+        <EmptyContent className="empty-actions">{children}</EmptyContent>
+      )}
+    </>
+  )
+}
 export type ListRow = {
   id: string
   label: string
   group: string
   cells: ReactNode[]
+  renameable?: boolean
 }
 export function DataList({
   rows,
@@ -20,6 +57,13 @@ export function DataList({
   busy = false,
   listRef,
   empty = "No items match this view.",
+  selection: sharedSelection,
+  selectionScope = label,
+  totalMatches = rows.length,
+  onRename,
+  onDelete,
+  onAction,
+  onLoadMore,
 }: {
   rows: readonly ListRow[]
   className?: string
@@ -31,7 +75,14 @@ export function DataList({
   label: string
   busy?: boolean
   listRef?: RefObject<HTMLTableElement | null>
-  empty?: string
+  empty?: ReactNode
+  selection?: ReturnType<typeof useListSelection>
+  selectionScope?: string
+  totalMatches?: number
+  onRename?: (id: string, name: string) => Promise<void>
+  onDelete?: () => void
+  onAction?: (key: string) => boolean
+  onLoadMore?: () => void
 }) {
   const prefix = useId()
   const ownRef = useRef<HTMLTableElement>(null)
@@ -39,13 +90,48 @@ export function DataList({
   const cursor = useRef<HTMLTableRowElement>(null)
   const selected = rows.findIndex((row) => row.id === selectedId)
   const active = selected < 0 ? 0 : selected
-  const { onKeyDown } = useListNavigation(
+  const ownSelection = useListSelection(selectionScope)
+  const selection = sharedSelection ?? ownSelection
+  const [touchSelection, setTouchSelection] = useState(false)
+  const [rename, setRename] = useState<{ id: string; value: string } | null>(
+    null
+  )
+  const [saving, setSaving] = useState(false)
+  const [renameError, setRenameError] = useState("")
+  const requestedLength = useRef<number | null>(null)
+  const startRename = () => {
+    const row = rows[active]
+    if (row && onRename && row.renameable !== false) {
+      setRename({ id: row.id, value: row.label })
+      setRenameError("")
+    }
+  }
+  const { onKeyDown, choose } = useListNavigation(
     rows.map((row) => row.id),
     rows[active]?.id,
     onSelect,
     onOpen,
-    onBack
+    onBack,
+    {
+      selection,
+      onRename: onRename ? startRename : undefined,
+      onDelete,
+      onAction,
+      onLoadMore: onLoadMore
+        ? () => {
+            requestedLength.current = rows.length
+            onLoadMore()
+          }
+        : undefined,
+    }
   )
+  useLayoutEffect(() => {
+    const previous = requestedLength.current
+    if (previous !== null && rows.length > previous) {
+      requestedLength.current = null
+      choose(rows[previous].id)
+    }
+  }, [rows, choose])
   useLayoutEffect(() => {
     const place = () => {
       const row = document.getElementById(`${prefix}-${active}`)
@@ -61,26 +147,78 @@ export function DataList({
   }, [rows, active, prefix, root])
   return (
     <div className={`data-list ${className}`}>
+      {!!rows.length && (
+        <div className="list-selection-tools">
+          <button
+            className="list-select-toggle"
+            aria-pressed={touchSelection}
+            onClick={() => setTouchSelection(!touchSelection)}
+          >
+            {touchSelection ? "Done selecting" : "Select"}
+          </button>
+          {(selection.value.ids.length > 1 || selection.value.allMatching) && (
+            <>
+              <span>
+                {selection.value.allMatching
+                  ? totalMatches
+                  : selection.value.ids.length}{" "}
+                selected
+              </span>
+              {!selection.value.allMatching &&
+                totalMatches > selection.value.ids.length && (
+                  <button
+                    onClick={() =>
+                      selection.set({ ...selection.value, allMatching: true })
+                    }
+                  >
+                    Select all {totalMatches} matching
+                  </button>
+                )}
+            </>
+          )}
+        </div>
+      )}
+      {renameError && (
+        <p role="alert" className="bad">
+          {renameError}
+        </p>
+      )}
       <table
         className="data-grid"
         role="grid"
         aria-label={label}
         aria-busy={busy}
+        aria-multiselectable="true"
         aria-colcount={columns.length}
         aria-activedescendant={rows.length ? `${prefix}-${active}` : undefined}
         tabIndex={0}
         ref={root}
         onKeyDown={onKeyDown}
+        onScrollCapture={(event) => {
+          const body = event.target
+          if (
+            body instanceof HTMLElement &&
+            body.classList.contains("data-body") &&
+            body.scrollHeight - body.scrollTop - body.clientHeight < 120
+          )
+            onLoadMore?.()
+        }}
       >
-        <thead>
-          <tr className="data-head">
-            {columns.map((column, i) => (
-              <th scope="col" className={i ? "data-extra" : undefined} key={i}>
-                {column}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        {rows.length > 0 && (
+          <thead>
+            <tr className="data-head">
+              {columns.map((column, i) => (
+                <th
+                  scope="col"
+                  className={i ? "data-extra" : undefined}
+                  key={i}
+                >
+                  {column}
+                </th>
+              ))}
+            </tr>
+          </thead>
+        )}
         <tbody className="data-body">
           {rows.length ? (
             <tr className="data-cursor" ref={cursor} aria-hidden="true">
@@ -100,16 +238,84 @@ export function DataList({
                   id={`${prefix}-${index}`}
                   className="data-row"
                   aria-label={row.label}
-                  aria-selected={index === active}
+                  aria-selected={
+                    selection.value.allMatching ||
+                    (selection.value.ids.length
+                      ? selection.value.ids.includes(row.id)
+                      : index === active)
+                  }
+                  data-active={index === active}
                   onKeyDown={onKeyDown}
-                  onClick={() => {
+                  onClick={(event) => {
+                    if (
+                      event.target instanceof Element &&
+                      event.target.closest("button,a,input,select,textarea")
+                    )
+                      return
                     root.current?.focus()
-                    onOpen(row.id)
+                    if (event.shiftKey) choose(row.id, "range")
+                    else if (event.metaKey || event.ctrlKey || touchSelection)
+                      choose(row.id, "toggle")
+                    else {
+                      choose(row.id)
+                      onOpen(row.id)
+                    }
                   }}
                 >
                   {row.cells.map((cell, i) => (
                     <td className={i ? "data-extra" : "data-name"} key={i}>
-                      {cell}
+                      {i === 0 && touchSelection && (
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${row.label}`}
+                          checked={
+                            selection.value.allMatching ||
+                            selection.value.ids.includes(row.id)
+                          }
+                          onChange={() => choose(row.id, "toggle")}
+                        />
+                      )}
+                      {i === 0 && rename?.id === row.id ? (
+                        <input
+                          className="row-rename"
+                          aria-label={`Rename ${row.label}`}
+                          value={rename.value}
+                          ref={(node) => {
+                            node?.focus()
+                          }}
+                          maxLength={120}
+                          disabled={saving}
+                          onChange={(event) =>
+                            setRename({ ...rename, value: event.target.value })
+                          }
+                          onKeyDown={(event) => {
+                            event.stopPropagation()
+                            if (event.key === "Escape") {
+                              event.preventDefault()
+                              setRename(null)
+                              root.current?.focus()
+                            } else if (
+                              event.key === "Enter" &&
+                              onRename &&
+                              !saving
+                            ) {
+                              event.preventDefault()
+                              setSaving(true)
+                              void onRename(rename.id, rename.value)
+                                .then(() => {
+                                  setRename(null)
+                                  root.current?.focus()
+                                })
+                                .catch((error) =>
+                                  setRenameError(message(error))
+                                )
+                                .finally(() => setSaving(false))
+                            }
+                          }}
+                        />
+                      ) : (
+                        cell
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -118,7 +324,22 @@ export function DataList({
           })}
         </tbody>
       </table>
-      {!rows.length && <p className="list-empty">{empty}</p>}
+      {!rows.length && (
+        <Empty className="list-empty">
+          {typeof empty === "string" ? (
+            <EmptyHeader>
+              <EmptyTitle>
+                {busy
+                  ? `Loading ${label.toLowerCase()}…`
+                  : `No ${label.toLowerCase()}`}
+              </EmptyTitle>
+              <EmptyDescription>{empty}</EmptyDescription>
+            </EmptyHeader>
+          ) : (
+            empty
+          )}
+        </Empty>
+      )}
     </div>
   )
 }

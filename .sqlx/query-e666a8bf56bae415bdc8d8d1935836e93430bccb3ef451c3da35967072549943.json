@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH changed AS (INSERT INTO tool_policies(endpoint_id,source_id,upstream_name,action) SELECT $1,source_id,name,$4 FROM unnest($2::uuid[],$3::text[]) targets(source_id,name) ON CONFLICT(endpoint_id,source_id,upstream_name) DO UPDATE SET action=EXCLUDED.action WHERE tool_policies.action IS DISTINCT FROM EXCLUDED.action RETURNING source_id,upstream_name) INSERT INTO control_changes(request_id,workspace_id,kind,item,action) SELECT $5,$1,'policy',t.path,$4 FROM changed c JOIN tools t ON t.source_id=c.source_id AND t.upstream_name=c.upstream_name",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "TextArray",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e666a8bf56bae415bdc8d8d1935836e93430bccb3ef451c3da35967072549943"
+}

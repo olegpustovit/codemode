@@ -7,12 +7,13 @@ import {
 } from "@tanstack/react-query"
 import { RefreshCw, ArrowLeft } from "lucide-react"
 import { z } from "zod"
-import { sourceQuery, workspacesQuery } from "./queries"
+import { sourceQuery, workspacesQuery, integrationsQuery } from "./queries"
 import type { Source } from "./queries"
 import { created, nothing, write } from "@/lib/api"
 import { PageHeader, StateBadge, ErrorNotice, date } from "@/components/common"
 import { ConfirmAction } from "@/components/confirm-action"
 import { Button } from "@/components/ui/button"
+import { IconPicker } from "@/components/icon-picker"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -46,7 +47,11 @@ export function SourcePage() {
   const sync = useMutation({
     mutationFn: () =>
       write(`/api/sources/${sourceId}/sync`, "POST", undefined, nothing),
-    onSuccess: () => cache.invalidateQueries({ queryKey: ["sources"] }),
+    onSuccess: () =>
+      Promise.all([
+        cache.invalidateQueries({ queryKey: ["sources"] }),
+        cache.invalidateQueries({ queryKey: ["integrations"] }),
+      ]),
   })
   return (
     <>
@@ -58,7 +63,7 @@ export function SourcePage() {
         Sources
       </Link>
       <PageHeader
-        title={source.slug}
+        title={source.name}
         description={`Python namespace: tools.${source.pythonName}`}
         action={
           <div className="flex gap-2">
@@ -148,17 +153,36 @@ export function SourcePage() {
   )
 }
 function SourceEditor({ source }: { source?: Source }) {
+  const integrations = useSuspenseQuery(integrationsQuery).data
+  const preset = integrations.some(
+    (entry) =>
+      entry.sourceId === source?.id && !entry.slug.startsWith("source-")
+  )
   const [kind, setKind] = useState(source?.kind ?? "mcp_http")
+  const [displayName, setDisplayName] = useState(source?.name ?? "")
   const cache = useQueryClient()
   const router = useRouter()
   const save = useMutation({
     mutationFn: async (form: FormData) => {
-      const slug = z
-        .string()
-        .min(1)
-        .max(64)
-        .regex(/^[a-zA-Z0-9_-]+$/)
-        .parse(form.get("slug"))
+      const name = z.string().min(1).max(120).parse(form.get("name"))
+      const slug =
+        source?.slug ??
+        (name
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]+/g, "_")
+          .replace(/^_+|_+$/g, "")
+          .slice(0, 64) ||
+          "source")
+      const icon = String(form.get("icon") ?? source?.icon ?? "plug")
+      if (source?.kind === "mcp_stdio") {
+        await write(
+          `/api/sources/${source.id}`,
+          "PATCH",
+          { name, icon },
+          nothing
+        )
+        return source.id
+      }
       const requiresAccount = form.get("requiresAccount") === "on"
       const transport =
         kind !== "mcp_stdio"
@@ -180,7 +204,12 @@ function SourceEditor({ source }: { source?: Source }) {
                 .array(z.string())
                 .parse(JSON.parse(String(form.get("args") || "[]"))),
             }
-      const body = { slug, requiresAccount, ...transport }
+      const body = {
+        slug,
+        ...(!preset ? { name, icon } : {}),
+        requiresAccount,
+        ...transport,
+      }
       if (source) {
         await write(`/api/sources/${source.id}`, "PUT", body, nothing)
         return source.id
@@ -190,6 +219,7 @@ function SourceEditor({ source }: { source?: Source }) {
     onSuccess: async (id) => {
       await Promise.all([
         cache.invalidateQueries({ queryKey: ["sources"] }),
+        cache.invalidateQueries({ queryKey: ["integrations"] }),
         cache.invalidateQueries({ queryKey: ["accounts"] }),
         cache.invalidateQueries({ queryKey: ["policies"] }),
       ])
@@ -209,25 +239,40 @@ function SourceEditor({ source }: { source?: Source }) {
     >
       <FieldGroup>
         <Field>
-          <FieldLabel htmlFor="slug">Source name</FieldLabel>
+          <FieldLabel htmlFor="source-name">Name</FieldLabel>
           <Input
-            id="slug"
-            name="slug"
-            defaultValue={source?.slug}
+            id="source-name"
+            name="name"
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
             required
-            pattern="[a-zA-Z0-9_-]+"
-            maxLength={64}
-            placeholder="research"
+            maxLength={120}
+            readOnly={preset}
+            placeholder="Acme Billing"
           />
           <FieldDescription>
-            Letters, numbers, dashes and underscores.
+            {source ? (
+              <>
+                Python namespace: <code>tools.{source.pythonName}</code>.
+                Renaming keeps it unchanged.
+              </>
+            ) : (
+              "The Python namespace is derived once from this name."
+            )}
           </FieldDescription>
         </Field>
+        {!preset && (
+          <IconPicker
+            selected={source?.icon ?? "plug"}
+            label={displayName || "Source"}
+          />
+        )}
         <Field>
           <FieldLabel htmlFor="kind">Connection type</FieldLabel>
           <NativeSelect
             id="kind"
             name="kind"
+            disabled={source?.kind === "mcp_stdio"}
             value={kind}
             onChange={(e) =>
               setKind(
@@ -312,6 +357,7 @@ function SourceEditor({ source }: { source?: Source }) {
               <Input
                 id="command"
                 name="command"
+                readOnly
                 required
                 defaultValue={
                   source?.kind === "mcp_stdio" ? source.command : ""
@@ -319,7 +365,7 @@ function SourceEditor({ source }: { source?: Source }) {
                 placeholder="/usr/local/bin/mcp-server"
               />
               <FieldDescription>
-                Absolute path on the gateway server.
+                Operator-managed connection. You can change its name and icon.
               </FieldDescription>
             </Field>
             <Field>
@@ -327,6 +373,7 @@ function SourceEditor({ source }: { source?: Source }) {
               <Textarea
                 id="args"
                 name="args"
+                readOnly
                 className="font-mono"
                 defaultValue={JSON.stringify(
                   source?.kind === "mcp_stdio" ? source.args : [],

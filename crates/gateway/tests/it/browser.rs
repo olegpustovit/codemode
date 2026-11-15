@@ -275,6 +275,35 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
     let source_info = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(source_info["pythonName"], "fixture");
     assert_eq!(source_info["status"], "needs_link");
+    assert_eq!(source_info["name"], "fixture");
+    assert_eq!(source_info["icon"], "plug");
+    let path = format!("/api/sources/{source}");
+    let updated = request(reqwest::Method::PATCH, &path)
+        .header("cookie", &cookie)
+        .json(&serde_json::json!({"name":"Acme Billing","icon":"card"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(updated.status(), StatusCode::NO_CONTENT);
+    let renamed = request(reqwest::Method::GET, &path)
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap()
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    assert_eq!(renamed["name"], "Acme Billing");
+    assert_eq!(renamed["icon"], "card");
+    assert_eq!(renamed["slug"], "fixture");
+    assert_eq!(renamed["pythonName"], "fixture");
+    let invalid = request(reqwest::Method::PATCH, &path)
+        .header("cookie", &cookie)
+        .json(&serde_json::json!({"name":"Acme Billing","icon":"arbitrary-svg"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
     let response = request(
         reqwest::Method::POST,
         &format!("/api/sources/{source}/sync"),

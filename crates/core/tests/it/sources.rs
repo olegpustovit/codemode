@@ -16,6 +16,74 @@ fn http(slug: &str, url: &str) -> Source {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn display_name_and_icon_round_trip_without_changing_namespaces(pool: sqlx::PgPool) {
+    use codemode_core::components::sources::{Display, SourceInput};
+    let db = database(&pool).await;
+    let sources = managed_sources(db.clone(), Catalogue::new(db));
+    let input: SourceInput = serde_json::from_value(serde_json::json!({"slug":"Acme_Billing","name":"Acme Billing","icon":"card","kind":"mcp_http","url":"https://billing.example/mcp"})).unwrap();
+    let id = sources.save_input(None, input).await.unwrap();
+    let original = sources.get(id).await.unwrap().unwrap();
+    assert_eq!(
+        (original.name.as_str(), original.icon.as_str()),
+        ("Acme Billing", "card")
+    );
+    assert_eq!(
+        (original.source.slug.as_str(), original.python_name.as_str()),
+        ("acme_billing", "acme_billing")
+    );
+    sources
+        .set_display(
+            id,
+            Display {
+                name: "ACME Finance".into(),
+                icon: "mono".into(),
+            },
+        )
+        .await
+        .unwrap();
+    let renamed = sources.get(id).await.unwrap().unwrap();
+    assert_eq!(renamed.name, "ACME Finance");
+    assert_eq!(renamed.icon, "mono");
+    assert_eq!(renamed.python_name, original.python_name);
+    assert_eq!(renamed.source, original.source);
+    // An old caller omitting display fields preserves the user's metadata.
+    sources.save(Some(id), original.source).await.unwrap();
+    let saved = sources.get(id).await.unwrap().unwrap();
+    assert_eq!(
+        (saved.name.as_str(), saved.icon.as_str()),
+        ("ACME Finance", "mono")
+    );
+    for (name, icon) in [
+        ("Acme", "unknown"),
+        (" ", "plug"),
+        ("Acme\nBilling", "plug"),
+    ] {
+        assert!(matches!(
+            sources
+                .set_display(
+                    id,
+                    Display {
+                        name: name.into(),
+                        icon: icon.into()
+                    }
+                )
+                .await,
+            Err(SourceError::Display(_))
+        ));
+    }
+    let legacy: SourceInput = serde_json::from_value(
+        serde_json::json!({"slug":"Legacy","kind":"mcp_http","url":"https://legacy.example/mcp"}),
+    )
+    .unwrap();
+    let legacy = sources.save_input(None, legacy).await.unwrap();
+    let legacy = sources.get(legacy).await.unwrap().unwrap();
+    assert_eq!(
+        (legacy.name.as_str(), legacy.icon.as_str()),
+        ("Legacy", "plug")
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn managed_sources_keep_names_and_invalidate_credentials_when_destination_changes(
     pool: sqlx::PgPool,
 ) {
@@ -58,7 +126,7 @@ async fn managed_sources_keep_names_and_invalidate_credentials_when_destination_
     assert_eq!(accounts.list().await.unwrap().len(), 1);
     assert_eq!(
         sources.get(first).await.unwrap().unwrap().source.slug,
-        "Renamed"
+        "work_name"
     );
     assert_eq!(
         sources.get(first).await.unwrap().unwrap().python_name,
@@ -175,7 +243,75 @@ async fn integrations_reuse_connections_and_merge_only_the_current_tenants_link_
         Err(integrations::Error::NotFound)
     ));
     assert!(other.list().await.unwrap().is_empty());
+    let sentry = sources
+        .save(None, http("sentry", "https://mcp.sentry.dev/mcp"))
+        .await
+        .unwrap();
+    accounts
+        .link_bearer(sentry, "existing-sentry-credential".into())
+        .await
+        .unwrap();
+    let preserved = integrations::list(&sources)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.source_id == Some(sentry))
+        .unwrap();
+    assert_eq!(preserved.entry.category, "Custom");
+    assert_eq!(preserved.entry.name, "sentry");
+    assert_eq!(preserved.entry.icon, "plug");
+    assert!(
+        accounts
+            .list()
+            .await
+            .unwrap()
+            .iter()
+            .any(|account| account.source_id == sentry)
+    );
     private.close().await;
+}
+
+#[sqlx::test(migrations = false)]
+async fn display_migration_preserves_legacy_sources_and_binary_rollback_inserts(
+    pool: sqlx::PgPool,
+) {
+    let mut legacy = sqlx::migrate!("./migrations");
+    legacy.migrations = legacy
+        .migrations
+        .iter()
+        .filter(|migration| migration.version <= 19)
+        .cloned()
+        .collect::<Vec<_>>()
+        .into();
+    legacy.run(&pool).await.unwrap();
+    let config =
+        serde_json::to_value(http("legacy_billing", "https://billing.example/mcp")).unwrap();
+    let id: Uuid = sqlx::query_scalar("INSERT INTO sources(slug,kind,config,python_name) VALUES('legacy_billing','mcp_http',$1,'legacy_billing') RETURNING id").bind(&config).fetch_one(&pool).await.unwrap();
+    let db = database(&pool).await;
+    let stored: (Uuid, String, String, String, serde_json::Value) =
+        sqlx::query_as("SELECT id,slug,name,icon,config FROM sources WHERE id=$1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        stored,
+        (
+            id,
+            "legacy_billing".into(),
+            "legacy_billing".into(),
+            "plug".into(),
+            config
+        )
+    );
+    let name: String = sqlx::query_scalar(
+        "INSERT INTO sources(slug,kind,config) VALUES('old-binary','mcp_http','{}') RETURNING name",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(name, "old-binary");
+    db.close().await;
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -328,4 +464,30 @@ async fn oauth_apps_are_sealed_tenant_private_and_independent_of_linked_accounts
     ));
     private.close().await;
     db.close().await;
+}
+
+#[sqlx::test(migrations = false)]
+async fn glob_search_matches_the_shared_browser_cases_in_postgres(pool: sqlx::PgPool) {
+    #[derive(serde::Deserialize)]
+    struct Case {
+        query: String,
+        value: String,
+        matches: bool,
+    }
+    let cases: Vec<Case> =
+        serde_json::from_str(include_str!("../../../../fixtures/search-patterns.json")).unwrap();
+    for case in cases {
+        let patterns = codemode_core::components::patterns::sql(&case.query);
+        let result: bool = sqlx::query_scalar("SELECT $1 ILIKE ALL($2::text[])")
+            .bind(&case.value)
+            .bind(patterns)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            result, case.matches,
+            "{} against {}",
+            case.query, case.value
+        );
+    }
 }

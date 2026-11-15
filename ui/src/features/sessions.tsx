@@ -1,3 +1,10 @@
+import { flushSync } from "react-dom"
+import {
+  useListCursor,
+  useListSelection,
+  listSearchKeys,
+} from "@/hooks/use-list-navigation"
+import { MatchText, SearchHint } from "@/components/match-text"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, getRouteApi } from "@tanstack/react-router"
@@ -6,18 +13,18 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
-  useSuspenseQuery,
+  useSuspenseInfiniteQuery,
 } from "@tanstack/react-query"
-import { Search } from "lucide-react"
+import { Search, Activity } from "lucide-react"
 import type { AgentSession } from "./queries"
 import {
-  agentSessionsQuery,
-  agentSessionQuery,
+  agentSessionsInfiniteQuery,
+  agentSessionInfiniteQuery,
   executionQuery,
   sessionActivitySchema,
 } from "./queries"
 import { ExecutionContent } from "./executions"
-import { DataList } from "@/components/data-list"
+import { DataList, ListEmpty } from "@/components/data-list"
 import { PaneStack } from "@/components/pane-stack"
 import { TabBar } from "@/components/tab-bar"
 import { ShellSlot } from "@/components/shell-slot"
@@ -30,26 +37,99 @@ const route = getRouteApi("/_authenticated/sessions")
 export function SessionsPage() {
   const search = route.useSearch()
   const navigate = route.useNavigate()
-  const page = useSuspenseQuery(
-    agentSessionsQuery(search.q, search.before)
-  ).data
-  const rows = page.sessions.filter(
-    (s) => search.tab !== "errors" || s.failures > 0
+  const pages = useSuspenseInfiniteQuery(
+    agentSessionsInfiniteQuery(search.q, search.tab === "errors")
   )
+  const rows = pages.data.pages.flatMap((page) => page.sessions)
+  const totalMatches = pages.data.pages[0]?.totalMatches ?? 0
+  const loadMore = pages.hasNextPage
+    ? () => {
+        if (!pages.isFetching && !pages.isFetchNextPageError)
+          void pages.fetchNextPage({ cancelRefetch: false })
+      }
+    : undefined
+  const [cursor, setCursor] = useListCursor(
+    search.selected ?? search.cursor,
+    `${search.q ?? ""}:${search.tab ?? ""}`
+  )
+  const [opened, setOpened] = useListCursor(search.selected)
+  const [runCursor, setRunCursor] = useListCursor(
+    search.execution ?? search.runCursor,
+    opened
+  )
+  const [openedExecution, setOpenedExecution] = useListCursor(
+    search.execution,
+    opened
+  )
+  const selection = useListSelection(`${search.q ?? ""}:${search.tab ?? ""}`)
   const input = useRef<HTMLInputElement>(null)
   const list = useRef<HTMLTableElement>(null)
   const runs = useRef<HTMLTableElement>(null)
-  const session = useQuery({
-    ...agentSessionQuery(search.selected ?? "", search.runBefore),
-    enabled: !!search.selected,
+  const session = useInfiniteQuery({
+    ...agentSessionInfiniteQuery(opened ?? ""),
+    enabled: !!opened,
+    select: (data) => ({
+      ...data.pages[0],
+      executions: data.pages.flatMap((page) => page.executions),
+    }),
   })
   const execution = useQuery({
-    ...executionQuery(search.execution ?? ""),
+    ...executionQuery(openedExecution ?? ""),
     enabled:
-      !!search.execution &&
-      session.data?.executions.some((e) => e.id === search.execution) === true,
+      !!openedExecution &&
+      session.data?.executions.some((e) => e.id === openedExecution) === true,
   })
-  const timeline = search.view === "timeline" && !search.execution
+  const {
+    data: openedSession,
+    hasNextPage: moreExecutions,
+    isFetching: loadingExecutions,
+    isFetchNextPageError: executionPageError,
+    fetchNextPage: fetchExecutions,
+  } = session
+  const {
+    hasNextPage: moreSessions,
+    isFetching: loadingSessions,
+    isFetchNextPageError: sessionPageError,
+    fetchNextPage: fetchSessions,
+  } = pages
+  useEffect(() => {
+    if (
+      openedExecution &&
+      openedSession &&
+      !openedSession.executions.some(
+        (execution) => execution.id === openedExecution
+      ) &&
+      moreExecutions &&
+      !loadingExecutions &&
+      !executionPageError
+    )
+      void fetchExecutions({ cancelRefetch: false })
+  }, [
+    openedExecution,
+    openedSession,
+    moreExecutions,
+    loadingExecutions,
+    executionPageError,
+    fetchExecutions,
+  ])
+  useEffect(() => {
+    if (
+      opened &&
+      !rows.some((row) => row.id === opened) &&
+      moreSessions &&
+      !loadingSessions &&
+      !sessionPageError
+    )
+      void fetchSessions({ cancelRefetch: false })
+  }, [
+    opened,
+    rows,
+    moreSessions,
+    loadingSessions,
+    sessionPageError,
+    fetchSessions,
+  ])
+  const timeline = search.view === "timeline" && !openedExecution
   const activity = useInfiniteQuery({
     queryKey: ["session-activity"],
     initialPageParam: "",
@@ -62,6 +142,8 @@ export function SessionsPage() {
     enabled: timeline,
     refetchInterval: 5_000,
   })
+  const { report } = useStatus()
+  const cache = useQueryClient()
   const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } =
     activity
   useEffect(() => {
@@ -95,12 +177,14 @@ export function SessionsPage() {
         view: search.view === "timeline" ? "list" : "timeline",
       },
     })
-  const selected = search.selected ?? search.cursor ?? rows[0]?.id
+  const selected = cursor ?? rows[0]?.id
   const back = () => {
-    if (search.execution) {
+    if (openedExecution) {
+      setOpenedExecution("")
       void navigate({ search: { ...search, execution: undefined } })
       requestAnimationFrame(() => runs.current?.focus())
     } else {
+      setOpened("")
       void navigate({
         search: {
           ...search,
@@ -112,7 +196,11 @@ export function SessionsPage() {
       requestAnimationFrame(() => list.current?.focus())
     }
   }
-  const choose = (id: string, open = false) =>
+  const choose = (id: string, open = false) => {
+    setCursor(id)
+    if (open) flushSync(() => setOpened(id))
+    else if (opened) setOpened(id)
+    if (!open) return
     void navigate({
       search: {
         ...search,
@@ -122,6 +210,7 @@ export function SessionsPage() {
       },
       replace: !open,
     })
+  }
   useEffect(() => {
     const keys = (event: KeyboardEvent) => {
       if (
@@ -157,11 +246,11 @@ export function SessionsPage() {
         event.preventDefault()
         back()
       } else if (
-        search.execution &&
+        openedExecution &&
         (event.key === "ArrowDown" || event.key === "ArrowUp")
       ) {
         const items = session.data?.executions ?? []
-        const index = items.findIndex((e) => e.id === search.execution)
+        const index = items.findIndex((e) => e.id === openedExecution)
         const next =
           items[
             Math.max(
@@ -174,10 +263,8 @@ export function SessionsPage() {
           ]
         if (next) {
           event.preventDefault()
-          void navigate({
-            search: { ...search, execution: next.id },
-            replace: true,
-          })
+          setRunCursor(next.id)
+          setOpenedExecution(next.id)
         }
       }
     }
@@ -193,6 +280,7 @@ export function SessionsPage() {
             id="session-search"
             ref={input}
             type="search"
+            aria-describedby="list-search-hint"
             aria-label="Search sessions"
             placeholder="Search sessions"
             value={search.q ?? ""}
@@ -206,13 +294,19 @@ export function SessionsPage() {
                 replace: true,
               })
             }
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault()
-                back()
-              }
-            }}
+            onKeyDown={(event) =>
+              listSearchKeys(
+                event,
+                list.current,
+                () =>
+                  void navigate({
+                    search: { ...search, q: undefined },
+                    replace: true,
+                  })
+              )
+            }
           />
+          <SearchHint />
           <span className="kbd">/</span>
         </label>
       </ShellSlot>
@@ -236,7 +330,7 @@ export function SessionsPage() {
                 ? [
                     {
                       label: session.data.session.title,
-                      onSelect: search.execution
+                      onSelect: openedExecution
                         ? () =>
                             void navigate({
                               search: { ...search, execution: undefined },
@@ -245,7 +339,7 @@ export function SessionsPage() {
                     },
                   ]
                 : []),
-              ...(search.execution
+              ...(openedExecution
                 ? [{ label: execution.data?.title ?? "Execution" }]
                 : []),
             ]}
@@ -278,11 +372,15 @@ export function SessionsPage() {
         label="Filter sessions"
         panelId="session-panes"
         tabs={[
-          { id: "all", label: "All", count: page.sessions.length },
+          {
+            id: "all",
+            label: "All",
+            count: pages.data.pages[0]?.allMatches ?? 0,
+          },
           {
             id: "errors",
             label: "With errors",
-            count: page.sessions.filter((s) => s.failures > 0).length,
+            count: pages.data.pages[0]?.errorMatches ?? 0,
           },
         ]}
         selected={search.tab ?? "all"}
@@ -299,7 +397,7 @@ export function SessionsPage() {
       <PaneStack
         id="session-panes"
         label="Session"
-        open={!!search.selected}
+        open={!!opened}
         list={
           <>
             <DataList
@@ -330,7 +428,9 @@ export function SessionsPage() {
                 }),
                 cells: timeline
                   ? [
-                      s.title,
+                      <MatchText key="title" query={search.q ?? ""}>
+                        {s.title}
+                      </MatchText>,
                       <TimelineLane
                         key="track"
                         session={s}
@@ -339,8 +439,12 @@ export function SessionsPage() {
                       />,
                     ]
                   : [
-                      s.title,
-                      s.client,
+                      <MatchText key="title" query={search.q ?? ""}>
+                        {s.title}
+                      </MatchText>,
+                      <MatchText key="client" query={search.q ?? ""}>
+                        {s.client}
+                      </MatchText>,
                       s.executions,
                       s.toolCalls,
                       <span
@@ -352,20 +456,62 @@ export function SessionsPage() {
                       date(s.lastSeenAt),
                     ],
               }))}
-              onSelect={(id) => {
-                if (search.selected) choose(id)
-                else
-                  void navigate({
-                    search: { ...search, cursor: id },
-                    replace: true,
-                  })
+              selection={selection}
+              totalMatches={totalMatches}
+              onLoadMore={loadMore}
+              onRename={async (id, title) => {
+                await write(`/api/sessions/${id}`, "PATCH", { title }, nothing)
+                await cache.invalidateQueries({ queryKey: ["agent-sessions"] })
+                report("Session renamed")
               }}
+              onSelect={(id) => choose(id)}
               onOpen={(id) => choose(id, true)}
               onBack={back}
               empty={
-                search.q
-                  ? "No matching sessions. Press Esc to clear your search."
-                  : "Waiting for the first execution…"
+                search.q ? (
+                  <ListEmpty
+                    title="No matching sessions"
+                    description="Try another name or pattern. Esc clears your search."
+                  >
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        void navigate({
+                          search: { ...search, q: undefined },
+                          replace: true,
+                        })
+                      }
+                    >
+                      Clear search
+                    </Button>
+                  </ListEmpty>
+                ) : (
+                  <ListEmpty
+                    icon={<Activity strokeWidth={1} aria-hidden="true" />}
+                    title={
+                      search.tab === "errors"
+                        ? "No sessions with errors"
+                        : "No sessions yet"
+                    }
+                    description={
+                      search.tab === "errors"
+                        ? "Sessions with failed executions appear here."
+                        : "Connect an agent and run Python. Its activity will appear here."
+                    }
+                  >
+                    <Button
+                      render={<Link to="/tokens" search={{ detail: "new" }} />}
+                    >
+                      Create personal token
+                    </Button>
+                    <Button
+                      variant="outline"
+                      render={<Link to="/integrations" />}
+                    >
+                      Browse integrations
+                    </Button>
+                  </ListEmpty>
+                )
               }
             />
             {timeline && (
@@ -376,28 +522,20 @@ export function SessionsPage() {
                 )}
               </>
             )}
-            <div className="pane-pagination">
+            <ErrorNotice error={pages.error} />
+            {pages.isFetchingNextPage && (
+              <output className="list-loading">Loading more sessions…</output>
+            )}
+            {pages.isFetchNextPageError && (
               <Button
-                variant="ghost"
-                disabled={!search.before}
+                variant="outline"
                 onClick={() =>
-                  void navigate({ search: { ...search, before: undefined } })
+                  void pages.fetchNextPage({ cancelRefetch: false })
                 }
               >
-                Latest sessions
+                Retry loading sessions
               </Button>
-              <Button
-                variant="ghost"
-                disabled={!page.nextCursor}
-                onClick={() =>
-                  void navigate({
-                    search: { ...search, before: page.nextCursor ?? undefined },
-                  })
-                }
-              >
-                Older sessions
-              </Button>
-            </div>
+            )}
           </>
         }
         detail={
@@ -423,7 +561,7 @@ export function SessionsPage() {
                   label="Session executions"
                   listRef={runs}
                   columns={["Execution", "Calls", "Status"]}
-                  selectedId={search.execution ?? search.runCursor}
+                  selectedId={runCursor}
                   rows={session.data.executions.map((e) => ({
                     id: e.id,
                     label: e.title ?? "Python execution",
@@ -439,59 +577,51 @@ export function SessionsPage() {
                       </span>,
                     ],
                   }))}
-                  onSelect={(id) =>
+                  onSelect={(id) => {
+                    setRunCursor(id)
+                    if (openedExecution) setOpenedExecution(id)
+                  }}
+                  onOpen={(id) => {
+                    setRunCursor(id)
+                    setOpenedExecution(id)
                     void navigate({
-                      search: {
-                        ...search,
-                        runCursor: id,
-                        execution: search.execution ? id : undefined,
-                      },
-                      replace: true,
+                      search: { ...search, selected: opened, execution: id },
                     })
-                  }
-                  onOpen={(id) =>
-                    void navigate({ search: { ...search, execution: id } })
+                  }}
+                  onLoadMore={
+                    session.hasNextPage
+                      ? () => {
+                          if (
+                            !session.isFetching &&
+                            !session.isFetchNextPageError
+                          )
+                            void session.fetchNextPage({ cancelRefetch: false })
+                        }
+                      : undefined
                   }
                   onBack={back}
                 />
-                <div className="pane-pagination">
+                {session.isFetchingNextPage && (
+                  <output className="list-loading">
+                    Loading more executions…
+                  </output>
+                )}
+                {session.isFetchNextPageError && (
                   <Button
-                    variant="ghost"
-                    disabled={!search.runBefore}
+                    variant="outline"
                     onClick={() =>
-                      void navigate({
-                        search: {
-                          ...search,
-                          runBefore: undefined,
-                          execution: undefined,
-                        },
-                      })
+                      void session.fetchNextPage({ cancelRefetch: false })
                     }
                   >
-                    Latest executions
+                    Retry loading executions
                   </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={!session.data.nextCursor}
-                    onClick={() =>
-                      void navigate({
-                        search: {
-                          ...search,
-                          runBefore: session.data?.nextCursor ?? undefined,
-                          execution: undefined,
-                        },
-                      })
-                    }
-                  >
-                    Older executions
-                  </Button>
-                </div>
+                )}
               </>
             )}
           </>
         }
         execution={
-          search.execution ? (
+          openedExecution ? (
             <>
               <div className="pane-heading">
                 <span>Execution</span>

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT t.source_id,s.revision AS source_revision,t.upstream_name,t.path,t.description,t.stub_full AS signature,t.read_only,t.destructive,\n            (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name)) AS \"in_scope!\",p.action AS \"override_action?: Action\",\n            CASE WHEN NOT e.all_tools AND NOT EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name) THEN 'block' ELSE COALESCE(p.action,'allow') END AS \"effective_action!: Action\"\n            FROM tools t JOIN sources s ON s.id=t.source_id JOIN endpoints e ON e.id=$1 LEFT JOIN tool_policies p ON p.endpoint_id=e.id AND p.source_id=t.source_id AND p.upstream_name=t.upstream_name\n            WHERE (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=t.source_id))\n            AND ($2='' OR t.search @@ websearch_to_tsquery('simple',$2)) AND ($3::text IS NULL OR t.path>$3) ORDER BY t.path LIMIT 51",
+  "query": "WITH matched AS (\n            SELECT t.source_id,s.revision AS source_revision,t.upstream_name,t.path,t.description,t.stub_full AS signature,t.read_only,t.destructive,\n            (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name)) AS in_scope,p.action AS override_action,\n            CASE WHEN NOT e.all_tools AND NOT EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name) THEN 'block' ELSE COALESCE(p.action,'allow') END AS effective_action,\n            count(*) OVER() AS total_matches\n            FROM tools t JOIN sources s ON s.id=t.source_id JOIN endpoints e ON e.id=$1 LEFT JOIN tool_policies p ON p.endpoint_id=e.id AND p.source_id=t.source_id AND p.upstream_name=t.upstream_name\n            WHERE (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=t.source_id))\n            AND NOT EXISTS(SELECT 1 FROM unnest($2::text[]) terms(pattern) WHERE NOT (t.path ILIKE pattern OR t.description ILIKE pattern))\n        ) SELECT source_id,source_revision,upstream_name,path,description,signature,read_only,destructive,\n            in_scope AS \"in_scope!\",override_action AS \"override_action?: Action\",effective_action AS \"effective_action!: Action\",total_matches AS \"total_matches!\"\n        FROM matched WHERE ($3::text IS NULL OR path>$3) ORDER BY path LIMIT 51",
   "describe": {
     "columns": [
       {
@@ -113,12 +113,18 @@
         "name": "effective_action!: Action",
         "type_info": "Text",
         "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
+        "name": "total_matches!",
+        "type_info": "Int8",
+        "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "Text",
+        "TextArray",
         "Text"
       ]
     },
@@ -133,8 +139,9 @@
       false,
       null,
       false,
+      null,
       null
     ]
   },
-  "hash": "1df3e222434176c50535e6027a99d97905349dc0bc36cbe21d4f41daa210fc1a"
+  "hash": "199b0454b71a3d368812a28cf52283589739682b3bc35d4ccef880936019a728"
 }

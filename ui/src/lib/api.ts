@@ -41,6 +41,7 @@ export function write<T>(
 }
 export const nothing = z.void()
 export const created = z.object({ id: z.uuid() })
+export const bulkResult = z.object({ changed: z.number() })
 export const httpUrl = z
   .url()
   .refine(

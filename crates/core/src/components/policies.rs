@@ -56,12 +56,15 @@ pub struct ToolPolicy {
     pub in_scope: bool,
     pub override_action: Option<Action>,
     pub effective_action: Action,
+    #[serde(skip)]
+    total_matches: i64,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Page {
     pub tools: Vec<ToolPolicy>,
     pub next_cursor: Option<String>,
+    pub total_matches: i64,
 }
 #[derive(Clone)]
 pub struct Policies {
@@ -94,20 +97,47 @@ impl Policies {
         if query.len() > 1024 || after.is_some_and(|v| v.len() > 1024) {
             return Err(Error::Invalid);
         }
-        let mut tools=sqlx::query_as!(ToolPolicy,r#"SELECT t.source_id,s.revision AS source_revision,t.upstream_name,t.path,t.description,t.stub_full AS signature,t.read_only,t.destructive,
-            (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name)) AS "in_scope!",p.action AS "override_action?: Action",
-            CASE WHEN NOT e.all_tools AND NOT EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name) THEN 'block' ELSE COALESCE(p.action,'allow') END AS "effective_action!: Action"
-            FROM tools t JOIN sources s ON s.id=t.source_id JOIN endpoints e ON e.id=$1 LEFT JOIN tool_policies p ON p.endpoint_id=e.id AND p.source_id=t.source_id AND p.upstream_name=t.upstream_name
-            WHERE (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=t.source_id))
-            AND ($2='' OR t.search @@ websearch_to_tsquery('simple',$2)) AND ($3::text IS NULL OR t.path>$3) ORDER BY t.path LIMIT 51"#,endpoint,query,after)
-            .fetch_all(&self.db.0).await.map_err(DbError::from)?;
+        let patterns = super::patterns::sql(query);
+        let mut tools = self.matching(endpoint, &patterns, after).await?;
+        let total_matches = match tools.first() {
+            Some(tool) => tool.total_matches,
+            None if after.is_some() => self
+                .matching(endpoint, &patterns, None)
+                .await?
+                .first()
+                .map_or(0, |tool| tool.total_matches),
+            None => 0,
+        };
         let next_cursor = if tools.len() > 50 {
             tools.truncate(50);
             tools.last().map(|t| t.path.clone())
         } else {
             None
         };
-        Ok(Page { tools, next_cursor })
+        Ok(Page {
+            tools,
+            next_cursor,
+            total_matches,
+        })
+    }
+    async fn matching(
+        &self,
+        endpoint: Uuid,
+        patterns: &[String],
+        after: Option<&str>,
+    ) -> Result<Vec<ToolPolicy>, Error> {
+        Ok(sqlx::query_as!(ToolPolicy,r#"WITH matched AS (
+            SELECT t.source_id,s.revision AS source_revision,t.upstream_name,t.path,t.description,t.stub_full AS signature,t.read_only,t.destructive,
+            (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name)) AS in_scope,p.action AS override_action,
+            CASE WHEN NOT e.all_tools AND NOT EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name) THEN 'block' ELSE COALESCE(p.action,'allow') END AS effective_action,
+            count(*) OVER() AS total_matches
+            FROM tools t JOIN sources s ON s.id=t.source_id JOIN endpoints e ON e.id=$1 LEFT JOIN tool_policies p ON p.endpoint_id=e.id AND p.source_id=t.source_id AND p.upstream_name=t.upstream_name
+            WHERE (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=t.source_id))
+            AND NOT EXISTS(SELECT 1 FROM unnest($2::text[]) terms(pattern) WHERE NOT (t.path ILIKE pattern OR t.description ILIKE pattern))
+        ) SELECT source_id,source_revision,upstream_name,path,description,signature,read_only,destructive,
+            in_scope AS "in_scope!",override_action AS "override_action?: Action",effective_action AS "effective_action!: Action",total_matches AS "total_matches!"
+        FROM matched WHERE ($3::text IS NULL OR path>$3) ORDER BY path LIMIT 51"#,endpoint,patterns,after)
+            .fetch_all(&self.db.0).await.map_err(DbError::from)?)
     }
     pub async fn set_in_scope(
         &self,
@@ -184,5 +214,66 @@ impl Policies {
         }
         tx.commit().await.map_err(DbError::from)?;
         Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BulkAction {
+    Allow,
+    Block,
+    Include,
+    Exclude,
+}
+impl Policies {
+    pub async fn bulk(
+        &self,
+        endpoint: Uuid,
+        selection: super::bulk::Selection<String>,
+        expected: i64,
+        action: BulkAction,
+    ) -> Result<u64, super::bulk::Error> {
+        use super::bulk::Error;
+        selection.validate(expected)?;
+        if selection
+            .ids
+            .as_ref()
+            .is_some_and(|ids| ids.iter().any(|id| id.is_empty() || id.len() > 1024))
+        {
+            return Err(Error::Invalid);
+        }
+        let patterns = selection.patterns();
+        let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
+        let workspace = sqlx::query!(
+            "SELECT all_tools FROM endpoints WHERE id=$1 FOR UPDATE",
+            endpoint
+        )
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(DbError::from)?
+        .ok_or(Error::Changed)?;
+        if workspace.all_tools && matches!(action, BulkAction::Include | BulkAction::Exclude) {
+            return Err(Error::Scope);
+        }
+        let targets=sqlx::query!("SELECT t.source_id,t.upstream_name,t.path FROM tools t JOIN sources s ON s.id=t.source_id JOIN endpoints e ON e.id=$1 WHERE (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=t.source_id)) AND ($2::text[] IS NULL OR t.path=ANY($2)) AND NOT EXISTS(SELECT 1 FROM unnest($3::text[]) terms(pattern) WHERE NOT(t.path ILIKE pattern OR t.description ILIKE pattern)) ORDER BY t.path FOR SHARE OF s",endpoint,selection.ids.as_deref(),&patterns).fetch_all(&mut *tx).await.map_err(DbError::from)?;
+        if targets.len() as i64 != expected {
+            return Err(Error::Changed);
+        }
+        let sources: Vec<_> = targets.iter().map(|target| target.source_id).collect();
+        let names: Vec<_> = targets
+            .iter()
+            .map(|target| target.upstream_name.clone())
+            .collect();
+        let request = Uuid::new_v4();
+        let changed=match action {
+            BulkAction::Allow | BulkAction::Block => {
+                let action=if matches!(action,BulkAction::Allow) {"allow"} else {"block"};
+                sqlx::query!("WITH changed AS (INSERT INTO tool_policies(endpoint_id,source_id,upstream_name,action) SELECT $1,source_id,name,$4 FROM unnest($2::uuid[],$3::text[]) targets(source_id,name) ON CONFLICT(endpoint_id,source_id,upstream_name) DO UPDATE SET action=EXCLUDED.action WHERE tool_policies.action IS DISTINCT FROM EXCLUDED.action RETURNING source_id,upstream_name) INSERT INTO control_changes(request_id,workspace_id,kind,item,action) SELECT $5,$1,'policy',t.path,$4 FROM changed c JOIN tools t ON t.source_id=c.source_id AND t.upstream_name=c.upstream_name",endpoint,&sources,&names,action,request).execute(&mut *tx).await.map_err(DbError::from)?.rows_affected()
+            }
+            BulkAction::Include => sqlx::query!("WITH changed AS (INSERT INTO endpoint_tools(endpoint_id,source_id,upstream_name) SELECT $1,source_id,name FROM unnest($2::uuid[],$3::text[]) targets(source_id,name) ON CONFLICT DO NOTHING RETURNING source_id,upstream_name) INSERT INTO control_changes(request_id,workspace_id,kind,item,action) SELECT $4,$1,'scope',t.path,'include' FROM changed c JOIN tools t ON t.source_id=c.source_id AND t.upstream_name=c.upstream_name",endpoint,&sources,&names,request).execute(&mut *tx).await.map_err(DbError::from)?.rows_affected(),
+            BulkAction::Exclude => sqlx::query!("WITH changed AS (DELETE FROM endpoint_tools WHERE endpoint_id=$1 AND (source_id,upstream_name) IN (SELECT * FROM unnest($2::uuid[],$3::text[])) RETURNING source_id,upstream_name) INSERT INTO control_changes(request_id,workspace_id,kind,item,action) SELECT $4,$1,'scope',t.path,'exclude' FROM changed c JOIN tools t ON t.source_id=c.source_id AND t.upstream_name=c.upstream_name",endpoint,&sources,&names,request).execute(&mut *tx).await.map_err(DbError::from)?.rows_affected(),
+        };
+        tx.commit().await.map_err(DbError::from)?;
+        Ok(changed)
     }
 }

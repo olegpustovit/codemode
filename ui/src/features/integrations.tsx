@@ -1,3 +1,12 @@
+import { flushSync } from "react-dom"
+import { BulkPane } from "@/components/bulk-pane"
+import { matches } from "@/lib/match"
+import { MatchText, SearchHint } from "@/components/match-text"
+import {
+  useListCursor,
+  useListSelection,
+  listSearchKeys,
+} from "@/hooks/use-list-navigation"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Link, getRouteApi } from "@tanstack/react-router"
@@ -6,7 +15,7 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query"
-import { Plus, Search } from "lucide-react"
+import { Plus, Search, Plug } from "lucide-react"
 import { OAuthAppSetup } from "./oauth-app"
 import {
   integrationsQuery,
@@ -16,7 +25,7 @@ import {
 } from "./queries"
 import type { Integration } from "./queries"
 import { Facts } from "@/components/facts"
-import { DataList } from "@/components/data-list"
+import { DataList, ListEmpty } from "@/components/data-list"
 import { PaneStack } from "@/components/pane-stack"
 import { TabBar } from "@/components/tab-bar"
 import { ShellSlot } from "@/components/shell-slot"
@@ -26,7 +35,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { useStatus } from "@/components/status-bar"
-import { created, httpUrl, message, nothing, write } from "@/lib/api"
+import {
+  created,
+  httpUrl,
+  message,
+  nothing,
+  write,
+  bulkResult,
+} from "@/lib/api"
 import { z } from "zod"
 const route = getRouteApi("/_authenticated/integrations")
 const methodNames = {
@@ -48,15 +64,16 @@ export function filterIntegrations(
   q: string,
   tab: string
 ) {
-  const words = q.toLowerCase().replaceAll("_", " ").trim().split(/\s+/)
   return entries
     .filter((entry) => {
-      const text =
-        `${entry.name} ${entry.category} ${entry.description} ${entry.toolNames.join(" ")}`
-          .toLowerCase()
-          .replaceAll("_", " ")
       return (
-        words.every((word) => text.includes(word)) &&
+        matches(
+          q,
+          entry.name,
+          entry.category,
+          entry.description,
+          ...entry.toolNames
+        ) &&
         (tab === "linked"
           ? entry.state === "ready"
           : tab === "attention"
@@ -73,6 +90,13 @@ export function IntegrationsPage() {
   const entries = useSuspenseQuery(integrationsQuery).data
   const search = route.useSearch()
   const navigate = route.useNavigate()
+  const [cursor, setCursor] = useListCursor(
+    search.selected,
+    `${search.q ?? ""}:${search.tab ?? ""}`
+  )
+  const [pane, setPane] = useListCursor(search.detail, search.selected)
+  const selection = useListSelection(`${search.tab ?? ""}:${search.q ?? ""}`)
+  const cache = useQueryClient()
   const { report } = useStatus()
   const list = useRef<HTMLTableElement>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -88,11 +112,17 @@ export function IntegrationsPage() {
   const tab = search.tab ?? "all"
   const rows = filterIntegrations(entries, q, tab)
   const selected =
-    rows.find(
-      (entry) =>
-        entry.slug === search.selected || entry.sourceId === search.selected
-    ) ?? rows[0]
-  const open = search.detail === "open" && !!selected
+    rows.find((entry) => entry.slug === cursor || entry.sourceId === cursor) ??
+    rows[0]
+  const selectedEntries = selection.value.allMatching
+    ? rows
+    : rows.filter((entry) => selection.value.ids.includes(entry.slug))
+  const selectedCount = selectedEntries.length
+  const bulk = selectedCount > 1
+  const customOnly = selectedEntries.every(
+    (entry) => entry.sourceId && entry.slug.startsWith("source-")
+  )
+  const open = bulk || (pane === "open" && !!selected)
   const tabs = [
     { id: "all", label: "All", count: entries.length },
     {
@@ -108,7 +138,10 @@ export function IntegrationsPage() {
       ).length,
     },
   ]
-  const choose = (id: string, push = false) =>
+  const choose = (id: string, push = false) => {
+    setCursor(id)
+    if (!push) return
+    flushSync(() => setPane("open"))
     void navigate({
       search: {
         ...search,
@@ -119,6 +152,7 @@ export function IntegrationsPage() {
       },
       replace: !push,
     })
+  }
   const changeTab = (id: string) => {
     const target = tabs.find((item) => item.id === id)
     if (!target) return
@@ -135,6 +169,14 @@ export function IntegrationsPage() {
     if (next) choose(next.slug)
   }
   const back = () => {
+    if (selection.value.allMatching || selection.value.ids.length > 1) {
+      selection.set({
+        ids: selected?.slug ? [selected?.slug] : [],
+        allMatching: false,
+      })
+      return
+    }
+    setPane("")
     if (q) void navigate({ search: { ...search, q: undefined }, replace: true })
     else
       void navigate({ search: { ...search, detail: undefined }, replace: true })
@@ -197,8 +239,20 @@ export function IntegrationsPage() {
         <label className="global-search">
           <Search aria-hidden="true" />
           <input
+            onKeyDown={(event) =>
+              listSearchKeys(
+                event,
+                list.current,
+                () =>
+                  void navigate({
+                    search: { ...search, q: undefined },
+                    replace: true,
+                  })
+              )
+            }
             ref={mountSearch}
             type="search"
+            aria-describedby="list-search-hint"
             aria-label="Search this list"
             placeholder="Search vendors and tools"
             value={q}
@@ -209,6 +263,7 @@ export function IntegrationsPage() {
               })
             }
           />
+          <SearchHint />
           <span className="kbd">/</span>
         </label>
       </ShellSlot>
@@ -246,6 +301,7 @@ export function IntegrationsPage() {
         open={open}
         list={
           <DataList
+            selection={selection}
             listRef={list}
             label="Integrations"
             columns={["Vendor", "Connects with", "Status"]}
@@ -254,10 +310,13 @@ export function IntegrationsPage() {
               id: entry.slug,
               label: entry.name,
               group: entry.category,
+              renameable: entry.slug.startsWith("source-"),
               cells: [
                 <span key="name" className="vendor-name">
-                  <VendorGlyph name={entry.icon} />
-                  <span>{entry.name}</span>
+                  <VendorGlyph name={entry.icon} label={entry.name} />
+                  <span>
+                    <MatchText query={q}>{entry.name}</MatchText>
+                  </span>
                 </span>,
                 entry.methods.map((method) => methodNames[method]).join(" / "),
                 <span
@@ -271,22 +330,131 @@ export function IntegrationsPage() {
                 </span>,
               ],
             }))}
+            onRename={async (id, name) => {
+              const entry = entries.find((entry) => entry.slug === id)
+              if (!entry?.sourceId || !id.startsWith("source-")) return
+              await write(
+                `/api/sources/${entry.sourceId}`,
+                "PATCH",
+                { name, icon: entry.icon },
+                nothing
+              )
+              await Promise.all([
+                cache.invalidateQueries({ queryKey: ["integrations"] }),
+                cache.invalidateQueries({ queryKey: ["sources"] }),
+              ])
+              report("Connector renamed; Python namespace unchanged")
+            }}
+            onAction={(key) => {
+              if (
+                key !== "e" ||
+                !selected?.sourceId ||
+                !selected.slug.startsWith("source-")
+              )
+                return false
+              void navigate({
+                to: "/sources/$sourceId",
+                params: { sourceId: selected.sourceId },
+              })
+              return true
+            }}
             onSelect={choose}
             onOpen={(id) => choose(id, true)}
             onBack={back}
-            empty="No integrations match. Try another vendor, category or tool name."
+            empty={
+              q ? (
+                <ListEmpty
+                  title="No matching integrations"
+                  description="Try another name or pattern. Esc clears your search."
+                >
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void navigate({
+                        search: { ...search, q: undefined },
+                        replace: true,
+                      })
+                    }
+                  >
+                    Clear search
+                  </Button>
+                </ListEmpty>
+              ) : (
+                <ListEmpty
+                  icon={<Plug strokeWidth={1} aria-hidden="true" />}
+                  title={
+                    tab === "attention"
+                      ? "No integrations need attention"
+                      : "No linked integrations"
+                  }
+                  description={
+                    tab === "attention"
+                      ? "Your integrations have no connection errors to resolve."
+                      : "Choose a provider or add a custom connector to make its tools available to agents."
+                  }
+                >
+                  <Button variant="outline" onClick={() => changeTab("all")}>
+                    Browse integrations
+                  </Button>
+                </ListEmpty>
+              )
+            }
           />
         }
         detail={
-          selected && (
-            <IntegrationDetails
-              key={selected.slug}
-              entry={selected}
-              close={back}
-              oauthError={
-                search.oauth === "denied" ? search.oauthError : undefined
+          bulk ? (
+            <BulkPane
+              key={JSON.stringify(selection.value)}
+              count={selectedCount}
+              names={selectedEntries.map((entry) => entry.name)}
+              allMatching={selection.value.allMatching}
+              actions={[
+                {
+                  id: "sync",
+                  label: customOnly
+                    ? "Sync connectors"
+                    : "Select only custom connectors to sync",
+                  disabled: !customOnly,
+                },
+              ]}
+              onClose={() =>
+                selection.set({
+                  ids: selected ? [selected.slug] : [],
+                  allMatching: false,
+                })
               }
+              onAction={async () => {
+                const result = await write(
+                  "/api/sources/bulk-sync",
+                  "POST",
+                  {
+                    selection: {
+                      ids: selectedEntries.map((entry) => entry.sourceId),
+                    },
+                    expectedCount: selectedCount,
+                  },
+                  bulkResult
+                )
+                await Promise.all([
+                  cache.invalidateQueries({ queryKey: ["integrations"] }),
+                  cache.invalidateQueries({ queryKey: ["sources"] }),
+                ])
+                report(
+                  `Synchronization requested for ${result.changed} connectors`
+                )
+              }}
             />
+          ) : (
+            selected && (
+              <IntegrationDetails
+                key={selected.slug}
+                entry={selected}
+                close={back}
+                oauthError={
+                  search.oauth === "denied" ? search.oauthError : undefined
+                }
+              />
+            )
           )
         }
       />
@@ -403,7 +571,7 @@ function IntegrationDetails({
       <div className="pane-body">
         <h2>{entry.name}</h2>
         <p className="pane-meta">{integrationState(entry)}</p>
-        <VendorGlyph name={entry.icon} large />
+        <VendorGlyph name={entry.icon} label={entry.name} large />
         <p>{entry.description}</p>
         <Facts
           items={[

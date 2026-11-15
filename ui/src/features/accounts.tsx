@@ -127,10 +127,10 @@ function AccountEditor({ sourceId }: { sourceId: string }) {
         className="flex items-center gap-2 text-sm text-muted-foreground"
       >
         <ArrowLeft className="size-4" />
-        {source.slug}
+        {source.name}
       </Link>
       <PageHeader
-        title={`Account for ${source.slug}`}
+        title={`Account for ${source.name}`}
         description={
           source.kind === "mcp_stdio"
             ? source.command

@@ -1,9 +1,11 @@
-import { queryOptions } from "@tanstack/react-query"
+import { queryOptions, infiniteQueryOptions } from "@tanstack/react-query"
 import { z } from "zod"
 import { api } from "@/lib/api"
 const common = {
   id: z.uuid(),
   slug: z.string(),
+  name: z.string(),
+  icon: z.string(),
   requiresAccount: z.boolean(),
   status: z.string(),
   lastError: z.string().nullable(),
@@ -142,20 +144,27 @@ export const toolPolicySchema = z.object({
   effectiveAction: policyAction,
 })
 export type ToolPolicy = z.infer<typeof toolPolicySchema>
+const policyPageSchema = z.object({
+  tools: toolPolicySchema.array(),
+  totalMatches: z.number(),
+  nextCursor: z.string().nullable(),
+})
+const loadPolicies = (id: string, q: string, cursor?: string) => {
+  const search = new URLSearchParams({ q })
+  if (cursor) search.set("cursor", cursor)
+  return api(`/api/workspaces/${id}/policies?${search}`, policyPageSchema)
+}
 export const policyQuery = (id: string, q = "", cursor?: string) =>
   queryOptions({
     queryKey: ["policies", id, { q, cursor }],
-    queryFn: () => {
-      const search = new URLSearchParams({ q })
-      if (cursor) search.set("cursor", cursor)
-      return api(
-        `/api/workspaces/${id}/policies?${search}`,
-        z.object({
-          tools: toolPolicySchema.array(),
-          nextCursor: z.string().nullable(),
-        })
-      )
-    },
+    queryFn: () => loadPolicies(id, q, cursor),
+  })
+export const policyInfiniteQuery = (id: string, q = "") =>
+  infiniteQueryOptions({
+    queryKey: ["policies", id, "infinite", { q }],
+    initialPageParam: "",
+    queryFn: ({ pageParam }) => loadPolicies(id, q, pageParam),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
   })
 export const scriptSummarySchema = z.object({
   id: z.uuid(),
@@ -232,34 +241,54 @@ export const agentSessionSchema = z.object({
   sources: z.string().array(),
 })
 export type AgentSession = z.infer<typeof agentSessionSchema>
+const agentSessionPageSchema = z.object({
+  sessions: agentSessionSchema.array(),
+  totalMatches: z.number(),
+  allMatches: z.number(),
+  errorMatches: z.number(),
+  nextCursor: z.uuid().nullable(),
+})
+const loadAgentSessions = (q: string, before?: string, errorsOnly = false) => {
+  const search = new URLSearchParams({ q, errors_only: String(errorsOnly) })
+  if (before) search.set("before", before)
+  return api(`/api/sessions?${search}`, agentSessionPageSchema)
+}
 export const agentSessionsQuery = (q = "", before?: string) =>
   queryOptions({
     queryKey: ["agent-sessions", { q, before }],
-    queryFn: () => {
-      const search = new URLSearchParams({ q })
-      if (before) search.set("before", before)
-      return api(
-        `/api/sessions?${search}`,
-        z.object({
-          sessions: agentSessionSchema.array(),
-          nextCursor: z.uuid().nullable(),
-        })
-      )
-    },
+    queryFn: () => loadAgentSessions(q, before),
     refetchInterval: 5_000,
   })
+export const agentSessionsInfiniteQuery = (q = "", errorsOnly = false) =>
+  infiniteQueryOptions({
+    queryKey: ["agent-sessions", "infinite", { q, errorsOnly }],
+    initialPageParam: "",
+    queryFn: ({ pageParam }) => loadAgentSessions(q, pageParam, errorsOnly),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    refetchInterval: 5_000,
+  })
+const agentSessionDetailSchema = z.object({
+  session: agentSessionSchema,
+  executions: detail.array(),
+  nextCursor: z.uuid().nullable(),
+})
+const loadAgentSession = (id: string, before?: string) =>
+  api(
+    `/api/sessions/${id}${before ? `?before=${before}` : ""}`,
+    agentSessionDetailSchema
+  )
 export const agentSessionQuery = (id: string, before?: string) =>
   queryOptions({
     queryKey: ["agent-sessions", id, { before }],
-    queryFn: () =>
-      api(
-        `/api/sessions/${id}${before ? `?before=${before}` : ""}`,
-        z.object({
-          session: agentSessionSchema,
-          executions: detail.array(),
-          nextCursor: z.uuid().nullable(),
-        })
-      ),
+    queryFn: () => loadAgentSession(id, before),
+    refetchInterval: 5_000,
+  })
+export const agentSessionInfiniteQuery = (id: string) =>
+  infiniteQueryOptions({
+    queryKey: ["agent-sessions", id, "infinite"],
+    initialPageParam: "",
+    queryFn: ({ pageParam }) => loadAgentSession(id, pageParam),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     refetchInterval: 5_000,
   })
 

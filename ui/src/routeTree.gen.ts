@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated.account'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated.accounts'
 import { Route as AuthenticatedAuthorizeRouteImport } from './routes/_authenticated.authorize'
 import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated.integrations'
@@ -47,6 +48,11 @@ const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   id: '/accounts',
@@ -172,6 +178,7 @@ const AuthenticatedWorkspacesWorkspaceIdScriptsNewRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/account': typeof AuthenticatedAccountRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/authorize': typeof AuthenticatedAuthorizeRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
@@ -197,6 +204,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/account': typeof AuthenticatedAccountRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/authorize': typeof AuthenticatedAuthorizeRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
@@ -224,6 +232,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
   '/_authenticated/authorize': typeof AuthenticatedAuthorizeRoute
   '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
@@ -251,6 +260,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/account'
     | '/accounts'
     | '/authorize'
     | '/integrations'
@@ -276,6 +286,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/account'
     | '/accounts'
     | '/authorize'
     | '/integrations'
@@ -302,6 +313,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/account'
     | '/_authenticated/accounts'
     | '/_authenticated/authorize'
     | '/_authenticated/integrations'
@@ -353,6 +365,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/account': {
+      id: '/_authenticated/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AuthenticatedAccountRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/accounts': {
       id: '/_authenticated/accounts'
@@ -505,6 +524,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAccountRoute: typeof AuthenticatedAccountRoute
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
   AuthenticatedAuthorizeRoute: typeof AuthenticatedAuthorizeRoute
   AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
@@ -529,6 +549,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAccountRoute: AuthenticatedAccountRoute,
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
   AuthenticatedAuthorizeRoute: AuthenticatedAuthorizeRoute,
   AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,

@@ -17,6 +17,7 @@ use std::sync::Arc;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use uuid::Uuid;
 mod agent_sessions;
+mod bulk;
 mod endpoints;
 mod graphql;
 mod linked;
@@ -51,7 +52,7 @@ async fn database(pool: &sqlx::PgPool) -> Database {
     let db = Database::connect(pool.connect_options().to_url_lossy().as_str())
         .await
         .unwrap();
-    assert_eq!(db.schema_version(), 19);
+    assert_eq!(db.schema_version(), 20);
     db
 }
 

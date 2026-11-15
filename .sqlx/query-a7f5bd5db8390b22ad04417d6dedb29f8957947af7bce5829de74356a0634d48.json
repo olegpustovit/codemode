@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO control_changes(request_id,workspace_id,kind,item,action) VALUES($1,$2,'token',$3,'revoke')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a7f5bd5db8390b22ad04417d6dedb29f8957947af7bce5829de74356a0634d48"
+}

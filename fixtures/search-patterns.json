@@ -1,0 +1,142 @@
+[
+  {
+    "query": "issue",
+    "value": "github.create_issue",
+    "matches": true
+  },
+  {
+    "query": "github.*",
+    "value": "GitHub.create_issue",
+    "matches": true
+  },
+  {
+    "query": "github.*",
+    "value": "linear.create_issue",
+    "matches": false
+  },
+  {
+    "query": "*.delete_*",
+    "value": "github.delete_issue",
+    "matches": true
+  },
+  {
+    "query": "*.delete_*",
+    "value": "github.deleteXissue",
+    "matches": false
+  },
+  {
+    "query": "linear.?et_issue",
+    "value": "linear.get_issue",
+    "matches": true
+  },
+  {
+    "query": "linear.?et_issue",
+    "value": "linear.reset_issue",
+    "matches": false
+  },
+  {
+    "query": "github.* pull",
+    "value": "github.list_pull_requests",
+    "matches": true
+  },
+  {
+    "query": "github.* pull",
+    "value": "github.list_issues",
+    "matches": false
+  },
+  {
+    "query": "100%",
+    "value": "Reached 100% today",
+    "matches": true
+  },
+  {
+    "query": "100%",
+    "value": "Reached 1000 today",
+    "matches": false
+  },
+  {
+    "query": "a_b",
+    "value": "a_b",
+    "matches": true
+  },
+  {
+    "query": "a_b",
+    "value": "axb",
+    "matches": false
+  },
+  {
+    "query": "a\\b",
+    "value": "a\\b",
+    "matches": true
+  },
+  {
+    "query": "a\\b",
+    "value": "ab",
+    "matches": false
+  },
+  {
+    "query": "*100%*",
+    "value": "1000",
+    "matches": false
+  },
+  {
+    "query": "*a_b*",
+    "value": "first a_b last",
+    "matches": true
+  },
+  {
+    "query": "*a_b*",
+    "value": "first axb last",
+    "matches": false
+  },
+  {
+    "query": "[a](b)+",
+    "value": "[a](b)+",
+    "matches": true
+  },
+  {
+    "query": "a?c",
+    "value": "abc",
+    "matches": true
+  },
+  {
+    "query": "a?c",
+    "value": "xabc",
+    "matches": false
+  },
+  {
+    "query": "a*c",
+    "value": "abbbc",
+    "matches": true
+  },
+  {
+    "query": "a*c",
+    "value": "abbb",
+    "matches": false
+  },
+  {
+    "query": "a**c",
+    "value": "ac",
+    "matches": true
+  },
+  {
+    "query": "?",
+    "value": "é",
+    "matches": true
+  },
+  {
+    "query": "",
+    "value": "anything",
+    "matches": true
+  },
+  {
+    "query": "?",
+    "value": "İ",
+    "matches": true
+  },
+  {
+    "query": "İ*",
+    "value": "İd",
+    "matches": true
+  }
+]

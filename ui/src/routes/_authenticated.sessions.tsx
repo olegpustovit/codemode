@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { z } from "zod"
 import { SessionsPage } from "@/features/sessions"
-import { agentSessionsQuery } from "@/features/queries"
+import { agentSessionsInfiniteQuery } from "@/features/queries"
 export const Route = createFileRoute("/_authenticated/sessions")({
   validateSearch: z.object({
     q: z.string().max(1024).optional().catch(undefined),
@@ -14,10 +14,13 @@ export const Route = createFileRoute("/_authenticated/sessions")({
     before: z.uuid().optional().catch(undefined),
     runBefore: z.uuid().optional().catch(undefined),
   }),
-  loaderDeps: ({ search }) => ({ q: search.q, before: search.before }),
+  loaderDeps: ({ search }) => ({
+    q: search.q,
+    errorsOnly: search.tab === "errors",
+  }),
   loader: ({ context, deps }) =>
-    context.queryClient.ensureQueryData(
-      agentSessionsQuery(deps.q, deps.before)
+    context.queryClient.ensureInfiniteQueryData(
+      agentSessionsInfiniteQuery(deps.q, deps.errorsOnly)
     ),
   head: () => ({ meta: [{ title: "Sessions · Codemode" }] }),
   component: SessionsPage,

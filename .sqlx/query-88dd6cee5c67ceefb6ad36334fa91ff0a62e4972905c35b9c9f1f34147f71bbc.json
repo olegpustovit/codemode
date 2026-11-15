@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.source_id,t.upstream_name,t.path FROM tools t JOIN sources s ON s.id=t.source_id JOIN endpoints e ON e.id=$1 WHERE (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=t.source_id)) AND ($2::text[] IS NULL OR t.path=ANY($2)) AND NOT EXISTS(SELECT 1 FROM unnest($3::text[]) terms(pattern) WHERE NOT(t.path ILIKE pattern OR t.description ILIKE pattern)) ORDER BY t.path FOR SHARE OF s",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "tools",
+            "name": "source_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "upstream_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tools",
+            "name": "upstream_name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tools",
+            "name": "path"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "88dd6cee5c67ceefb6ad36334fa91ff0a62e4972905c35b9c9f1f34147f71bbc"
+}

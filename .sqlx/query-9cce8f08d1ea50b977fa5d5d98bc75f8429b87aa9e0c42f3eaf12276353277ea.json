@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT all_tools FROM endpoints WHERE id=$1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "all_tools",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "endpoints",
+            "name": "all_tools"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9cce8f08d1ea50b977fa5d5d98bc75f8429b87aa9e0c42f3eaf12276353277ea"
+}

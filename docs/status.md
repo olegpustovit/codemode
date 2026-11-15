@@ -1,5 +1,9 @@
 # Implementation status
 
+## Schema-20 control-plane fixes — release qualification
+
+All twelve steps of the [control-plane fixes](https://artifacts.microapps.space/a/jqm3ze7az66e) are implemented. Native **111/111**, hardened Oracle **111/111**, exhaustive core **98/98** and UI **32/32** checks pass. Final optimized-browser qualification, visual correction review, restored-backup preservation and deployment remain in progress. See [the implementation ledger](control-plane-fixes/implementation.md). The schema-19 release below remains the current production release.
+
 ## Current release — final-v5 proposal, schema 19
 
 The [replacement proposal](https://artifacts.microapps.space/a/hkwwwp90n0dt) phases A–E are implemented, merged in [PR #1](https://github.com/olegpustovit/codemode/pull/1) and deployed at https://codemode.microapps.space. Code build **d89531faf9a8**, schema **19**, UI **76b8f0e8e2e9**, running SHA-256 **0df472af2cef4962c7d4a954ec04882c6b7366ef9af1f61817ba066e85f972c3**. The restored-backup preflight preserved 18 existing protected metadata tables. Public HTTPS serves byte-identical copies of all 77 staged files; desktop/mobile sign-in checks and service/backup/security-property checks pass. Deployment created no accounts or provider consent.

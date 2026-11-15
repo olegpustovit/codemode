@@ -184,3 +184,52 @@ fn database_error(error: sqlx::Error) -> Error {
         other => Error::Database(DbError::from(other)),
     }
 }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Revision {
+    pub id: Uuid,
+    pub revision: i64,
+}
+impl Scripts {
+    pub async fn remove_many(
+        &self,
+        endpoint: Uuid,
+        selection: super::bulk::Selection<Uuid>,
+        expected: i64,
+        revisions: &[Revision],
+    ) -> Result<u64, super::bulk::Error> {
+        use super::bulk::Error;
+        selection.validate(expected)?;
+        if revisions.len() as i64 != expected || revisions.len() > 128 {
+            return Err(Error::Invalid);
+        }
+        let revisions: std::collections::BTreeMap<_, _> = revisions
+            .iter()
+            .map(|revision| (revision.id, revision.revision))
+            .collect();
+        if revisions.len() as i64 != expected {
+            return Err(Error::Invalid);
+        }
+        let patterns = selection.patterns();
+        let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
+        sqlx::query!("SELECT id FROM endpoints WHERE id=$1 FOR UPDATE", endpoint)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(DbError::from)?
+            .ok_or(Error::Changed)?;
+        let targets=sqlx::query!("SELECT id,revision FROM saved_scripts WHERE endpoint_id=$1 AND ($2::uuid[] IS NULL OR id=ANY($2)) AND NOT EXISTS(SELECT 1 FROM unnest($3::text[]) terms(pattern) WHERE NOT(name ILIKE pattern OR description ILIKE pattern)) ORDER BY id FOR UPDATE",endpoint,selection.ids.as_deref(),&patterns).fetch_all(&mut *tx).await.map_err(DbError::from)?;
+        if targets.len() as i64 != expected
+            || targets
+                .iter()
+                .any(|target| revisions.get(&target.id) != Some(&target.revision))
+        {
+            return Err(Error::Changed);
+        }
+        let ids: Vec<_> = targets.into_iter().map(|target| target.id).collect();
+        let request = Uuid::new_v4();
+        let changed=sqlx::query!("WITH changed AS (DELETE FROM saved_scripts WHERE endpoint_id=$1 AND id=ANY($2) RETURNING id) INSERT INTO control_changes(request_id,workspace_id,kind,item,action) SELECT $3,$1,'script',id::text,'delete' FROM changed",endpoint,&ids,request).execute(&mut *tx).await.map_err(DbError::from)?.rows_affected();
+        tx.commit().await.map_err(DbError::from)?;
+        Ok(changed)
+    }
+}

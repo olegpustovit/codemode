@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH changed AS (DELETE FROM endpoint_tools WHERE endpoint_id=$1 AND (source_id,upstream_name) IN (SELECT * FROM unnest($2::uuid[],$3::text[])) RETURNING source_id,upstream_name) INSERT INTO control_changes(request_id,workspace_id,kind,item,action) SELECT $4,$1,'scope',t.path,'exclude' FROM changed c JOIN tools t ON t.source_id=c.source_id AND t.upstream_name=c.upstream_name",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "TextArray",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6a37eb2f79d14adcaa201d1464347b88859d18409d2151527ae06140fb037e11"
+}

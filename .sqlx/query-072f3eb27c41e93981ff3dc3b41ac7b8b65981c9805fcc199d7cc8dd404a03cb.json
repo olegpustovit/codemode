@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.id FROM endpoints e WHERE EXISTS(SELECT 1 FROM oauth_grants g WHERE g.endpoint_id=e.id AND g.id=ANY($1)) ORDER BY e.id FOR KEY SHARE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "endpoints",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "072f3eb27c41e93981ff3dc3b41ac7b8b65981c9805fcc199d7cc8dd404a03cb"
+}

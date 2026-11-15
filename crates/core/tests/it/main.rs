@@ -16,12 +16,13 @@ use sqlx::ConnectOptions;
 use std::sync::Arc;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use uuid::Uuid;
-mod approvals;
+mod agent_sessions;
 mod endpoints;
 mod graphql;
 mod linked;
 mod oauth;
 mod openapi;
+mod policies;
 mod scripts;
 mod sessions;
 mod sources;
@@ -50,7 +51,7 @@ async fn database(pool: &sqlx::PgPool) -> Database {
     let db = Database::connect(pool.connect_options().to_url_lossy().as_str())
         .await
         .unwrap();
-    assert_eq!(db.schema_version(), 16);
+    assert_eq!(db.schema_version(), 19);
     db
 }
 
@@ -265,18 +266,6 @@ impl Sandbox for FakeSandbox {
     ) -> Result<((), Step), codemode_core::infrastructure::sandbox::Error> {
         unreachable!()
     }
-    async fn snapshot(
-        &self,
-        _: (),
-    ) -> Result<Vec<u8>, codemode_core::infrastructure::sandbox::Error> {
-        unreachable!()
-    }
-    async fn restore(
-        &self,
-        _: &[u8],
-    ) -> Result<((), Vec<u32>), codemode_core::infrastructure::sandbox::Error> {
-        unreachable!()
-    }
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -300,7 +289,6 @@ async fn completion_and_failure_are_audited(pool: sqlx::PgPool) {
         tasks.clone(),
         CancellationToken::new(),
         Default::default(),
-        [73; 32],
     ));
     for (code, status) in [
         ("return 42", "completed"),

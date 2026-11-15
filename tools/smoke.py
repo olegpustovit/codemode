@@ -74,7 +74,7 @@ for version in ["2025-11-25", "2026-07-28"]:
         }, version)
         assert result["protocolVersion"] == version, result
     tools = rpc("tools/list", {}, version)["tools"]
-    assert {tool["name"] for tool in tools} == {"search", "execute", "resume"}
+    assert {tool["name"] for tool in tools} == {"search", "execute"}
     response = rpc("tools/call", {"name": "execute", "arguments": {
         "code": 'print("smoke")\nreturn {"answer": 42}',
     }}, version)

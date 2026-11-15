@@ -51,7 +51,7 @@ async fn stdio_dispatch_only_receives_the_explicit_environment(pool: sqlx::PgPoo
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| root.join("../../.tools/monty/bin/monty"));
     let sandbox = Arc::new(
-        MontySandbox::new(&worker, std::time::Duration::from_secs(1), [73; 32], 32768)
+        MontySandbox::new(&worker, std::time::Duration::from_secs(1), 32768)
             .await
             .unwrap(),
     );
@@ -69,7 +69,6 @@ async fn stdio_dispatch_only_receives_the_explicit_environment(pool: sqlx::PgPoo
         tasks.clone(),
         stop.clone(),
         Default::default(),
-        [73; 32],
     ));
     let result = execution
         .execute(

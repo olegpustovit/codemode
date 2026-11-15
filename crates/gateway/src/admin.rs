@@ -8,12 +8,10 @@ use axum::{
 };
 use codemode_core::components::{
     accounts::{self, Accounts},
+    agent_sessions::{self, AgentSessions},
     auth::Auth,
-    execution::{
-        approvals::{self, Approvals},
-        log,
-    },
-    policies,
+    execution::log,
+    integrations, policies,
     scripts::{self, Scripts},
     sessions::{self, Sessions},
     sources::{self, Sources},
@@ -29,9 +27,9 @@ const CLEAR_COOKIE: &str =
 
 #[derive(Clone)]
 pub struct State {
-    pub approvals: Approvals,
     pub scripts: Scripts,
     pub log: log::Log,
+    pub agent_sessions: AgentSessions,
     pub auth: Auth,
     pub sessions: Arc<Sessions>,
     pub accounts: Arc<Accounts>,
@@ -56,8 +54,10 @@ pub fn router(state: State) -> Router {
             "/api/workspaces/{id}/policies",
             get(tool_policies).put(set_tool_policy),
         )
-        .route("/api/approvals", get(approvals))
-        .route("/api/approvals/{id}", get(approval).post(decide_approval))
+        .route(
+            "/api/workspaces/{id}/policies/source",
+            put(set_source_policy),
+        )
         .route("/api/workspaces/{id}/scope", put(set_tool_scope_mode))
         .route(
             "/api/workspaces/{id}/scope/tools",
@@ -71,6 +71,8 @@ pub fn router(state: State) -> Router {
             "/api/workspaces/{id}/scripts/{script}",
             get(saved_script).put(update_script).delete(remove_script),
         )
+        .route("/api/integrations", get(integration_list))
+        .route("/api/integrations/{slug}", post(add_integration))
         .route("/api/sources", get(sources).post(create_source))
         .route(
             "/api/sources/{id}",
@@ -80,6 +82,11 @@ pub fn router(state: State) -> Router {
         .route("/api/tokens", get(tokens).post(create_token))
         .route("/api/tokens/{id}", delete(revoke_token))
         .route("/api/accounts", get(accounts))
+        .route("/api/oauth-apps", get(configured_oauth_apps))
+        .route(
+            "/api/oauth-apps/{provider}",
+            put(save_oauth_app).delete(remove_oauth_app),
+        )
         .route(
             "/api/accounts/{id}/oauth",
             axum::routing::post(start_upstream_oauth),
@@ -91,6 +98,12 @@ pub fn router(state: State) -> Router {
         )
         .route("/api/accounts/{id}/environment", put(link_environment))
         .route("/api/accounts/{id}/http", put(link_http_account))
+        .route("/api/sessions", get(agent_session_list))
+        .route("/api/session-activity", get(agent_session_activity))
+        .route(
+            "/api/sessions/{id}",
+            get(agent_session_detail).patch(rename_agent_session),
+        )
         .route("/api/executions", get(executions))
         .route("/api/executions/{id}", get(execution))
         .route_layer(middleware::from_fn_with_state(
@@ -109,7 +122,13 @@ pub fn router(state: State) -> Router {
         .with_state(state)
 }
 
-struct ApiError(StatusCode, &'static str);
+enum ApiError {
+    Message(StatusCode, &'static str),
+    OAuth {
+        stage: accounts::OAuthStage,
+        detail: String,
+    },
+}
 struct ApiJson<T>(T);
 impl<S: Send + Sync, T: serde::de::DeserializeOwned> FromRequest<S> for ApiJson<T> {
     type Rejection = ApiError;
@@ -117,34 +136,40 @@ impl<S: Send + Sync, T: serde::de::DeserializeOwned> FromRequest<S> for ApiJson<
         Json::<T>::from_request(request, state)
             .await
             .map(|Json(value)| Self(value))
-            .map_err(|error| ApiError(error.status(), "invalid JSON request"))
+            .map_err(|error| ApiError::Message(error.status(), "invalid JSON request"))
     }
 }
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (self.0, Json(serde_json::json!({"error":self.1}))).into_response()
+        match self {
+            Self::Message(status, message) => (status, Json(serde_json::json!({"error":message}))).into_response(),
+            Self::OAuth { stage, detail } => (StatusCode::BAD_GATEWAY, Json(serde_json::json!({
+                "error":format!("upstream authorization failed at {stage}: {detail}; {}", stage.recovery()),
+                "stage":stage, "detail":detail,
+            }))).into_response(),
+        }
     }
 }
 fn unavailable(error: impl std::error::Error) -> ApiError {
     tracing::error!(error=?error,"control-plane operation failed");
-    ApiError(StatusCode::SERVICE_UNAVAILABLE, "operation unavailable")
+    ApiError::Message(StatusCode::SERVICE_UNAVAILABLE, "operation unavailable")
 }
 impl From<sessions::Error> for ApiError {
     fn from(error: sessions::Error) -> Self {
         match error {
-            sessions::Error::Busy => Self(
+            sessions::Error::Busy => Self::Message(
                 StatusCode::TOO_MANY_REQUESTS,
                 "too many sign-in attempts; try again in one minute",
             ),
-            sessions::Error::NotAllowed => Self(
+            sessions::Error::NotAllowed => Self::Message(
                 StatusCode::FORBIDDEN,
                 "registration is limited to ursus95@gmail.com and @olegpustovit.com addresses",
             ),
-            sessions::Error::Exists => Self(
+            sessions::Error::Exists => Self::Message(
                 StatusCode::CONFLICT,
                 "email is already registered; sign in instead",
             ),
-            sessions::Error::Configuration => Self(
+            sessions::Error::Configuration => Self::Message(
                 StatusCode::BAD_REQUEST,
                 "password must contain 12..1024 bytes",
             ),
@@ -155,21 +180,27 @@ impl From<sessions::Error> for ApiError {
 impl From<accounts::Error> for ApiError {
     fn from(error: accounts::Error) -> Self {
         match error {
-            accounts::Error::Invalid => Self(StatusCode::BAD_REQUEST, "invalid credential"),
-            accounts::Error::NotFound => Self(StatusCode::NOT_FOUND, "source not found"),
-            accounts::Error::OAuth => Self(
-                StatusCode::BAD_GATEWAY,
-                "upstream authorization unavailable; retry linking the account",
+            accounts::Error::Invalid => {
+                Self::Message(StatusCode::BAD_REQUEST, "invalid credential")
+            }
+            accounts::Error::NotFound => Self::Message(StatusCode::NOT_FOUND, "source not found"),
+            accounts::Error::Provider => Self::Message(
+                StatusCode::BAD_REQUEST,
+                "provider does not support OAuth-app configuration",
             ),
-            accounts::Error::State => Self(
+            accounts::Error::OAuth { stage, detail } => {
+                tracing::warn!(%stage, %detail, "upstream authorization failed");
+                Self::OAuth { stage, detail }
+            }
+            accounts::Error::State => Self::Message(
                 StatusCode::BAD_REQUEST,
                 "invalid or expired authorization callback",
             ),
-            accounts::Error::Changed => Self(
+            accounts::Error::Changed => Self::Message(
                 StatusCode::CONFLICT,
                 "source or account changed; retry linking the account",
             ),
-            accounts::Error::Busy => Self(
+            accounts::Error::Busy => Self::Message(
                 StatusCode::TOO_MANY_REQUESTS,
                 "account authorization is busy; retry shortly",
             ),
@@ -180,21 +211,23 @@ impl From<accounts::Error> for ApiError {
 impl From<sources::Error> for ApiError {
     fn from(error: sources::Error) -> Self {
         match error {
-            sources::Error::Busy => Self(
+            sources::Error::Busy => Self::Message(
                 StatusCode::TOO_MANY_REQUESTS,
                 "OpenAPI document loading is busy; retry shortly",
             ),
-            sources::Error::NotFound => Self(StatusCode::NOT_FOUND, "source not found"),
-            sources::Error::Conflict => Self(StatusCode::CONFLICT, "source slug is already in use"),
+            sources::Error::NotFound => Self::Message(StatusCode::NOT_FOUND, "source not found"),
+            sources::Error::Conflict => {
+                Self::Message(StatusCode::CONFLICT, "source slug is already in use")
+            }
             sources::Error::OpenApi(
                 codemode_core::components::openapi::Error::Invalid(reason)
                 | codemode_core::components::openapi::Error::Arguments(reason),
-            ) => Self(StatusCode::BAD_REQUEST, reason),
-            sources::Error::OpenApi(_) => Self(
+            ) => Self::Message(StatusCode::BAD_REQUEST, reason),
+            sources::Error::OpenApi(_) => Self::Message(
                 StatusCode::BAD_GATEWAY,
                 "OpenAPI document could not be fetched; check its address and ensure it is accessible without redirects",
             ),
-            sources::Error::Config(_) => Self(
+            sources::Error::Config(_) => Self::Message(
                 StatusCode::BAD_REQUEST,
                 "invalid source configuration; use an HTTP(S) MCP URL without credentials or an absolute stdio command",
             ),
@@ -205,24 +238,26 @@ impl From<sources::Error> for ApiError {
 impl From<workspaces::Error> for ApiError {
     fn from(error: workspaces::Error) -> Self {
         match error {
-            workspaces::Error::Invalid => Self(
+            workspaces::Error::Invalid => Self::Message(
                 StatusCode::BAD_REQUEST,
                 "workspace name must contain 1..80 characters",
             ),
-            workspaces::Error::Reserved => Self(
+            workspaces::Error::Reserved => Self::Message(
                 StatusCode::CONFLICT,
                 "the default workspace cannot be removed or have its sources changed",
             ),
             workspaces::Error::Conflict => {
-                Self(StatusCode::CONFLICT, "workspace name already exists")
+                Self::Message(StatusCode::CONFLICT, "workspace name already exists")
             }
-            workspaces::Error::NotFound => Self(StatusCode::NOT_FOUND, "workspace not found"),
-            workspaces::Error::Sources => Self(
+            workspaces::Error::NotFound => {
+                Self::Message(StatusCode::NOT_FOUND, "workspace not found")
+            }
+            workspaces::Error::Sources => Self::Message(
                 StatusCode::BAD_REQUEST,
                 "workspace contains unknown or duplicate sources",
             ),
             workspaces::Error::Limit => {
-                Self(StatusCode::BAD_REQUEST, "maximum 64 custom workspaces")
+                Self::Message(StatusCode::BAD_REQUEST, "maximum 64 custom workspaces")
             }
             other => unavailable(other),
         }
@@ -234,16 +269,18 @@ impl From<codemode_core::components::auth::oauth::Error> for ApiError {
         use codemode_core::components::auth::oauth::Error;
         match error {
             Error::Database(error) => unavailable(error),
-            Error::Busy => Self(
+            Error::Busy => Self::Message(
                 StatusCode::TOO_MANY_REQUESTS,
                 "OAuth operation busy; try again later",
             ),
-            Error::Client => Self(StatusCode::BAD_REQUEST, "invalid_client"),
-            Error::Grant => Self(StatusCode::BAD_REQUEST, "invalid_grant"),
-            Error::Scope => Self(StatusCode::BAD_REQUEST, "invalid_scope"),
-            Error::Target => Self(StatusCode::BAD_REQUEST, "invalid_target"),
-            Error::Request => Self(StatusCode::BAD_REQUEST, "invalid_request"),
-            Error::UnsupportedGrant => Self(StatusCode::BAD_REQUEST, "unsupported_grant_type"),
+            Error::Client => Self::Message(StatusCode::BAD_REQUEST, "invalid_client"),
+            Error::Grant => Self::Message(StatusCode::BAD_REQUEST, "invalid_grant"),
+            Error::Scope => Self::Message(StatusCode::BAD_REQUEST, "invalid_scope"),
+            Error::Target => Self::Message(StatusCode::BAD_REQUEST, "invalid_target"),
+            Error::Request => Self::Message(StatusCode::BAD_REQUEST, "invalid_request"),
+            Error::UnsupportedGrant => {
+                Self::Message(StatusCode::BAD_REQUEST, "unsupported_grant_type")
+            }
         }
     }
 }
@@ -275,7 +312,7 @@ async fn oauth_decision(
         None
     };
     let mut redirect = url::Url::parse(&decision.request.redirect_uri)
-        .map_err(|_| ApiError(StatusCode::BAD_REQUEST, "invalid_request"))?;
+        .map_err(|_| ApiError::Message(StatusCode::BAD_REQUEST, "invalid_request"))?;
     {
         let mut query = redirect.query_pairs_mut();
         if let Some(code) = code {
@@ -304,7 +341,10 @@ async fn endpoint(
         .get(id)
         .await?
         .map(Json)
-        .ok_or(ApiError(StatusCode::NOT_FOUND, "workspace not found"))
+        .ok_or(ApiError::Message(
+            StatusCode::NOT_FOUND,
+            "workspace not found",
+        ))
 }
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -346,7 +386,10 @@ async fn remove_endpoint(
     if state.workspaces.remove(id).await? {
         Ok(StatusCode::NO_CONTENT)
     } else {
-        Err(ApiError(StatusCode::NOT_FOUND, "workspace not found"))
+        Err(ApiError::Message(
+            StatusCode::NOT_FOUND,
+            "workspace not found",
+        ))
     }
 }
 
@@ -364,7 +407,7 @@ async fn source(
         .get(id)
         .await?
         .map(Json)
-        .ok_or(ApiError(StatusCode::NOT_FOUND, "source not found"))
+        .ok_or(ApiError::Message(StatusCode::NOT_FOUND, "source not found"))
 }
 pub(crate) fn user_source(source: &sources::Source) -> Result<(), &'static str> {
     if matches!(source.transport, sources::Transport::McpStdio { .. }) {
@@ -377,7 +420,7 @@ async fn create_source(
     AxumState(state): AxumState<State>,
     ApiJson(input): ApiJson<sources::Source>,
 ) -> Result<Response, ApiError> {
-    user_source(&input).map_err(|message| ApiError(StatusCode::FORBIDDEN, message))?;
+    user_source(&input).map_err(|message| ApiError::Message(StatusCode::FORBIDDEN, message))?;
     let id = state.sources.save(None, input).await?;
     Ok((StatusCode::CREATED, Json(serde_json::json!({"id":id}))).into_response())
 }
@@ -386,7 +429,7 @@ async fn update_source(
     Path(id): Path<Uuid>,
     ApiJson(input): ApiJson<sources::Source>,
 ) -> Result<StatusCode, ApiError> {
-    user_source(&input).map_err(|message| ApiError(StatusCode::FORBIDDEN, message))?;
+    user_source(&input).map_err(|message| ApiError::Message(StatusCode::FORBIDDEN, message))?;
     state.sources.save(Some(id), input).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -397,7 +440,7 @@ async fn remove_source(
     if state.sources.remove(id).await? {
         Ok(StatusCode::NO_CONTENT)
     } else {
-        Err(ApiError(StatusCode::NOT_FOUND, "source not found"))
+        Err(ApiError::Message(StatusCode::NOT_FOUND, "source not found"))
     }
 }
 async fn sync_source(
@@ -448,9 +491,9 @@ async fn browser_boundary(
     let mut response = if request.headers().get_all(header::HOST).iter().count() != 1
         || (host != state.hostname && host != format!("{}:443", state.hostname))
     {
-        ApiError(StatusCode::NOT_FOUND, "unknown control plane").into_response()
+        ApiError::Message(StatusCode::NOT_FOUND, "unknown control plane").into_response()
     } else if !safe_method && !same_origin {
-        ApiError(
+        ApiError::Message(
             StatusCode::FORBIDDEN,
             "same-origin browser request required",
         )
@@ -475,11 +518,13 @@ async fn require_session(
     next: Next,
 ) -> Response {
     let Some(token) = cookie(request.headers()) else {
-        return ApiError(StatusCode::UNAUTHORIZED, "sign in required").into_response();
+        return ApiError::Message(StatusCode::UNAUTHORIZED, "sign in required").into_response();
     };
     match state.sessions.authenticate(token).await {
         Ok(true) => next.run(request).await,
-        Ok(false) => ApiError(StatusCode::UNAUTHORIZED, "sign in required").into_response(),
+        Ok(false) => {
+            ApiError::Message(StatusCode::UNAUTHORIZED, "sign in required").into_response()
+        }
         Err(error) => ApiError::from(error).into_response(),
     }
 }
@@ -514,7 +559,7 @@ async fn login(
         .sessions
         .login(&input.email, input.password)
         .await?
-        .ok_or(ApiError(
+        .ok_or(ApiError::Message(
             StatusCode::UNAUTHORIZED,
             "incorrect email or password",
         ))?;
@@ -580,7 +625,7 @@ async fn create_token(
 ) -> Result<Response, ApiError> {
     let name = input.name.trim();
     if name.is_empty() || name.len() > 128 || name.chars().any(char::is_control) {
-        return Err(ApiError(
+        return Err(ApiError::Message(
             StatusCode::BAD_REQUEST,
             "name must contain 1..128 bytes",
         ));
@@ -588,9 +633,10 @@ async fn create_token(
     let workspace_id = if input.administration {
         state.workspaces.default_id().await?
     } else {
-        input
-            .workspace_id
-            .ok_or(ApiError(StatusCode::BAD_REQUEST, "choose a workspace"))?
+        input.workspace_id.ok_or(ApiError::Message(
+            StatusCode::BAD_REQUEST,
+            "choose a workspace",
+        ))?
     };
     let (id, token) = state
         .auth
@@ -606,7 +652,10 @@ async fn create_token(
         )
         .await
         .map_err(unavailable)?
-        .ok_or(ApiError(StatusCode::NOT_FOUND, "workspace not found"))?;
+        .ok_or(ApiError::Message(
+            StatusCode::NOT_FOUND,
+            "workspace not found",
+        ))?;
     Ok((
         StatusCode::CREATED,
         Json(serde_json::json!({"id":id,"token":token})),
@@ -620,7 +669,7 @@ async fn revoke_token(
     if state.auth.revoke(id).await.map_err(unavailable)? {
         Ok(StatusCode::NO_CONTENT)
     } else {
-        Err(ApiError(StatusCode::NOT_FOUND, "token not found"))
+        Err(ApiError::Message(StatusCode::NOT_FOUND, "token not found"))
     }
 }
 async fn accounts(
@@ -674,7 +723,10 @@ async fn execution(
         .await
         .map_err(unavailable)?
         .map(Json)
-        .ok_or(ApiError(StatusCode::NOT_FOUND, "execution not found"))
+        .ok_or(ApiError::Message(
+            StatusCode::NOT_FOUND,
+            "execution not found",
+        ))
 }
 async fn unlink_account(
     AxumState(state): AxumState<State>,
@@ -690,7 +742,10 @@ async fn start_upstream_oauth(
     Path(id): Path<Uuid>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let session = cookie(&headers).ok_or(ApiError(StatusCode::UNAUTHORIZED, "sign in required"))?;
+    let session = cookie(&headers).ok_or(ApiError::Message(
+        StatusCode::UNAUTHORIZED,
+        "sign in required",
+    ))?;
     let url = state
         .accounts
         .start_oauth(id, &state.hostname, session)
@@ -702,14 +757,29 @@ struct UpstreamCallback {
     state: String,
     code: Option<SecretString>,
     iss: Option<String>,
-    error: Option<String>,
+    error: Option<SecretString>,
+    error_description: Option<SecretString>,
 }
 async fn upstream_oauth_callback(
     AxumState(state): AxumState<State>,
     headers: HeaderMap,
     Query(callback): Query<UpstreamCallback>,
 ) -> Result<axum::response::Redirect, ApiError> {
-    let session = cookie(&headers).ok_or(ApiError(StatusCode::UNAUTHORIZED, "sign in required"))?;
+    let session = cookie(&headers).ok_or(ApiError::Message(
+        StatusCode::UNAUTHORIZED,
+        "sign in required",
+    ))?;
+    let denial = callback.error.as_ref().map(|error| {
+        format!(
+            "{}: {}",
+            error.expose_secret(),
+            callback
+                .error_description
+                .as_ref()
+                .map(ExposeSecret::expose_secret)
+                .unwrap_or("authorization was declined")
+        )
+    });
     let result = state
         .accounts
         .complete_oauth(
@@ -717,18 +787,28 @@ async fn upstream_oauth_callback(
             session,
             callback.code.as_ref().map(ExposeSecret::expose_secret),
             callback.iss.as_deref(),
-            callback.error.is_some(),
+            denial.as_deref(),
         )
         .await?;
-    let (id, status) = match result {
+    let (id, status, detail) = match result {
         accounts::OAuthCompletion::Linked(id) => {
             state.sources.wake();
-            (id, "linked")
+            (id, "linked", None)
         }
-        accounts::OAuthCompletion::Denied(id) => (id, "denied"),
+        accounts::OAuthCompletion::Denied(id, detail) => (id, "denied", Some(detail)),
     };
+    let mut query = url::form_urlencoded::Serializer::new(String::new());
+    query.extend_pairs([
+        ("selected", id.to_string().as_str()),
+        ("detail", "open"),
+        ("oauth", status),
+    ]);
+    if let Some(detail) = detail {
+        query.append_pair("oauthError", &detail);
+    }
     Ok(axum::response::Redirect::to(&format!(
-        "/sources/{id}/accounts?oauth={status}"
+        "/integrations?{}",
+        query.finish()
     )))
 }
 #[derive(serde::Deserialize)]
@@ -749,36 +829,16 @@ async fn link_environment(
     Ok(StatusCode::NO_CONTENT)
 }
 
-impl From<approvals::Error> for ApiError {
-    fn from(error: approvals::Error) -> Self {
-        match error {
-            approvals::Error::NotFound => Self(StatusCode::NOT_FOUND, "approval not found"),
-            approvals::Error::Expired => {
-                Self(StatusCode::GONE, "approval expired or caller was revoked")
-            }
-            approvals::Error::Invalid => {
-                Self(StatusCode::BAD_REQUEST, "approval could not be verified")
-            }
-            approvals::Error::Conflict => Self(
-                StatusCode::CONFLICT,
-                "approval changed; reload before continuing",
-            ),
-            approvals::Error::Busy => Self(
-                StatusCode::TOO_MANY_REQUESTS,
-                "approval processing is busy; retry shortly",
-            ),
-            other => unavailable(other),
-        }
-    }
-}
 impl From<policies::Error> for ApiError {
     fn from(error: policies::Error) -> Self {
         match error {
-            policies::Error::NotFound => Self(
+            policies::Error::NotFound => Self::Message(
                 StatusCode::NOT_FOUND,
                 "endpoint or tool changed; reload before continuing",
             ),
-            policies::Error::Invalid => Self(StatusCode::BAD_REQUEST, "invalid policy request"),
+            policies::Error::Invalid => {
+                Self::Message(StatusCode::BAD_REQUEST, "invalid policy request")
+            }
             other => unavailable(other),
         }
     }
@@ -794,11 +854,10 @@ async fn tool_policies(
     Path(id): Path<Uuid>,
     Query(query): Query<PolicyQuery>,
 ) -> Result<Json<policies::Page>, ApiError> {
-    state
-        .workspaces
-        .get(id)
-        .await?
-        .ok_or(ApiError(StatusCode::NOT_FOUND, "workspace not found"))?;
+    state.workspaces.get(id).await?.ok_or(ApiError::Message(
+        StatusCode::NOT_FOUND,
+        "workspace not found",
+    ))?;
     Ok(Json(
         state
             .sources
@@ -833,31 +892,28 @@ async fn set_tool_policy(
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
-async fn approvals(
-    AxumState(state): AxumState<State>,
-) -> Result<Json<Vec<approvals::Summary>>, ApiError> {
-    Ok(Json(state.approvals.list().await?))
-}
-async fn approval(
-    AxumState(state): AxumState<State>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<approvals::Detail>, ApiError> {
-    Ok(Json(state.approvals.detail(id).await?))
-}
+
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ApprovalRequest {
-    pause_id: Uuid,
-    decisions: Vec<approvals::Decision>,
+struct SourcePolicyRequest {
+    source_id: Uuid,
+    source_revision: i64,
+    action: policies::Action,
 }
-async fn decide_approval(
+async fn set_source_policy(
     AxumState(state): AxumState<State>,
     Path(id): Path<Uuid>,
-    ApiJson(request): ApiJson<ApprovalRequest>,
+    ApiJson(request): ApiJson<SourcePolicyRequest>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .approvals
-        .decide(id, request.pause_id, request.decisions)
+        .sources
+        .policies()
+        .set_source(
+            id,
+            request.source_id,
+            request.source_revision,
+            request.action,
+        )
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -909,21 +965,21 @@ impl From<scripts::Error> for ApiError {
     fn from(error: scripts::Error) -> Self {
         match error {
             scripts::Error::NotFound => {
-                Self(StatusCode::NOT_FOUND, "saved script or endpoint not found")
+                Self::Message(StatusCode::NOT_FOUND, "saved script or endpoint not found")
             }
-            scripts::Error::Invalid => Self(
+            scripts::Error::Invalid => Self::Message(
                 StatusCode::BAD_REQUEST,
                 "name must contain 1..120 characters, description at most 2000, and Python source at most 64 KiB",
             ),
-            scripts::Error::Conflict => Self(
+            scripts::Error::Conflict => Self::Message(
                 StatusCode::CONFLICT,
                 "a script with this name already exists in the endpoint",
             ),
-            scripts::Error::Changed => Self(
+            scripts::Error::Changed => Self::Message(
                 StatusCode::CONFLICT,
                 "script changed; copy your edits before reloading the latest version",
             ),
-            scripts::Error::Limit => Self(
+            scripts::Error::Limit => Self::Message(
                 StatusCode::CONFLICT,
                 "maximum 128 saved scripts per endpoint",
             ),
@@ -998,4 +1054,139 @@ async fn remove_script(
 ) -> Result<StatusCode, ApiError> {
     state.scripts.remove(endpoint, id, request.revision).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod oauth_error_tests {
+    use super::*;
+    #[tokio::test]
+    async fn oauth_error_response_identifies_the_stage_and_recovery_action() {
+        let response = ApiError::from(accounts::Error::OAuth {
+            stage: accounts::OAuthStage::Exchange,
+            detail: "invalid_grant: provider rejected [REDACTED]".into(),
+        })
+        .into_response();
+        assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+        let body = axum::body::to_bytes(response.into_body(), 4_096)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["stage"], "exchange");
+        assert_eq!(
+            body["detail"],
+            "invalid_grant: provider rejected [REDACTED]"
+        );
+        assert!(
+            body["error"]
+                .as_str()
+                .unwrap()
+                .contains("step 6 (token exchange)")
+        );
+        assert!(body["error"].as_str().unwrap().contains("retry linking"));
+        assert_eq!(body.as_object().unwrap().len(), 3);
+    }
+}
+
+impl From<integrations::Error> for ApiError {
+    fn from(error: integrations::Error) -> Self {
+        match error {
+            integrations::Error::NotFound => {
+                Self::Message(StatusCode::NOT_FOUND, "integration not found")
+            }
+            integrations::Error::Source(error) => error.into(),
+            other => unavailable(other),
+        }
+    }
+}
+async fn integration_list(
+    AxumState(state): AxumState<State>,
+) -> Result<Json<Vec<integrations::Integration>>, ApiError> {
+    Ok(Json(integrations::list(&state.sources).await?))
+}
+async fn add_integration(
+    AxumState(state): AxumState<State>,
+    Path(slug): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let id = integrations::add(&state.sources, &slug).await?;
+    state.sources.wake();
+    Ok(Json(serde_json::json!({"id":id})))
+}
+
+async fn configured_oauth_apps(
+    AxumState(state): AxumState<State>,
+) -> Result<Json<Vec<String>>, ApiError> {
+    Ok(Json(state.accounts.configured_apps().await?))
+}
+async fn save_oauth_app(
+    AxumState(state): AxumState<State>,
+    Path(provider): Path<String>,
+    ApiJson(input): ApiJson<accounts::OAuthAppInput>,
+) -> Result<StatusCode, ApiError> {
+    state.accounts.save_oauth_app(&provider, input).await?;
+    state.sources.wake();
+    Ok(StatusCode::NO_CONTENT)
+}
+async fn remove_oauth_app(
+    AxumState(state): AxumState<State>,
+    Path(provider): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    state.accounts.remove_oauth_app(&provider).await?;
+    state.sources.wake();
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionQuery {
+    #[serde(default)]
+    q: String,
+    before: Option<Uuid>,
+}
+async fn agent_session_list(
+    AxumState(state): AxumState<State>,
+    Query(query): Query<SessionQuery>,
+) -> Result<Json<agent_sessions::Page>, ApiError> {
+    Ok(Json(
+        state.agent_sessions.list(&query.q, query.before).await?,
+    ))
+}
+async fn agent_session_activity(
+    AxumState(state): AxumState<State>,
+    Query(query): Query<LogQuery>,
+) -> Result<Json<agent_sessions::ActivityPage>, ApiError> {
+    Ok(Json(state.agent_sessions.activity(query.before).await?))
+}
+async fn agent_session_detail(
+    AxumState(state): AxumState<State>,
+    Path(id): Path<Uuid>,
+    Query(query): Query<LogQuery>,
+) -> Result<Json<agent_sessions::Detail>, ApiError> {
+    Ok(Json(state.agent_sessions.detail(id, query.before).await?))
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionTitle {
+    title: String,
+}
+async fn rename_agent_session(
+    AxumState(state): AxumState<State>,
+    Path(id): Path<Uuid>,
+    ApiJson(input): ApiJson<SessionTitle>,
+) -> Result<StatusCode, ApiError> {
+    state.agent_sessions.rename(id, &input.title).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+impl From<agent_sessions::Error> for ApiError {
+    fn from(error: agent_sessions::Error) -> Self {
+        match error {
+            agent_sessions::Error::NotFound => {
+                Self::Message(StatusCode::NOT_FOUND, "session not found")
+            }
+            agent_sessions::Error::Invalid => Self::Message(
+                StatusCode::BAD_REQUEST,
+                "use a title of 1–160 characters without control characters and a search of at most 1024 bytes",
+            ),
+            other => unavailable(other),
+        }
+    }
 }

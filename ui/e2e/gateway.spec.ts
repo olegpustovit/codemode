@@ -200,7 +200,6 @@ test.beforeAll(async () => {
     CODEMODE_BIND: `127.0.0.1:${port}`,
     CODEMODE_SOURCES_FILE: sources,
     CODEMODE_MONTY_BIN: resolve(root, ".tools/monty/bin/monty"),
-    CODEMODE_SNAPSHOT_KEY: randomBytes(32).toString("hex"),
     CODEMODE_ENCRYPTION_KEY: randomBytes(32).toString("hex"),
     CODEMODE_LOG: "warn",
   }
@@ -319,7 +318,7 @@ async function login(page: Page, path = "/sources") {
   await page.getByLabel("Email", { exact: true }).fill("ursus95@gmail.com")
   await page.getByLabel("Password", { exact: true }).fill(password)
   await page.getByRole("button", { name: "Sign in", exact: true }).click()
-  await expect(page).toHaveURL(`${origin}${path}`)
+  await expect(page).toHaveURL(`${origin}${path === "/sources" ? "/integrations" : path}`)
 }
 async function capture(page: Page, file: string) {
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
@@ -338,16 +337,17 @@ async function noOverflow(page: Page) {
   ).toBe(true)
 }
 async function contrast(button: Locator) {
-  return button.evaluate((element) => {
+  const pixels = (await button.screenshot()).toString("base64")
+  return button.evaluate(async (element, pixels) => {
+    const image = new Image()
+    image.src = `data:image/png;base64,${pixels}`
+    await image.decode()
     const canvas = document.createElement("canvas")
     canvas.width = canvas.height = 1
     const context = canvas.getContext("2d")
     if (!context) throw new Error("Canvas unavailable for contrast measurement")
     const style = getComputedStyle(element)
-    context.fillStyle = "#fff"
-    context.fillRect(0, 0, 1, 1)
-    context.fillStyle = style.backgroundColor
-    context.fillRect(0, 0, 1, 1)
+    context.drawImage(image, 3, 3, 1, 1, 0, 0, 1, 1)
     const background = Array.from(context.getImageData(0, 0, 1, 1).data).slice(
       0,
       3
@@ -375,7 +375,7 @@ async function contrast(button: Locator) {
       background,
       ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
     }
-  })
+  }, pixels)
 }
 async function destructiveContrast(button: Locator, file: string) {
   const normal = await contrast(button)
@@ -443,10 +443,10 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await page.getByRole("button", { name: "Sign in", exact: true }).click()
   await expect(page).toHaveURL(`${origin}/tokens`)
   await page.goto("/sources")
-  await expect(page.getByText("Connect your first source")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Integrations", exact: true })).toBeVisible()
   await capture(page, "desktop-empty.png")
   await page
-    .getByRole("link", { name: "Add source", exact: true })
+    .getByRole("link", { name: "Add by URL", exact: true })
     .first()
     .click()
   await page.getByLabel("Source name", { exact: true }).fill("browser-fixture")
@@ -485,6 +485,7 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await capture(page,"workspace-editor-mobile.png")
   await page.setViewportSize({width:1440,height:1000})
   await page.goto("/tokens")
+  await page.getByRole("button", {name:"New personal token",exact:true}).click()
   await page.getByLabel("Name", { exact: true }).fill("Browser agent")
   await page.getByLabel("Workspace", { exact: true }).selectOption(workspaceId)
   await page.getByRole("button", { name: "Create token", exact: true }).click()
@@ -494,7 +495,7 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await expect(page.getByLabel("New access token")).toHaveCount(0)
   await page.reload()
   await expect(page.getByLabel("New access token")).toHaveCount(0)
-  await expect(page.getByText("Browser agent", { exact: true })).toBeVisible()
+  await expect(page.getByRole("grid",{name:"Agents with access",exact:true}).getByRole("row",{name:"Browser agent",exact:true})).toBeVisible()
   await expect
     .poll(() =>
       page.evaluate(
@@ -531,9 +532,20 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   const execution = JSON.parse(rpc.result.content[0].text)
   expect(execution.status).toBe("completed")
   expect(execution.toolCalls).toBe(1)
+  const history=await page.evaluate(()=>fetch("/api/sessions").then(r=>r.json()))
+  const session=history.sessions.find((entry:{workspaceId:string;client:string})=>entry.workspaceId===workspaceId&&entry.client==="Browser agent")
+  expect(session.title).toBe(`${source.pythonName}.echo`)
+  expect(new Date(session.expiresAt).getTime()-new Date(session.lastSeenAt).getTime()).toBe(4*24*3600*1000)
+  const stored=await page.evaluate(id=>fetch(`/api/sessions/${id}`).then(r=>r.json()),session.id)
+  expect(stored.executions[0].result).toBe(JSON.stringify(execution.result))
+  expect(stored.executions[0].output).toBe("browser execution\n")
+  expect(stored.executions[0].calls[0].preview).toBe(JSON.stringify(execution.result))
+  expect(await page.evaluate(id=>fetch(`/api/sessions/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:"Browser walkthrough"})}).then(r=>r.status),session.id)).toBe(204)
+  const renamed=await page.evaluate(()=>fetch("/api/sessions?q=Browser%20walkthrough").then(r=>r.json()))
+  expect(renamed.sessions[0].title).toBe("Browser walkthrough")
   await page.goto("/sources")
   await expect(
-    page.getByRole("link", { name: "browser-fixture", exact: true })
+    page.getByRole("row", { name: "browser-fixture", exact: true })
   ).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
   const cdp = await page.context().newCDPSession(page)
@@ -553,7 +565,7 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   )
   expect(
     fonts.fonts.some(
-      (font) => font.isCustomFont && font.familyName.includes("Geist")
+      (font) => font.isCustomFont && font.familyName.includes("M PLUS 1p")
     )
   ).toBe(true)
   await cdp.detach()
@@ -580,6 +592,8 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await expect(
     page.getByRole("heading", { name: "Python code", exact: true })
   ).toBeVisible()
+  await expect(page.getByRole("heading",{name:"Stdout",exact:true}).locator("..").locator("pre")).toHaveText("browser execution\n")
+  await expect(page.getByRole("heading",{name:"Result preview",level:2,exact:true}).locator("..").locator("pre")).toHaveText(JSON.stringify(execution.result))
   await capture(page, "desktop-execution.png")
   await page.goto(`/sources/${sourceId}/accounts`)
   await page
@@ -650,8 +664,9 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await page
     .getByRole("button", { name: "Delete workspace", exact: true })
     .click()
+  await expect(page.getByRole("alertdialog")).toHaveCount(0)
+  await expect(page.getByRole("status")).toContainText("within 3 seconds")
   await page
-    .getByRole("alertdialog")
     .getByRole("button", { name: "Delete workspace", exact: true })
     .click()
   await expect(page).toHaveURL(`${origin}/workspaces`)
@@ -680,21 +695,20 @@ test("mobile: navigation, filter URL, deep-link refresh and narrow content", asy
   await page.setViewportSize({ width: 390, height: 844 })
   await login(page)
   await expect(
-    page.getByRole("heading", { name: "Sources", exact: true })
+    page.getByRole("heading", { name: "Integrations", exact: true })
   ).toBeVisible()
   await capture(page, "mobile-sources.png")
   await noOverflow(page)
-  await page.getByRole("button", { name: "Toggle Sidebar" }).click()
-  await expect(page.getByRole("dialog")).toHaveCSS("opacity", "1")
+  await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible()
   await capture(page, "mobile-navigation.png")
-  await page.getByRole("link", { name: "Accounts", exact: true }).click()
+  await page.getByRole("link", { name: "Workspaces", exact: true }).click()
   await expect(
-    page.getByRole("heading", { name: "Linked accounts", exact: true })
+    page.getByRole("heading", { name: "Workspaces", exact: true })
   ).toBeVisible()
-  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible()
   await page.goto("/sources?q=browser")
   await page.reload()
-  await expect(page.getByLabel("Find a source")).toHaveValue("browser")
+  await expect(page.getByLabel("Search this list")).toHaveValue("browser")
   await page.goto("/sources/new")
   await page.getByLabel("Source name", { exact: true }).fill("x".repeat(64))
   await page.getByLabel("Server address").fill(fixtureUrl)
@@ -914,92 +928,23 @@ test("OpenAPI: add YAML document, pin the server, link a header key and execute 
     await capture(page, "tool-scope-mobile.png")
     await page.setViewportSize({ width: 1440, height: 1000 })
     const readsBefore = readCalls
-    const paused = JSON.parse(
-      (
-        await invoke("execute", {
-          code: `print("before approval")\nreturn await asyncio.gather(tools.${source.pythonName}.listItems(), tools.${source.pythonName}.deleteItems())`,
-        })
-      ).content[0].text
-    )
-    expect(paused.status).toBe("paused")
-    expect(destructiveCalls).toBe(0)
-    expect(readCalls).toBe(readsBefore)
-    const forged = await invoke("resume", {
-      executionId: paused.executionId,
-      allow: true,
-    })
-    expect(forged.isError).toBe(true)
-    expect(
-      JSON.parse(
-        (await invoke("resume", { executionId: paused.executionId })).content[0]
-          .text
-      ).status
-    ).toBe("paused")
-    await restartGateway()
-    expect(
-      JSON.parse(
-        (await invoke("resume", { executionId: paused.executionId })).content[0]
-          .text
-      ).status
-    ).toBe("paused")
-    await page.goto(paused.approvalUrl)
-    await expect(
-      page.getByText("This batch is waiting", { exact: true })
-    ).toBeVisible()
-    await expect(
-      page.getByRole("heading", {
-        name: `${source.pythonName}.deleteItems`,
-        exact: true,
-      })
-    ).toBeVisible()
-    await capture(page, "approval-desktop.png")
-    await page.setViewportSize({ width: 390, height: 844 })
-    await noOverflow(page)
-    await capture(page, "approval-mobile.png")
-    await page
-      .getByRole("button", {
-        name: `Allow ${source.pythonName}.deleteItems`,
-        exact: true,
-      })
-      .click()
-    await expect(
-      page.getByRole("button", {
-        name: `Allow ${source.pythonName}.deleteItems`,
-        exact: true,
-      })
-    ).toHaveCount(0)
-    expect(destructiveCalls).toBe(0)
-    expect(
-      JSON.parse(
-        (await invoke("resume", { executionId: paused.executionId })).content[0]
-          .text
-      ).status
-    ).toBe("paused")
-    await page
-      .getByRole("button", {
-        name: `Allow ${source.pythonName}.listItems`,
-        exact: true,
-      })
-      .click()
-    await expect(
-      page.getByText("Decisions saved", { exact: true })
-    ).toBeVisible()
-    const resumed = JSON.parse(
-      (await invoke("resume", { executionId: paused.executionId })).content[0]
-        .text
-    )
-    expect(resumed.status).toBe("completed")
-    expect(resumed.result).toEqual([["item-one"], "deleted"])
-    expect(resumed.output).toBe("before approval\n")
+    const completed = JSON.parse((await invoke("execute",{code:`print("calling allowed tools")\nreturn await asyncio.gather(tools.${source.pythonName}.listItems(), tools.${source.pythonName}.deleteItems())`})).content[0].text)
+    expect(completed.status).toBe("completed")
+    expect(completed.result).toEqual([["item-one"],"deleted"])
+    expect(completed.output).toBe("calling allowed tools\n")
     expect(destructiveCalls).toBe(1)
-    expect(readCalls).toBe(readsBefore + 1)
-    expect(
-      (await invoke("resume", { executionId: paused.executionId })).isError
-    ).toBe(true)
-    await page.reload()
-    await expect(
-      page.getByText("This approval is no longer available", { exact: true })
-    ).toBeVisible()
+    expect(readCalls).toBe(readsBefore+1)
+    const writePolicy = page.getByLabel(`Policy for ${source.pythonName}.deleteItems`,{exact:true})
+    await writePolicy.selectOption("block")
+    await update(`/api/workspaces/${main.id}/policies`,()=>page.getByRole("button",{name:`Save policy for ${source.pythonName}.deleteItems`,exact:true}).click())
+    const blockedWrite = JSON.parse((await invoke("execute",{code:`try:\n    await tools.${source.pythonName}.deleteItems()\nexcept PermissionError as e:\n    return str(e)`})).content[0].text)
+    expect(blockedWrite.status).toBe("completed")
+    expect(blockedWrite.result).toContain(`${source.pythonName}.deleteItems`)
+    expect(blockedWrite.result).toContain(main.id)
+    expect(destructiveCalls).toBe(1)
+    expect(await page.evaluate(()=>fetch("/api/approvals").then(response=>response.status))).toBe(404)
+    await page.goto("/approvals")
+    await expect(page.getByRole("heading",{name:"Page not found",exact:true})).toBeVisible()
     await page.setViewportSize({ width: 1440, height: 1000 })
     await page.goto(`/sources/${sourceId}/accounts`)
     await page
@@ -1042,7 +987,7 @@ test("OpenAPI: add YAML document, pin the server, link a header key and execute 
   }
 })
 
-test("GraphQL: add a source, link a credential, scope its tools and approve a mutation", async ({
+test("GraphQL: add a source, link a credential, scope its tools and execute an allowed mutation", async ({
   page,
 }) => {
   await login(page, "/sources/new")
@@ -1146,38 +1091,11 @@ test("GraphQL: add a source, link a credential, scope its tools and approve a mu
     expect(read.status).toBe("completed")
     expect(read.result).toEqual({ kind: "query", variables: { id: "one" } })
     const before = graphqlMutations
-    const paused = JSON.parse(
-      (
-        await invoke("execute", {
-          code: `return await tools.${source.pythonName}.mutation(query='mutation { deleteItem }')`,
-        })
-      ).content[0].text
-    )
-    expect(paused.status).toBe("paused")
-    expect(graphqlMutations).toBe(before)
-    await page.goto(paused.approvalUrl)
-    await expect(
-      page.getByRole("heading", {
-        name: `${source.pythonName}.mutation`,
-        exact: true,
-      })
-    ).toBeVisible()
-    await page
-      .getByRole("button", {
-        name: `Allow ${source.pythonName}.mutation`,
-        exact: true,
-      })
-      .click()
-    await expect(
-      page.getByText("Decisions saved", { exact: true })
-    ).toBeVisible()
-    const resumed = JSON.parse(
-      (await invoke("resume", { executionId: paused.executionId })).content[0]
-        .text
-    )
-    expect(resumed.status).toBe("completed")
-    expect(resumed.result.kind).toBe("mutation")
-    expect(graphqlMutations).toBe(before + 1)
+    const mutation = JSON.parse((await invoke("execute",{code:`return await tools.${source.pythonName}.mutation(query='mutation { deleteItem }')`})).content[0].text)
+    expect(mutation.status).toBe("completed")
+    expect(mutation.result.kind).toBe("mutation")
+    expect(graphqlMutations).toBe(before+1)
+
   } finally {
     await page.evaluate(
       (id) => fetch(`/api/tokens/${id}`, { method: "DELETE" }),
@@ -1309,7 +1227,7 @@ test("Saved scripts: CRUD, stale-edit protection and both MCP eras", async ({
       const tools = await rpc(version, "tools/list", {})
       expect(
         tools.tools.map((tool: { name: string }) => tool.name).sort()
-      ).toEqual(["execute", "resume", "search"])
+      ).toEqual(["execute", "search"])
       const found = await rpc(version, "tools/call", {
         name: "search",
         arguments: { query: "issues" },
@@ -1350,8 +1268,9 @@ test("Saved scripts: CRUD, stale-edit protection and both MCP eras", async ({
     )
   }
   await page.getByRole("button", { name: "Delete script", exact: true }).click()
+  await expect(page.getByRole("alertdialog")).toHaveCount(0)
+  await expect(page.getByRole("status")).toContainText("within 3 seconds")
   await page
-    .getByRole("alertdialog")
     .getByRole("button", { name: "Delete script", exact: true })
     .click()
   await expect(page).toHaveURL(`/workspaces/${main.id}/scripts`)
@@ -1414,8 +1333,8 @@ test("each account keeps its own MCPs, credentials, agent access and history", a
   await page
     .getByRole("button", { name: "Create account", exact: true })
     .click()
-  await expect(page).toHaveURL(`${origin}/sources`)
-  await expect(page.getByText("Connect your first source")).toBeVisible()
+  await expect(page).toHaveURL(`${origin}/integrations`)
+  await expect(page.getByRole("heading", { name: "Integrations", exact: true })).toBeVisible()
   await expect(
     page.getByText("second@olegpustovit.com", { exact: true })
   ).toBeVisible()
@@ -1432,6 +1351,9 @@ test("each account keeps its own MCPs, credentials, agent access and history", a
         source: await get(`/api/sources/${source.id}`),
         endpoint: await get(`/api/workspaces/${main.id}`),
         execution: await get(`/api/executions/${execution.id}`),
+        session: await get(`/api/sessions/${execution.sessionId}`),
+        renameSession: await fetch(`/api/sessions/${execution.sessionId}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:"foreign rename"})}).then(r=>r.status),
+        sessions: await fetch("/api/sessions").then(r=>r.json()),
         credential: await write(`/api/accounts/${source.id}`, {
           credential: "foreign-replacement",
         }),
@@ -1451,6 +1373,9 @@ test("each account keeps its own MCPs, credentials, agent access and history", a
   expect(denied.source).toBe(404)
   expect(denied.endpoint).toBe(404)
   expect(denied.execution).toBe(404)
+  expect(denied.session).toBe(404)
+  expect(denied.renameSession).toBe(404)
+  expect(denied.sessions.sessions).toEqual([])
   expect(denied.credential).toBe(404)
   expect(denied.token).toBe(404)
   expect(denied.user.admin).toBe(false)
@@ -1517,7 +1442,7 @@ test("each account keeps its own MCPs, credentials, agent access and history", a
   ).toBe(404)
   await page.reload()
   await expect(
-    page.getByRole("link", { name: "browser-fixture", exact: true })
+    page.getByRole("row", { name: "browser-fixture", exact: true })
   ).toBeVisible()
   await capture(page, "tenant-secondary.png")
   await restartGateway()
@@ -1542,22 +1467,26 @@ test("workspace bookmarks, preset connection and separate administration authori
   await page.goto("/endpoints")
   await expect(page).toHaveURL(`${origin}/workspaces`)
   await page.goto("/sources")
-  await expect(page.getByRole("heading", { name: "Popular MCP servers" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Integrations", exact: true })).toBeVisible()
   await capture(page, "workspace-source-presets-desktop.png")
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
   await capture(page, "workspace-source-presets-mobile.png")
-  await page.getByRole("button", { name: "Add Notion", exact: true }).click()
-  await expect(page).toHaveURL(/\/sources\/[0-9a-f-]+\/accounts$/)
-  const sourceId = new URL(page.url()).pathname.split("/").at(-2)!
+  const sourceId = await page.evaluate(async () => {
+    const response = await fetch("/api/integrations/notion", { method: "POST" })
+    if (!response.ok) throw new Error("Could not add registry integration")
+    return (await response.json()).id as string
+  })
+  await page.goto(`/integrations?selected=notion&detail=open`)
   const preset = await page.evaluate((id) => fetch(`/api/sources/${id}`).then((r) => r.json()), sourceId)
   expect(preset.url).toBe("https://mcp.notion.com/mcp")
   expect(preset.requiresAccount).toBe(true)
-  await expect(page.getByRole("button", { name: "Connect with OAuth", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeVisible()
   // No provider sign-in or external consent is performed by this test.
   await page.evaluate((id) => fetch(`/api/sources/${id}`, {method:"DELETE"}), sourceId)
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto("/tokens")
+  await page.getByRole("button", {name:"New personal token",exact:true}).click()
   await page.getByLabel("Access", {exact:true}).selectOption("admin")
   await expect(page.getByLabel("Workspace", {exact:true})).toHaveCount(0)
   await page.getByLabel("Name", {exact:true}).fill("Management browser check")
@@ -1572,17 +1501,22 @@ test("workspace bookmarks, preset connection and separate administration authori
   }
   expect((await rpc("/mcp","tools/list",{})).status()).toBe(401)
   const tools = await (await rpc("/mcp-admin","tools/list",{})).json()
-  expect(tools.result.tools).toHaveLength(9)
+  expect(tools.result.tools).toHaveLength(10)
   const modern=await page.request.post(`${loopback}/mcp-admin`, {
     headers:{host:hostname,Authorization:`Bearer ${token}`,Accept:"application/json, text/event-stream","MCP-Protocol-Version":"2026-07-28","Mcp-Method":"tools/list"},
     data:{jsonrpc:"2.0",id:1,method:"tools/list",params:{_meta:{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{name:"management-browser",version:"1"}}}},
   })
   expect(modern.status()).toBe(200)
-  expect((await modern.json()).result.tools).toHaveLength(9)
+  expect((await modern.json()).result.tools).toHaveLength(10)
   const workspaces = await (await rpc("/mcp-admin","tools/call",{name:"list_workspaces",arguments:{}})).json()
   expect(JSON.parse(workspaces.result.content[0].text).some((w: {allSources:boolean})=>w.allSources)).toBe(true)
   await page.getByRole("button", {name:"I saved it",exact:true}).click()
-  await expect(page.getByRole("cell",{name:"Administration /mcp-admin",exact:true})).toBeVisible()
+  const managementRow=page.getByRole("grid",{name:"Agents with access",exact:true}).getByRole("row",{name:"Management browser check",exact:true})
+  await expect(managementRow).toContainText("Administration")
+  await managementRow.click()
+  const managementDetails=page.getByRole("region",{name:"Token details",exact:true})
+  await expect(managementDetails).toContainText("Administration")
+  await expect(managementDetails).toContainText("/mcp-admin")
   const registration = await page.evaluate(() => fetch("/oauth/register",{method:"POST", headers:{"Content-Type":"application/json"},body:JSON.stringify({client_name:"Workspace manager",redirect_uris:["https://client.example/callback"],token_endpoint_auth_method:"none"})}).then((r)=>r.json()))
   const query=new URLSearchParams({response_type:"code",client_id:registration.client_id,redirect_uri:"https://client.example/callback",resource:`${origin}/mcp-admin`,scope:"admin",code_challenge:createHash("sha256").update("browser-verifier-123456789012345678901234567890123456789").digest("base64url"),code_challenge_method:"S256"})
   await page.goto(`/oauth/authorize?${query}`)
@@ -1595,4 +1529,298 @@ test("workspace bookmarks, preset connection and separate administration authori
   await capture(page,"workspace-admin-consent-mobile.png")
   await page.getByRole("button",{name:"Authorize administration",exact:true}).click()
   await expect(page).toHaveURL(/client\.example\/callback\?.*code=/)
+})
+
+test("integrations: real catalogue search, URL-backed panes and keyboard focus", async ({ page }) => {
+  const errors: string[] = []
+  page.on("pageerror", error => errors.push(error.message))
+  await page.goto("/login?redirect=%2Fintegrations")
+  await expect(page.getByRole("heading", { name: /^(Create your account|Sign in to your control plane)$/ })).toBeVisible()
+  const first = await page.getByRole("heading", { name: "Create your account", exact: true }).isVisible()
+  await page.getByLabel("Email", {exact:true}).fill("ursus95@gmail.com")
+  await page.getByLabel("Password", {exact:true}).fill(password)
+  await page.getByRole("button", {name:first ? "Create account" : "Sign in",exact:true}).click()
+  await expect(page).toHaveURL(`${origin}/integrations`)
+  const sourceId = await page.evaluate(async (url) => {
+    const response = await fetch("/api/sources", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:"keyboard-integration",kind:"mcp_http",url,requiresAccount:false})})
+    if(!response.ok) throw new Error("Could not create keyboard fixture")
+    return (await response.json()).id as string
+  },fixtureUrl)
+  try {
+    await expect.poll(() => page.evaluate(async (id) => {
+      const entries = await fetch("/api/integrations").then(r=>r.json())
+      return entries.find((entry:{sourceId:string})=>entry.sourceId===id)?.toolNames ?? []
+    },sourceId)).toContain("keyboard_integration.echo")
+    await page.setViewportSize({width:390,height:600})
+    const scrolling = await page.getByRole("grid",{name:"Integrations",exact:true}).evaluate(grid => {
+      const body=grid.querySelector<HTMLElement>(".data-body")!
+      const header=grid.querySelector("thead")!
+      const top=header.getBoundingClientRect().top
+      body.scrollTop=body.scrollHeight
+      return {scrolled:body.scrollTop>0,headerFixed:header.getBoundingClientRect().top===top}
+    })
+    expect(scrolling).toEqual({scrolled:true,headerFixed:true})
+    await page.setViewportSize({width:1440,height:1000})
+    await page.goto(`/integrations?selected=${sourceId}&detail=open`)
+    await expect(page.getByRole("heading",{name:"keyboard-integration",exact:true})).toBeVisible()
+    const search=page.getByRole("searchbox",{name:"Search this list"})
+    await search.fill("keyboard integration echo")
+    const grid=page.getByRole("grid",{name:"Integrations",exact:true})
+    await expect(grid.getByRole("row",{name:"keyboard-integration",exact:true})).toBeVisible()
+    await expect(grid.getByRole("row",{name:"Notion",exact:true})).toHaveCount(0)
+    await search.fill("")
+    await grid.focus()
+    await page.keyboard.press("ArrowLeft")
+    await expect(page.getByRole("heading",{name:"keyboard-integration",exact:true})).toBeHidden()
+    await page.keyboard.press("Enter")
+    await expect(page.getByRole("heading",{name:"keyboard-integration",exact:true})).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole("heading",{name:"keyboard-integration",exact:true})).toBeVisible()
+    await capture(page,"integrations-panes-desktop.png")
+    await page.setViewportSize({width:390,height:844})
+    await noOverflow(page)
+    await capture(page,"integrations-panes-mobile.png")
+    await page.getByRole("navigation", {name:"Sections"}).getByRole("link", {name:"Workspaces",exact:true}).focus()
+    await page.keyboard.press("Escape")
+    await expect(page.getByRole("navigation", {name:"Sections"})).toBeVisible()
+    await expect(page.getByRole("heading",{name:"keyboard-integration",exact:true})).toBeVisible()
+    await page.getByRole("button",{name:/^Close/}).click()
+    await expect(grid).toBeFocused()
+    await noOverflow(page)
+    await page.setViewportSize({width:1440,height:1000})
+    await page.goto("/workspaces?q=keyboard_integration")
+    const tools = page.getByRole("grid", {name:"Workspace tools",exact:true})
+    await expect(tools.getByRole("row",{name:"keyboard_integration.echo",exact:true})).toBeVisible()
+    await tools.focus()
+    await page.keyboard.press("Enter")
+    const policy = page.getByRole("region", {name:"Workspace tool details",exact:true})
+    await expect(policy.getByRole("heading",{name:"keyboard_integration.echo",exact:true})).toBeVisible()
+    await expect(policy.locator("pre")).toContainText("async def")
+    await policy.getByRole("button",{name:/^Block all from source/}).click()
+    await expect(tools.getByRole("row",{name:"keyboard_integration.echo",exact:true})).toContainText("Blocked")
+    await policy.getByRole("button",{name:/^Allow all from source/}).click()
+    await expect(tools.getByRole("row",{name:"keyboard_integration.echo",exact:true})).toContainText("Allowed")
+    await policy.getByRole("button",{name:/^Block Space/}).focus()
+    await page.keyboard.press("Space")
+    await expect(tools.getByRole("row",{name:"keyboard_integration.echo",exact:true})).toContainText("Blocked")
+    await page.reload()
+    await expect(policy.getByRole("heading",{name:"keyboard_integration.echo",exact:true})).toBeVisible()
+    const blockedSwitch = tools.getByRole("switch", {name:"Blocked: keyboard_integration.echo",exact:true})
+    await expect(blockedSwitch).toHaveAttribute("aria-checked","false")
+    expect(await blockedSwitch.locator("i").evaluate(node=>getComputedStyle(node).width)).toBe("26px")
+    await capture(page,"workspaces-panes-desktop.png")
+    await page.setViewportSize({width:390,height:844})
+    await noOverflow(page)
+    await capture(page,"workspaces-panes-mobile.png")
+    await policy.getByRole("button",{name:/Close/}).click()
+    await expect(tools).toBeFocused()
+    expect(errors).toEqual([])
+  } finally {
+    await page.evaluate(id=>fetch(`/api/sources/${id}`,{method:"DELETE"}),sourceId)
+  }
+})
+
+test("OAuth apps: write-only setup, static PKCE redirect and guarded removal", async ({ page }) => {
+  const errors: string[] = []
+  page.on("pageerror", error => errors.push(error.message))
+  await page.goto("/login?redirect=%2Fintegrations")
+  await expect(page.getByRole("heading", { name: /^(Create your account|Sign in to your control plane)$/ })).toBeVisible()
+  const first = await page.getByRole("heading", { name: "Create your account", exact: true }).isVisible()
+  await page.getByLabel("Email", {exact:true}).fill("ursus95@gmail.com")
+  await page.getByLabel("Password", {exact:true}).fill(password)
+  await page.getByRole("button", {name:first ? "Create account" : "Sign in",exact:true}).click()
+  await expect(page).toHaveURL(`${origin}/integrations`)
+  await page.goto("/integrations?selected=github&detail=open")
+  await expect(page.getByRole("heading",{name:"GitHub",exact:true})).toBeVisible()
+  await page.getByLabel("Connection method",{exact:true}).selectOption("oauth_app")
+  await expect(page.getByText(`${origin}/api/accounts/oauth/callback`,{exact:true})).toBeVisible()
+  await expect(page.getByRole("button",{name:"Connect",exact:true})).toHaveCount(0)
+  await page.getByLabel("Client ID",{exact:true}).fill("browser-app-id")
+  await page.getByLabel("Client secret",{exact:true}).fill("browser-app-secret")
+  await page.getByRole("button",{name:"Save OAuth app",exact:true}).click()
+  await expect(page.getByRole("button",{name:"Replace OAuth app",exact:true})).toBeVisible()
+  expect(await page.evaluate(()=>fetch("/api/oauth-apps").then(r=>r.text()))).toBe('["github"]')
+  await page.reload()
+  await page.getByLabel("Connection method",{exact:true}).selectOption("oauth_app")
+  await page.getByRole("button",{name:"Replace OAuth app",exact:true}).click()
+  await expect(page.getByLabel("Client ID",{exact:true})).toHaveValue("")
+  await expect(page.getByLabel("Client secret",{exact:true})).toHaveValue("")
+  await page.getByRole("button",{name:"Cancel",exact:true}).click()
+  await capture(page,"oauth-app-desktop.png")
+  await page.setViewportSize({width:390,height:844})
+  await noOverflow(page)
+  await capture(page,"oauth-app-mobile.png")
+  // Intercept the provider page: this checks the redirect without contacting GitHub or consenting.
+  await page.route("https://github.com/**",route=>route.fulfill({contentType:"text/html",body:"<p>Provider authorization fixture</p>"}))
+  await page.getByRole("button",{name:"Connect",exact:true}).click()
+  await expect(page).toHaveURL(/^https:\/\/github\.com\/login\/oauth\/authorize\?/)
+  const authorization=new URL(page.url())
+  expect(authorization.searchParams.get("client_id")).toBe("browser-app-id")
+  expect(authorization.searchParams.get("code_challenge_method")).toBe("S256")
+  expect(authorization.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  expect(authorization.searchParams.get("redirect_uri")).toBe(`${origin}/api/accounts/oauth/callback`)
+  expect(authorization.searchParams.get("scope")).toContain("repo")
+  expect(page.url()).not.toContain("browser-app-secret")
+  const denied = new URL(`${origin}/api/accounts/oauth/callback`)
+  denied.searchParams.set("state", authorization.searchParams.get("state")!)
+  denied.searchParams.set("error", "access_denied")
+  denied.searchParams.set("error_description", "workspace policy rejected this app")
+  await page.goto(denied.href)
+  await expect(page.getByRole("alert")).toContainText("step 5")
+  await expect(page.getByRole("alert")).toContainText("workspace policy rejected this app")
+  await page.getByLabel("Connection method",{exact:true}).selectOption("oauth_app")
+  const remove=page.getByRole("button",{name:"Remove OAuth app",exact:true})
+  await remove.click()
+  expect(await page.evaluate(()=>fetch("/api/oauth-apps").then(r=>r.json()))).toEqual(["github"])
+  await remove.click()
+  await expect(page.getByRole("button",{name:"Save OAuth app",exact:true})).toBeVisible()
+  expect(await page.evaluate(()=>fetch("/api/oauth-apps").then(r=>r.json()))).toEqual([])
+  await expect(page.getByRole("button",{name:"Connect",exact:true})).toHaveCount(0)
+  const sourceId=await page.evaluate(async()=>{
+    const entries=await fetch("/api/integrations").then(r=>r.json())
+    return entries.find((entry:{slug:string})=>entry.slug==="github")?.sourceId as string | undefined
+  })
+  if(sourceId) await page.evaluate(id=>fetch(`/api/sources/${id}`,{method:"DELETE"}),sourceId)
+  expect(errors).toEqual([])
+})
+
+test("sessions: real execution grouping, rename, three panes and mobile focus", async ({ page }) => {
+  const errors: string[] = []
+  page.on("pageerror", error => errors.push(error.message))
+  await page.goto("/login?redirect=%2Fsessions")
+  await expect(page.getByRole("heading", { name: /^(Create your account|Sign in to your control plane)$/ })).toBeVisible()
+  const first = await page.getByRole("heading", { name: "Create your account", exact: true }).isVisible()
+  await page.getByLabel("Email", { exact: true }).fill("ursus95@gmail.com")
+  await page.getByLabel("Password", { exact: true }).fill(password)
+  await page.getByRole("button", { name: first ? "Create account" : "Sign in", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible()
+  const issued = await page.evaluate(async () => fetch("/api/tokens", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Session browser agent", workspaceId: (await fetch("/api/workspaces").then(r => r.json())).find((w: { allSources: boolean }) => w.allSources).id }),
+  }).then(r => r.json()))
+  try {
+    for (const code of ['# First investigation\nprint("captured stdout")\nreturn 42', '# Second investigation\nraise ValueError("Fixture failure")']) {
+      const response = await page.request.post(`${loopback}/mcp`, {
+        headers: { host: hostname, Authorization: `Bearer ${issued.token}`, Accept: "application/json, text/event-stream", "MCP-Protocol-Version": "2025-11-25" },
+        data: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "execute", arguments: { code } } },
+      })
+      expect(response.ok(), await response.text()).toBe(true)
+      expect((await response.json()).error).toBeUndefined()
+    }
+    await page.reload()
+    const sessions = page.getByRole("grid", { name: "Sessions", exact: true })
+    await expect(sessions.getByRole("row", { name: "First investigation", exact: true })).toHaveCount(1)
+    await sessions.focus()
+    await page.keyboard.press("v")
+    await expect(page.getByRole("grid", { name: "Sessions timeline", exact: true })).toBeVisible()
+    await expect(page.getByRole("grid",{name:"Sessions timeline",exact:true}).getByRole("row",{name:"First investigation",exact:true}).locator(".timeline-track > b")).toHaveCount(2)
+    await expect(page.getByRole("row",{name:"First investigation",exact:true}).locator(".timeline-bar.has-failures")).toHaveCount(1)
+    await expect(page.getByRole("row",{name:"First investigation",exact:true}).locator(".timeline-track > b.failed")).toHaveCount(1)
+    await page.reload()
+    await expect(page.getByRole("button", { name: "Timeline", exact: true })).toHaveAttribute("aria-pressed", "true")
+    await capture(page, "sessions-timeline-desktop.png")
+    await page.setViewportSize({ width: 390, height: 844 })
+    await capture(page, "sessions-timeline-mobile.png")
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    await page.getByRole("button", { name: "List", exact: true }).click()
+    await sessions.focus()
+    await page.keyboard.press("Enter")
+    await page.getByRole("button",{name:"Rename session",exact:true}).click()
+    await expect(page.getByLabel("Session title", { exact: true })).toHaveValue("First investigation")
+    await page.getByLabel("Session title", { exact: true }).fill("Renamed browser session")
+    await page.getByRole("button", { name: "Save title", exact: true }).click()
+    await expect(page.getByRole("heading", { name: "Renamed browser session", exact: true })).toBeVisible()
+    const runs = page.getByRole("grid", { name: "Session executions", exact: true })
+    await expect(runs.getByRole("row", { name: /investigation$/ })).toHaveCount(2)
+    await runs.focus()
+    await page.keyboard.press("Enter")
+    const execution = page.getByRole("region", { name: "Execution details", exact: true })
+    await expect(execution.getByRole("heading", { name: "Second investigation", exact: true })).toBeVisible()
+    await execution.getByRole("button", { name: /Close/ }).focus()
+    await page.keyboard.press("ArrowDown")
+    await expect(execution.getByRole("heading", { name: "First investigation", exact: true })).toBeVisible()
+    await expect(execution.getByText("captured stdout", { exact: true })).toBeVisible()
+    await page.reload()
+    await expect(execution.getByRole("heading", { name: "First investigation", exact: true })).toBeVisible()
+    await capture(page, "sessions-panes-desktop.png")
+    const sessionDeepLink = page.url()
+    await page.getByRole("link", { name: "Save as script", exact: true }).click()
+    await expect(page.getByLabel("Python source", { exact: true })).toHaveValue('# First investigation\nprint("captured stdout")\nreturn 42')
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("")
+    await page.getByLabel("Name", { exact: true }).fill("from-session-browser")
+    await page.getByRole("button", {name:"Create script",exact:true}).click()
+    await expect(page.getByRole("heading", {name:"Edit script",exact:true})).toBeVisible()
+    await page.getByRole("heading", {name:"Edit script",exact:true}).click()
+    await page.keyboard.press("4")
+    await expect(page.getByRole("heading", {name:"Scripts",exact:true})).toBeVisible()
+    const scriptGrid = page.getByRole("grid", {name:"Scripts",exact:true})
+    await expect(scriptGrid.getByRole("row", {name:"from-session-browser",exact:true})).toBeVisible()
+    const scope = await page.evaluate(() => fetch("/api/workspaces",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:"Script scope fixture",sourceIds:[]})}).then(r=>r.json()))
+    await page.reload()
+    await page.getByRole("button",{name:"Script scope fixture",exact:true}).click()
+    await expect(scriptGrid.getByRole("row", {name:"from-session-browser",exact:true})).toHaveCount(0)
+    await page.getByRole("heading",{name:"Scripts",exact:true}).click()
+    await page.keyboard.press("3")
+    await expect(page.getByRole("tab",{name:/^Script scope fixture/})).toHaveAttribute("aria-selected","true")
+    await page.getByRole("heading",{name:"Workspaces",exact:true}).click()
+    await page.keyboard.press("4")
+    await expect(scriptGrid.getByRole("row", {name:"from-session-browser",exact:true})).toHaveCount(0)
+    await page.getByRole("button",{name:"All sources",exact:true}).click()
+    await expect(scriptGrid.getByRole("row", {name:"from-session-browser",exact:true})).toBeVisible()
+    await page.evaluate(id=>fetch(`/api/workspaces/${id}`,{method:"DELETE"}),scope.id)
+    await page.reload()
+    await expect(scriptGrid.getByRole("row",{name:"from-session-browser",exact:true})).toBeVisible()
+    await scriptGrid.focus()
+    await page.keyboard.press("Enter")
+    const scriptDetails = page.getByRole("region", {name:"Script details",exact:true})
+    await expect(scriptDetails.locator("pre")).toContainText("captured stdout")
+    await page.reload()
+    await expect(scriptDetails.getByRole("heading", {name:"from-session-browser",exact:true})).toBeVisible()
+    await capture(page,"scripts-panes-desktop.png")
+    await page.setViewportSize({width:390,height:844})
+    await noOverflow(page)
+    await capture(page,"scripts-panes-mobile.png")
+    await scriptDetails.getByRole("button",{name:"Delete script",exact:true}).click()
+    await expect(page.getByRole("status")).toContainText("Press Delete script again")
+    await scriptDetails.getByRole("button",{name:"Delete script",exact:true}).click()
+    await expect(scriptGrid.getByRole("row",{name:"from-session-browser",exact:true})).toHaveCount(0)
+    await page.setViewportSize({width:1440,height:1000})
+    await page.goto(sessionDeepLink)
+    await expect(execution.getByRole("heading", { name: "First investigation", exact: true })).toBeVisible()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expect(execution).toBeVisible()
+    await capture(page, "sessions-panes-mobile.png")
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+    await execution.getByRole("button", { name: /Close/ }).click()
+    await expect(page.getByRole("heading", {name:"Renamed browser session",exact:true})).toBeVisible()
+    await page.getByRole("region", { name: "Session details", exact: true }).getByRole("button", { name: /Close/ }).click()
+    await expect(sessions).toBeFocused()
+    await page.setViewportSize({width:1440,height:1000})
+    await page.goto(`/tokens?selected=${issued.id}&detail=open`)
+    const tokenDetails = page.getByRole("region",{name:"Token details",exact:true})
+    await expect(tokenDetails.getByRole("heading",{name:"Session browser agent",exact:true})).toBeVisible()
+    await expect(tokenDetails).toContainText("Personal token")
+    await page.getByRole("button",{name:"New personal token",exact:true}).click()
+    await page.getByLabel("Name",{exact:true}).fill("Pane token fixture")
+    await page.getByRole("button",{name:"Create token",exact:true}).click()
+    await expect(page.getByLabel("New access token")).toHaveValue(/^cm_/)
+    await page.getByRole("button",{name:"I saved it",exact:true}).click()
+    await expect(page.getByLabel("New access token")).toHaveCount(0)
+    const tokenGrid=page.getByRole("grid",{name:"Agents with access",exact:true})
+    await tokenGrid.getByRole("row",{name:"Pane token fixture",exact:true}).click()
+    await expect(tokenDetails.getByRole("heading",{name:"Pane token fixture",exact:true})).toBeVisible()
+    await capture(page,"tokens-panes-desktop.png")
+    await page.setViewportSize({width:390,height:844})
+    await noOverflow(page)
+    await capture(page,"tokens-panes-mobile.png")
+    await tokenDetails.getByRole("button",{name:"Revoke token",exact:true}).click()
+    await tokenDetails.getByRole("button",{name:"Revoke token",exact:true}).click()
+    await expect(tokenDetails).toContainText("Revoked")
+    await page.reload()
+    await expect(page.getByLabel("New access token")).toHaveCount(0)
+    expect(errors).toEqual([])
+  } finally {
+    await page.evaluate(id => fetch(`/api/tokens/${id}`, { method: "DELETE" }), issued.id)
+  }
 })

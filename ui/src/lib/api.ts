@@ -29,7 +29,7 @@ export async function api<T>(
 }
 export function write<T>(
   path: `/api/${string}`,
-  method: "POST" | "PUT" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   body: unknown,
   schema: z.ZodType<T>
 ) {
@@ -67,14 +67,16 @@ export function safeReturnPath(value: unknown) {
     url.origin !== "https://return.invalid" ||
     ![
       "/",
+      "/integrations",
       "/sources",
       "/accounts",
       "/workspaces",
       "/endpoints",
       "/tokens",
       "/executions",
+      "/sessions",
+      "/scripts",
       "/authorize",
-      "/approvals",
     ].some((path) =>
       path === "/"
         ? url.pathname === "/"

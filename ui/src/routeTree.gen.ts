@@ -14,9 +14,10 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated.accounts'
 import { Route as AuthenticatedAuthorizeRouteImport } from './routes/_authenticated.authorize'
+import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated.integrations'
+import { Route as AuthenticatedScriptsRouteImport } from './routes/_authenticated.scripts'
+import { Route as AuthenticatedSessionsRouteImport } from './routes/_authenticated.sessions'
 import { Route as AuthenticatedTokensRouteImport } from './routes/_authenticated.tokens'
-import { Route as AuthenticatedApprovalsIndexRouteImport } from './routes/_authenticated.approvals.index'
-import { Route as AuthenticatedApprovalsExecutionIdRouteImport } from './routes/_authenticated.approvals.$executionId'
 import { Route as AuthenticatedEndpointsIndexRouteImport } from './routes/_authenticated.endpoints.index'
 import { Route as AuthenticatedEndpointsSplatRouteImport } from './routes/_authenticated.endpoints.$'
 import { Route as AuthenticatedExecutionsIndexRouteImport } from './routes/_authenticated.executions.index'
@@ -57,23 +58,27 @@ const AuthenticatedAuthorizeRoute = AuthenticatedAuthorizeRouteImport.update({
   path: '/authorize',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedIntegrationsRoute =
+  AuthenticatedIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedScriptsRoute = AuthenticatedScriptsRouteImport.update({
+  id: '/scripts',
+  path: '/scripts',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSessionsRoute = AuthenticatedSessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedTokensRoute = AuthenticatedTokensRouteImport.update({
   id: '/tokens',
   path: '/tokens',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedApprovalsIndexRoute =
-  AuthenticatedApprovalsIndexRouteImport.update({
-    id: '/approvals/',
-    path: '/approvals/',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedApprovalsExecutionIdRoute =
-  AuthenticatedApprovalsExecutionIdRouteImport.update({
-    id: '/approvals/$executionId',
-    path: '/approvals/$executionId',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedEndpointsIndexRoute =
   AuthenticatedEndpointsIndexRouteImport.update({
     id: '/endpoints/',
@@ -169,15 +174,16 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/authorize': typeof AuthenticatedAuthorizeRoute
+  '/integrations': typeof AuthenticatedIntegrationsRoute
+  '/scripts': typeof AuthenticatedScriptsRoute
+  '/sessions': typeof AuthenticatedSessionsRoute
   '/tokens': typeof AuthenticatedTokensRoute
-  '/approvals/$executionId': typeof AuthenticatedApprovalsExecutionIdRoute
   '/endpoints/$': typeof AuthenticatedEndpointsSplatRoute
   '/executions/$executionId': typeof AuthenticatedExecutionsExecutionIdRoute
   '/sources/$sourceId': typeof AuthenticatedSourcesSourceIdRoute
   '/sources/new': typeof AuthenticatedSourcesNewRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
-  '/approvals/': typeof AuthenticatedApprovalsIndexRoute
   '/endpoints/': typeof AuthenticatedEndpointsIndexRoute
   '/executions/': typeof AuthenticatedExecutionsIndexRoute
   '/sources/': typeof AuthenticatedSourcesIndexRoute
@@ -193,15 +199,16 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/authorize': typeof AuthenticatedAuthorizeRoute
+  '/integrations': typeof AuthenticatedIntegrationsRoute
+  '/scripts': typeof AuthenticatedScriptsRoute
+  '/sessions': typeof AuthenticatedSessionsRoute
   '/tokens': typeof AuthenticatedTokensRoute
-  '/approvals/$executionId': typeof AuthenticatedApprovalsExecutionIdRoute
   '/endpoints/$': typeof AuthenticatedEndpointsSplatRoute
   '/executions/$executionId': typeof AuthenticatedExecutionsExecutionIdRoute
   '/sources/$sourceId': typeof AuthenticatedSourcesSourceIdRoute
   '/sources/new': typeof AuthenticatedSourcesNewRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
-  '/approvals': typeof AuthenticatedApprovalsIndexRoute
   '/endpoints': typeof AuthenticatedEndpointsIndexRoute
   '/executions': typeof AuthenticatedExecutionsIndexRoute
   '/sources': typeof AuthenticatedSourcesIndexRoute
@@ -219,15 +226,16 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
   '/_authenticated/authorize': typeof AuthenticatedAuthorizeRoute
+  '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
+  '/_authenticated/scripts': typeof AuthenticatedScriptsRoute
+  '/_authenticated/sessions': typeof AuthenticatedSessionsRoute
   '/_authenticated/tokens': typeof AuthenticatedTokensRoute
-  '/_authenticated/approvals/$executionId': typeof AuthenticatedApprovalsExecutionIdRoute
   '/_authenticated/endpoints/$': typeof AuthenticatedEndpointsSplatRoute
   '/_authenticated/executions/$executionId': typeof AuthenticatedExecutionsExecutionIdRoute
   '/_authenticated/sources/$sourceId': typeof AuthenticatedSourcesSourceIdRoute
   '/_authenticated/sources/new': typeof AuthenticatedSourcesNewRoute
   '/_authenticated/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/_authenticated/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
-  '/_authenticated/approvals/': typeof AuthenticatedApprovalsIndexRoute
   '/_authenticated/endpoints/': typeof AuthenticatedEndpointsIndexRoute
   '/_authenticated/executions/': typeof AuthenticatedExecutionsIndexRoute
   '/_authenticated/sources/': typeof AuthenticatedSourcesIndexRoute
@@ -245,15 +253,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/accounts'
     | '/authorize'
+    | '/integrations'
+    | '/scripts'
+    | '/sessions'
     | '/tokens'
-    | '/approvals/$executionId'
     | '/endpoints/$'
     | '/executions/$executionId'
     | '/sources/$sourceId'
     | '/sources/new'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
-    | '/approvals/'
     | '/endpoints/'
     | '/executions/'
     | '/sources/'
@@ -269,15 +278,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/accounts'
     | '/authorize'
+    | '/integrations'
+    | '/scripts'
+    | '/sessions'
     | '/tokens'
-    | '/approvals/$executionId'
     | '/endpoints/$'
     | '/executions/$executionId'
     | '/sources/$sourceId'
     | '/sources/new'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
-    | '/approvals'
     | '/endpoints'
     | '/executions'
     | '/sources'
@@ -294,15 +304,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/accounts'
     | '/_authenticated/authorize'
+    | '/_authenticated/integrations'
+    | '/_authenticated/scripts'
+    | '/_authenticated/sessions'
     | '/_authenticated/tokens'
-    | '/_authenticated/approvals/$executionId'
     | '/_authenticated/endpoints/$'
     | '/_authenticated/executions/$executionId'
     | '/_authenticated/sources/$sourceId'
     | '/_authenticated/sources/new'
     | '/_authenticated/workspaces/$workspaceId'
     | '/_authenticated/workspaces/new'
-    | '/_authenticated/approvals/'
     | '/_authenticated/endpoints/'
     | '/_authenticated/executions/'
     | '/_authenticated/sources/'
@@ -357,25 +368,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAuthorizeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/integrations': {
+      id: '/_authenticated/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof AuthenticatedIntegrationsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/scripts': {
+      id: '/_authenticated/scripts'
+      path: '/scripts'
+      fullPath: '/scripts'
+      preLoaderRoute: typeof AuthenticatedScriptsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/sessions': {
+      id: '/_authenticated/sessions'
+      path: '/sessions'
+      fullPath: '/sessions'
+      preLoaderRoute: typeof AuthenticatedSessionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/tokens': {
       id: '/_authenticated/tokens'
       path: '/tokens'
       fullPath: '/tokens'
       preLoaderRoute: typeof AuthenticatedTokensRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/approvals/': {
-      id: '/_authenticated/approvals/'
-      path: '/approvals'
-      fullPath: '/approvals/'
-      preLoaderRoute: typeof AuthenticatedApprovalsIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/approvals/$executionId': {
-      id: '/_authenticated/approvals/$executionId'
-      path: '/approvals/$executionId'
-      fullPath: '/approvals/$executionId'
-      preLoaderRoute: typeof AuthenticatedApprovalsExecutionIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/endpoints/': {
@@ -489,15 +507,16 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
   AuthenticatedAuthorizeRoute: typeof AuthenticatedAuthorizeRoute
+  AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
+  AuthenticatedScriptsRoute: typeof AuthenticatedScriptsRoute
+  AuthenticatedSessionsRoute: typeof AuthenticatedSessionsRoute
   AuthenticatedTokensRoute: typeof AuthenticatedTokensRoute
-  AuthenticatedApprovalsExecutionIdRoute: typeof AuthenticatedApprovalsExecutionIdRoute
   AuthenticatedEndpointsSplatRoute: typeof AuthenticatedEndpointsSplatRoute
   AuthenticatedExecutionsExecutionIdRoute: typeof AuthenticatedExecutionsExecutionIdRoute
   AuthenticatedSourcesSourceIdRoute: typeof AuthenticatedSourcesSourceIdRoute
   AuthenticatedSourcesNewRoute: typeof AuthenticatedSourcesNewRoute
   AuthenticatedWorkspacesWorkspaceIdRoute: typeof AuthenticatedWorkspacesWorkspaceIdRoute
   AuthenticatedWorkspacesNewRoute: typeof AuthenticatedWorkspacesNewRoute
-  AuthenticatedApprovalsIndexRoute: typeof AuthenticatedApprovalsIndexRoute
   AuthenticatedEndpointsIndexRoute: typeof AuthenticatedEndpointsIndexRoute
   AuthenticatedExecutionsIndexRoute: typeof AuthenticatedExecutionsIndexRoute
   AuthenticatedSourcesIndexRoute: typeof AuthenticatedSourcesIndexRoute
@@ -512,9 +531,10 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
   AuthenticatedAuthorizeRoute: AuthenticatedAuthorizeRoute,
+  AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,
+  AuthenticatedScriptsRoute: AuthenticatedScriptsRoute,
+  AuthenticatedSessionsRoute: AuthenticatedSessionsRoute,
   AuthenticatedTokensRoute: AuthenticatedTokensRoute,
-  AuthenticatedApprovalsExecutionIdRoute:
-    AuthenticatedApprovalsExecutionIdRoute,
   AuthenticatedEndpointsSplatRoute: AuthenticatedEndpointsSplatRoute,
   AuthenticatedExecutionsExecutionIdRoute:
     AuthenticatedExecutionsExecutionIdRoute,
@@ -523,7 +543,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedWorkspacesWorkspaceIdRoute:
     AuthenticatedWorkspacesWorkspaceIdRoute,
   AuthenticatedWorkspacesNewRoute: AuthenticatedWorkspacesNewRoute,
-  AuthenticatedApprovalsIndexRoute: AuthenticatedApprovalsIndexRoute,
   AuthenticatedEndpointsIndexRoute: AuthenticatedEndpointsIndexRoute,
   AuthenticatedExecutionsIndexRoute: AuthenticatedExecutionsIndexRoute,
   AuthenticatedSourcesIndexRoute: AuthenticatedSourcesIndexRoute,

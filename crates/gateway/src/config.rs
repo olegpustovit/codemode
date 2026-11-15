@@ -8,7 +8,6 @@ pub struct Config {
     pub database_url: secrecy::SecretString,
     pub sources_file: PathBuf,
     pub monty_bin: PathBuf,
-    pub snapshot_key: Option<secrecy::SecretString>,
     pub encryption_key: Option<secrecy::SecretString>,
     pub encryption_key_id: String,
     pub log_json: bool,
@@ -49,7 +48,6 @@ impl Config {
             monty_bin: std::env::var_os("CODEMODE_MONTY_BIN")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("./monty")),
-            snapshot_key: std::env::var("CODEMODE_SNAPSHOT_KEY").ok().map(Into::into),
             encryption_key: std::env::var("CODEMODE_ENCRYPTION_KEY")
                 .ok()
                 .map(Into::into),
@@ -63,11 +61,6 @@ impl Config {
                 result_bytes: limit("CODEMODE_RESULT_BYTES", 32768, 256..=1048576)?,
                 concurrent_executions: limit("CODEMODE_CONCURRENT_EXECUTIONS", 8, 1..=64)?,
                 concurrent_calls: limit("CODEMODE_CONCURRENT_CALLS", 16, 1..=100)?,
-                approval_lifetime: Duration::from_secs(limit(
-                    "CODEMODE_APPROVAL_LIFETIME_SECS",
-                    600,
-                    1..=3600,
-                )? as u64),
                 upstream_timeout: Duration::from_secs(limit(
                     "CODEMODE_UPSTREAM_TIMEOUT_SECS",
                     30,

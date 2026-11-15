@@ -6,8 +6,8 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query"
 import { z } from "zod"
-import { Plus, ArrowLeft } from "lucide-react"
-import { workspacesQuery, workspaceQuery, sourcesQuery } from "./queries"
+import { ArrowLeft } from "lucide-react"
+import { workspaceQuery, sourcesQuery } from "./queries"
 import type { Workspace } from "./queries"
 import { configQuery } from "@/lib/runtime"
 import { write, created, nothing } from "@/lib/api"
@@ -24,69 +24,7 @@ import {
   FieldSet,
   FieldLegend,
 } from "@/components/ui/field"
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
 const detailRoute = getRouteApi("/_authenticated/workspaces/$workspaceId")
-export function WorkspacesPage() {
-  const workspaces = useSuspenseQuery(workspacesQuery).data
-  const config = useSuspenseQuery(configQuery).data
-  return (
-    <>
-      <PageHeader
-        title="Workspaces"
-        description="Connect to /mcp, then choose a workspace during OAuth authorization."
-        action={
-          <Button render={<Link to="/workspaces/new" />}>
-            <Plus data-icon="inline-start" />
-            Create workspace
-          </Button>
-        }
-      />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Workspace</TableHead>
-            <TableHead>Source scope</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {workspaces.map((workspace) => (
-            <TableRow key={workspace.id}>
-              <TableCell>
-                <Link
-                  to="/workspaces/$workspaceId"
-                  params={{ workspaceId: workspace.id }}
-                  className="font-medium underline underline-offset-4"
-                >
-                  {workspace.name}
-                </Link>
-                <p className="font-mono text-xs break-all text-muted-foreground">
-                  https://{config.hostname}/mcp
-                </p>
-              </TableCell>
-              <TableCell>
-                {workspace.allSources
-                  ? "All sources"
-                  : `${workspace.sourceIds.length} sources`}
-                {!workspace.allTools && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Selected tools only
-                  </p>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </>
-  )
-}
 export function NewWorkspacePage() {
   return (
     <>

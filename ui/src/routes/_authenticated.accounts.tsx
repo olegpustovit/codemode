@@ -1,12 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { AccountsPage } from "@/features/accounts"
-import { sourcesQuery, accountsQuery } from "@/features/queries"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 export const Route = createFileRoute("/_authenticated/accounts")({
-  loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.query({ ...sourcesQuery, staleTime: "static" }),
-      context.queryClient.query({ ...accountsQuery, staleTime: "static" }),
-    ]),
-  head: () => ({ meta: [{ title: "Accounts · Codemode" }] }),
-  component: AccountsPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/integrations", search: { tab: "linked" } })
+  },
 })

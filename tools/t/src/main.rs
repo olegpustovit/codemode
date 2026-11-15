@@ -108,7 +108,9 @@ fn run(args: &[OsString]) -> u8 {
 
     let run_deadline = Instant::now() + if slow { SLOW_RUN_DEADLINE } else { RUN_DEADLINE };
     let (serial, parallel): (Vec<Case>, Vec<Case>) = cases.into_iter().partition(|c| c.serial);
-    let workers = thread::available_parallelism().map_or(4, usize::from);
+    // SSH multiplexing and the deployment database cannot absorb the build host's CPU count.
+    let workers = thread::available_parallelism().map_or(4, usize::from)
+        .min(if env::var_os("T_RUNNER").is_some() { 4 } else { usize::MAX });
     let mut outcomes = run_batch(&parallel, workers, run_deadline, &logs, 0, slow);
     outcomes.extend(run_batch(&serial, 1, run_deadline, &logs, parallel.len(), slow));
 
@@ -174,7 +176,7 @@ fn build(cargo_args: &[OsString]) -> Result<Vec<Exe>, u8> {
     let mut exes = Vec::new();
     for line in text.lines().filter(|l| l.contains("\"reason\":\"compiler-artifact\"")) {
         let Some(path) = json_str(line, "\"executable\":") else { continue };
-        if !line.contains("\"test\":true") {
+        if !is_test_artifact(line) {
             continue;
         }
         let target = line.find("\"target\":").map_or(line, |at| &line[at..]);
@@ -183,6 +185,12 @@ fn build(cargo_args: &[OsString]) -> Result<Vec<Exe>, u8> {
         exes.push(Exe { path: PathBuf::from(path), krate, integration: kind == "test" });
     }
     Ok(exes)
+}
+
+fn is_test_artifact(line: &str) -> bool {
+    line.split_once("\"profile\":{")
+        .and_then(|(_, profile)| profile.split('}').next())
+        .is_some_and(|profile| profile.contains("\"test\":true"))
 }
 
 fn cargo_command() -> Command {
@@ -222,7 +230,11 @@ fn json_str(line: &str, key: &str) -> Option<String> {
 /// Case names in one test executable. `#[ignore]` cases are the slow tier: listed only when `include_ignored`.
 fn list(exe: &Path, include_ignored: bool) -> Vec<String> {
     let names = |extra: &[&str]| -> Vec<String> {
-        let Ok(output) = Command::new(exe).args(["--list", "--format", "terse"]).args(extra).output() else { return Vec::new() };
+        let Ok(output) = test_command(exe, env::var_os("T_RUNNER"), UNIT_DEADLINE).args(["--list", "--format", "terse"]).args(extra).output() else { return Vec::new() };
+        if !output.status.success() {
+            eprintln!("t: cannot list {}: {}", exe.display(), String::from_utf8_lossy(&output.stderr));
+            return Vec::new();
+        }
         String::from_utf8_lossy(&output.stdout)
             .lines()
             .filter_map(|line| line.strip_suffix(": test").map(str::to_owned))
@@ -264,14 +276,7 @@ fn run_case(case: &Case, run_deadline: Instant, log: PathBuf, slow: bool) -> Out
     let outcome = |status| Outcome { krate: case.krate.clone(), name: case.name.clone(), elapsed: started.elapsed(), status, log: log.clone() };
     let Ok(file) = File::create(&log) else { return outcome("FAIL") };
     let Ok(file_err) = file.try_clone() else { return outcome("FAIL") };
-    let mut command = match env::var_os("T_RUNNER") {
-        Some(runner) => {
-            let mut command = Command::new(runner);
-            command.arg(&case.exe).env("T_CASE_DEADLINE_SECS", case.deadline.as_secs().to_string());
-            command
-        }
-        None => Command::new(&case.exe),
-    };
+    let mut command = test_command(&case.exe, env::var_os("T_RUNNER"), case.deadline);
     command.args(["--exact", &case.name, "--nocapture", "--test-threads=1"]);
     if slow {
         command.arg("--include-ignored");
@@ -283,6 +288,17 @@ fn run_case(case: &Case, run_deadline: Instant, log: PathBuf, slow: bool) -> Out
         Some(true) => outcome("ok"),
         Some(false) => outcome("FAIL"),
         None => outcome("TIMEOUT"),
+    }
+}
+
+fn test_command(exe: &Path, runner: Option<OsString>, deadline: Duration) -> Command {
+    match runner {
+        Some(runner) => {
+            let mut command = Command::new(runner);
+            command.arg(exe).env("T_CASE_DEADLINE_SECS", deadline.as_secs().to_string());
+            command
+        }
+        None => Command::new(exe),
     }
 }
 
@@ -402,6 +418,24 @@ fn append(path: &Path, rows: &[String]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ordinary_binary_test_capability_is_not_a_test_harness() {
+        assert!(!is_test_artifact(r#"{"target":{"test":true},"profile":{"test":false}}"#));
+        assert!(is_test_artifact(r#"{"target":{"test":true},"profile":{"test":true}}"#));
+        assert!(!is_test_artifact(r#"{"target":{"test":true}}"#));
+    }
+
+    #[test]
+    fn remote_harness_is_used_for_listing_as_well_as_running() {
+        let exe = Path::new("/cross-built/it");
+        let mut command = test_command(exe, Some("/bin/echo".into()), UNIT_DEADLINE);
+        let output = command.args(["--list", "--format", "terse"]).output().unwrap();
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), "/cross-built/it --list --format terse");
+        assert!(command.get_envs().any(|(key, value)| key == "T_CASE_DEADLINE_SECS" && value == Some(std::ffi::OsStr::new("2"))));
+        assert_eq!(test_command(exe, None, UNIT_DEADLINE).get_program(), exe);
+    }
 
     #[test]
     fn target_and_manifest_values_are_not_test_filters() {

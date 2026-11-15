@@ -9,6 +9,7 @@ use axum::{
 use codemode_core::components::{
     auth::Principal,
     execution::log::Log,
+    integrations,
     sources::{Source, Transport},
 };
 use rmcp::{
@@ -191,6 +192,19 @@ impl Administration {
             "delete_workspace",
             serde_json::json!({"id":input.id}),
             self.state.workspaces.remove(input.id),
+        )
+        .await
+    }
+    #[tool(
+        description = "List the integration registry with your existing connections, link state and tool counts. No credentials are returned; provider consent stays in the browser.",
+        annotations(read_only_hint = true)
+    )]
+    async fn list_integrations(&self, context: RequestContext<RoleServer>) -> CallToolResult {
+        self.audited(
+            &context,
+            "list_integrations",
+            serde_json::json!({}),
+            integrations::list(&self.state.sources),
         )
         .await
     }

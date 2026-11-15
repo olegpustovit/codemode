@@ -1,17 +1,20 @@
-use std::{collections::BTreeMap, path::Path, sync::Mutex, time::Duration};
+use std::{
+    collections::BTreeMap,
+    path::Path,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use uuid::Uuid;
 
-use hmac::{Hmac, Mac};
 use monty_pool::{
     Checkout, Pool, PoolConfig, PoolError, ReplConfig, ResumeValue, TurnEvent, on_print_sync,
 };
 use monty_types::{ExcType, MontyException, MontyObject, ResourceLimits};
 use serde_json::value::RawValue;
-use sha2::Sha256;
 
 pub const MEMORY: usize = 64 * 1024 * 1024;
 pub const OUTPUT: usize = 32 * 1024;
-const MAX_SNAPSHOT: usize = 72 * 1024 * 1024;
+const MAX_FRAME: usize = 72 * 1024 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -19,8 +22,6 @@ pub enum Error {
     Worker(#[source] PoolError),
     #[error("invalid worker message: {0}")]
     Invalid(String),
-    #[error("snapshot authentication failed")]
-    Snapshot,
     #[error("source exceeds 64 KB")]
     Source,
 }
@@ -42,7 +43,24 @@ pub enum Step {
     Calls(Vec<PendingCall>),
 }
 
-pub type CallResult = Result<Box<RawValue>, String>;
+#[derive(Debug, thiserror::Error)]
+pub enum CallFailure {
+    #[error("{0}")]
+    Tool(String),
+    #[error("{0}")]
+    Permission(String),
+}
+impl From<String> for CallFailure {
+    fn from(message: String) -> Self {
+        Self::Tool(message)
+    }
+}
+impl From<&str> for CallFailure {
+    fn from(message: &str) -> Self {
+        Self::Tool(message.into())
+    }
+}
+pub type CallResult = Result<Box<RawValue>, CallFailure>;
 
 pub trait Sandbox {
     type Run: Send;
@@ -64,24 +82,23 @@ pub trait Sandbox {
     ) -> impl Future<Output = Result<(Self::Run, Step), Error>> + Send {
         self.start(code, prelude)
     }
-    fn restore_for(
-        &self,
-        _caller: Uuid,
-        snapshot: &[u8],
-    ) -> impl Future<Output = Result<(Self::Run, Vec<u32>), Error>> + Send {
-        self.restore(snapshot)
+    fn capture(&self) -> Arc<Mutex<Capture>> {
+        Arc::new(Mutex::new(Capture::default()))
     }
-    fn snapshot(&self, run: Self::Run) -> impl Future<Output = Result<Vec<u8>, Error>> + Send;
-    fn restore(
+    fn start_captured_for(
         &self,
-        snapshot: &[u8],
-    ) -> impl Future<Output = Result<(Self::Run, Vec<u32>), Error>> + Send;
+        caller: Uuid,
+        code: &str,
+        prelude: &str,
+        _output: Arc<Mutex<Capture>>,
+    ) -> impl Future<Output = Result<(Self::Run, Step), Error>> + Send {
+        self.start_for(caller, code, prelude)
+    }
 }
 
 pub struct MontySandbox {
     pub pool: Pool,
     repl: ReplConfig,
-    key: [u8; 32],
     output_budget: usize,
     turn_deadline: Duration,
     owners: Mutex<Owners>,
@@ -112,7 +129,7 @@ impl Owners {
 
 pub struct Run {
     pub worker: Option<Checkout>,
-    output: Capture,
+    output: Arc<Mutex<Capture>>,
     calls: usize,
 }
 
@@ -120,7 +137,6 @@ impl MontySandbox {
     pub async fn new(
         binary: &Path,
         deadline: Duration,
-        key: [u8; 32],
         output_budget: usize,
     ) -> Result<Self, Error> {
         let mut config = PoolConfig::subprocess(binary);
@@ -129,8 +145,8 @@ impl MontySandbox {
         // Configure includes cold process isolation; execution turns keep their own hard deadline.
         config.request_timeout = Some(deadline.max(Duration::from_secs(1)));
         config.checkout_timeout = Some(Duration::from_secs(1));
-        // Valid results and snapshots can approach the worker's memory ceiling.
-        config.max_decode_bytes = MAX_SNAPSHOT;
+        // Valid results can approach the worker's memory ceiling.
+        config.max_decode_bytes = MAX_FRAME;
         let pool = Pool::new(config).await?;
         let repl = ReplConfig {
             script_name: "execution.py".into(),
@@ -144,7 +160,6 @@ impl MontySandbox {
         Ok(Self {
             pool,
             repl,
-            key,
             output_budget,
             turn_deadline: deadline,
             owners: Mutex::new(Owners::default()),
@@ -192,7 +207,7 @@ impl MontySandbox {
     async fn advance(&self, mut run: Run, mut event: TurnEvent) -> Result<(Run, Step), Error> {
         let mut pending = Vec::new();
         loop {
-            let mut printer = on_print_sync(|_, text| run.output.append(text));
+            let mut printer = on_print_sync(|_, text| Capture::append_shared(&run.output, text));
             let worker = run
                 .worker
                 .as_mut()
@@ -209,13 +224,13 @@ impl MontySandbox {
                     if let Some(worker) = run.worker.take() {
                         self.turn(worker.finish()).await?;
                     }
-                    let output = std::mem::take(&mut run.output);
+                    let output = Capture::take(&run.output);
                     return Ok((
                         run,
                         Step::Done {
                             result,
-                            output: output.text,
-                            output_dropped_bytes: output.dropped,
+                            output: output.0,
+                            output_dropped_bytes: output.1,
                         },
                     ));
                 }
@@ -296,11 +311,27 @@ impl Sandbox for MontySandbox {
     async fn start(&self, code: &str, prelude: &str) -> Result<(Run, Step), Error> {
         self.start_for(Uuid::nil(), code, prelude).await
     }
+    fn capture(&self) -> Arc<Mutex<Capture>> {
+        Arc::new(Mutex::new(Capture {
+            budget: self.output_budget,
+            ..Default::default()
+        }))
+    }
     async fn start_for(
         &self,
         caller: Uuid,
         code: &str,
         prelude: &str,
+    ) -> Result<(Run, Step), Error> {
+        self.start_captured_for(caller, code, prelude, self.capture())
+            .await
+    }
+    async fn start_captured_for(
+        &self,
+        caller: Uuid,
+        code: &str,
+        prelude: &str,
+        output: Arc<Mutex<Capture>>,
     ) -> Result<(Run, Step), Error> {
         if code.len() > 64 * 1024 {
             return Err(Error::Source);
@@ -329,17 +360,13 @@ impl Sandbox for MontySandbox {
             source.push('\n');
         }
         source.push_str("json.dumps(await __codemode_main())\n");
-        let mut output = Capture {
-            budget: self.output_budget,
-            ..Default::default()
-        };
         let event = self
             .turn(worker.feed(
                 source,
                 vec![("_call".into(), MontyObject::function("_call", None))],
                 vec![],
                 false,
-                &mut on_print_sync(|_, text| output.append(text)),
+                &mut on_print_sync(|_, text| Capture::append_shared(&output, text)),
             ))
             .await?;
         self.advance(
@@ -365,9 +392,12 @@ impl Sandbox for MontySandbox {
                     id,
                     match result {
                         Ok(value) => ResumeValue::Return(MontyObject::string(value.get())),
-                        Err(message) => ResumeValue::Error(MontyException::new(
-                            ExcType::RuntimeError,
-                            Some(message),
+                        Err(error) => ResumeValue::Error(MontyException::new(
+                            match error {
+                                CallFailure::Permission(_) => ExcType::PermissionError,
+                                CallFailure::Tool(_) => ExcType::RuntimeError,
+                            },
+                            Some(error.to_string()),
                         )),
                     },
                 )
@@ -380,100 +410,14 @@ impl Sandbox for MontySandbox {
         let event = self
             .turn(worker.resume_futures(
                 answers,
-                &mut on_print_sync(|_, text| run.output.append(text)),
+                &mut on_print_sync(|_, text| Capture::append_shared(&run.output, text)),
             ))
             .await?;
         self.advance(run, event).await
     }
-
-    async fn snapshot(&self, mut run: Run) -> Result<Vec<u8>, Error> {
-        let worker = run
-            .worker
-            .as_mut()
-            .ok_or_else(|| Error::Invalid("worker already finished".into()))?;
-        let dump = self.turn(worker.dump()).await?;
-        let mut bytes = Vec::with_capacity(48 + run.output.text.len() + dump.len());
-        bytes.extend_from_slice(&[0; 32]);
-        bytes.extend_from_slice(&(run.calls as u32).to_le_bytes());
-        bytes.extend_from_slice(&(run.output.text.len() as u32).to_le_bytes());
-        bytes.extend_from_slice(&(run.output.dropped as u64).to_le_bytes());
-        bytes.extend_from_slice(run.output.text.as_bytes());
-        bytes.extend_from_slice(&dump);
-        let mut mac = Hmac::<Sha256>::new_from_slice(&self.key).map_err(|_| Error::Snapshot)?;
-        mac.update(&bytes[32..]);
-        bytes[..32].copy_from_slice(&mac.finalize().into_bytes());
-        if bytes.len() > MAX_SNAPSHOT {
-            return Err(Error::Snapshot);
-        }
-        Ok(bytes)
-    }
-
-    async fn restore(&self, snapshot: &[u8]) -> Result<(Run, Vec<u32>), Error> {
-        self.restore_for(Uuid::nil(), snapshot).await
-    }
-    async fn restore_for(&self, caller: Uuid, snapshot: &[u8]) -> Result<(Run, Vec<u32>), Error> {
-        if snapshot.len() < 48 || snapshot.len() > MAX_SNAPSHOT {
-            return Err(Error::Snapshot);
-        }
-        let mut mac = Hmac::<Sha256>::new_from_slice(&self.key).map_err(|_| Error::Snapshot)?;
-        mac.update(&snapshot[32..]);
-        mac.verify_slice(&snapshot[..32])
-            .map_err(|_| Error::Snapshot)?;
-        let calls =
-            u32::from_le_bytes(snapshot[32..36].try_into().map_err(|_| Error::Snapshot)?) as usize;
-        let output_len =
-            u32::from_le_bytes(snapshot[36..40].try_into().map_err(|_| Error::Snapshot)?) as usize;
-        if output_len > self.output_budget || calls > 100 || 48 + output_len >= snapshot.len() {
-            return Err(Error::Snapshot);
-        }
-        let output = std::str::from_utf8(&snapshot[48..48 + output_len])
-            .map_err(|_| Error::Snapshot)?
-            .to_owned();
-        let mut worker = self.checkout_for(caller).await?;
-        let (event, _) = self
-            .turn(worker.restore(
-                snapshot[48 + output_len..].to_vec(),
-                vec![],
-                &mut on_print_sync(|_, _| {}),
-            ))
-            .await?;
-        let event = event.ok_or_else(|| Error::Invalid("expected suspended snapshot".into()))?;
-        // Restored futures refer to the batch saved by the host, not newly emitted calls.
-        let step = match event {
-            TurnEvent::ResolveFutures {
-                pending_call_ids, ..
-            } if pending_call_ids.len() <= 100
-                && pending_call_ids
-                    .iter()
-                    .enumerate()
-                    .all(|(i, id)| !pending_call_ids[..i].contains(id)) =>
-            {
-                pending_call_ids
-            }
-            other => {
-                return Err(Error::Invalid(format!(
-                    "unexpected restored event: {other:?}"
-                )));
-            }
-        };
-        Ok((
-            Run {
-                worker: Some(worker),
-                output: Capture {
-                    budget: self.output_budget,
-                    text: output,
-                    dropped: u64::from_le_bytes(
-                        snapshot[40..48].try_into().map_err(|_| Error::Snapshot)?,
-                    ) as usize,
-                },
-                calls,
-            },
-            step,
-        ))
-    }
 }
 
-struct Capture {
+pub struct Capture {
     budget: usize,
     text: String,
     dropped: usize,
@@ -488,6 +432,28 @@ impl Default for Capture {
     }
 }
 impl Capture {
+    fn append_shared(output: &Arc<Mutex<Self>>, text: &str) {
+        output
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .append(text);
+    }
+    pub(crate) fn snapshot(output: &Arc<Mutex<Self>>) -> (String, usize) {
+        let output = output
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        (output.text.clone(), output.dropped)
+    }
+    fn take(output: &Arc<Mutex<Self>>) -> (String, usize) {
+        let mut output = output
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        (
+            std::mem::take(&mut output.text),
+            std::mem::take(&mut output.dropped),
+        )
+    }
+
     fn append(&mut self, text: &str) {
         let mut n = text.len().min(self.budget.saturating_sub(self.text.len()));
         while !text.is_char_boundary(n) {

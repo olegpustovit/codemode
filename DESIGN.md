@@ -1,271 +1,194 @@
 ---
 name: Codemode
-description: A software distribution index for connected tools and endpoint scope.
+description: A transparent, keyboard-driven control plane for connected tools and agent activity.
 colors:
-  background: "oklch(1 0 0)"
-  foreground: "oklch(0.145 0 0)"
-  card: "oklch(1 0 0)"
-  card-foreground: "oklch(0.145 0 0)"
-  popover: "oklch(1 0 0)"
-  popover-foreground: "oklch(0.145 0 0)"
-  primary: "oklch(0.205 0 0)"
-  primary-foreground: "oklch(0.985 0 0)"
-  muted: "oklch(0.97 0 0)"
-  muted-foreground: "oklch(0.47 0.012 255)"
-  destructive: "oklch(0.48 0.19 27.325)"
-  border: "oklch(0.922 0 0)"
-  input: "oklch(0.922 0 0)"
-  ring: "oklch(0.708 0 0)"
-  sidebar: "oklch(0.25 0.035 255)"
-  sidebar-foreground: "oklch(0.96 0.006 255)"
-  sidebar-accent: "oklch(0.34 0.045 255)"
-  sidebar-accent-foreground: "oklch(1 0 0)"
-  sidebar-border: "oklch(0.39 0.035 255)"
-  sidebar-ring: "oklch(0.708 0 0)"
-  selection: "oklch(.86 .045 255)"
-  selection-foreground: "oklch(.2 .03 255)"
+  ground: "#020309"
+  surface: "transparent"
+  text: "#F3F5FA"
+  secondary-text: "rgba(243,245,250,.78)"
+  quiet-text: "rgba(243,245,250,.58)"
+  line: "rgba(200,215,255,.10)"
+  strong-line: "rgba(200,215,255,.20)"
+  accent-text: "color-mix(in srgb,rgb(var(--hue)) 40%,#fff)"
+  accent-wash: "rgba(var(--hue),.16)"
+  primary-fill: "rgba(var(--hue), .32)"
+  control-hover: "rgba(255,255,255,.045)"
+  error: "#FF8C98"
+  warning: "#F3CE80"
 typography:
   headline:
-    fontFamily: "'Geist Variable', sans-serif"
-    fontSize: "1.75rem"
-    fontWeight: 650
-    lineHeight: 1.2
-    letterSpacing: "-0.025em"
+    fontFamily: "'M PLUS 1p', system-ui, sans-serif"
+    fontSize: "28px"
+    fontWeight: 300
+    lineHeight: 1.15
+    letterSpacing: "-.005em"
   title:
-    fontFamily: "'Geist Variable', sans-serif"
-    fontSize: "1.125rem"
-    fontWeight: 600
-    lineHeight: 1.5
+    fontFamily: "'M PLUS 1p', system-ui, sans-serif"
+    fontSize: "20px"
+    fontWeight: 400
+    lineHeight: 1.25
   body:
-    fontFamily: "'Geist Variable', sans-serif"
-    fontSize: "1rem"
+    fontFamily: "'M PLUS 1p', system-ui, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.45
+  label:
+    fontFamily: "'M PLUS 1p', system-ui, sans-serif"
+    fontSize: "11px"
+    fontWeight: 500
+    letterSpacing: ".08em"
+  code:
+    fontFamily: "'JetBrains Mono', ui-monospace, monospace"
+    fontSize: "12px"
     fontWeight: 400
     lineHeight: 1.6
-  label:
-    fontFamily: "'Geist Variable', sans-serif"
-    fontSize: "0.875rem"
-    fontWeight: 500
-    lineHeight: "1.25rem"
-  metadata:
-    fontFamily: "'Geist Variable', sans-serif"
-    fontSize: "0.75rem"
-    fontWeight: 400
-    lineHeight: "1rem"
-  code:
-    fontFamily: "ui-monospace, SFMono-Regular, monospace"
-    fontSize: "0.8125rem"
-    fontWeight: 400
-    lineHeight: 1.65
 rounded:
-  md: "0.5rem"
-  lg: "0.625rem"
-  xl: "0.875rem"
-  4xl: "1.625rem"
+  square: "0px"
+  keycap: "3px"
 spacing:
-  "1": "0.25rem"
-  "1.5": "0.375rem"
-  "2": "0.5rem"
-  "2.5": "0.625rem"
-  "3": "0.75rem"
-  "4": "1rem"
-  "5": "1.25rem"
-  "6": "1.5rem"
-  "7": "1.75rem"
-  "9": "2.25rem"
-  "10": "2.5rem"
+  "1": "4px"
+  "2": "8px"
+  "3": "12px"
+  "4": "16px"
+  "5": "24px"
+  "6": "32px"
+  "7": "48px"
+  "8": "72px"
 components:
   button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.primary-foreground}"
-    typography: "{typography.label}"
-    rounded: "{rounded.lg}"
-    height: "2rem"
-    padding: "0 0.625rem"
-  button-outline:
-    backgroundColor: "{colors.background}"
-    textColor: "{colors.foreground}"
-    typography: "{typography.label}"
-    rounded: "{rounded.lg}"
-    height: "2rem"
-    padding: "0 0.625rem"
-  button-outline-hover:
-    backgroundColor: "{colors.muted}"
-    textColor: "{colors.foreground}"
+    backgroundColor: "{colors.primary-fill}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.square}"
+    height: "30px"
+    padding: "0 12px"
   button-ghost:
-    backgroundColor: "transparent"
-    typography: "{typography.label}"
-    rounded: "{rounded.lg}"
-    height: "2rem"
-    padding: "0 0.625rem"
-  button-destructive:
-    backgroundColor: "color-mix(in oklab, var(--destructive) 10%, transparent)"
-    textColor: "{colors.destructive}"
-    typography: "{typography.label}"
-    rounded: "{rounded.lg}"
-    height: "2rem"
-    padding: "0 0.625rem"
-  button-destructive-hover:
-    backgroundColor: "color-mix(in oklab, var(--destructive) 20%, transparent)"
-  input:
-    backgroundColor: "transparent"
-    textColor: "{colors.foreground}"
-    rounded: "{rounded.lg}"
-    height: "2rem"
-    padding: "0.25rem 0.625rem"
-  navigation:
-    backgroundColor: "{colors.sidebar}"
-    textColor: "{colors.sidebar-foreground}"
-    typography: "{typography.label}"
-    width: "16rem"
-  state-badge:
-    textColor: "{colors.foreground}"
-    rounded: "{rounded.4xl}"
-    height: "1.25rem"
-    padding: "0.125rem 0.5rem"
-  state-badge-destructive:
-    backgroundColor: "color-mix(in oklab, var(--destructive) 10%, transparent)"
-    textColor: "{colors.destructive}"
-    rounded: "{rounded.4xl}"
-    height: "1.25rem"
-    padding: "0.125rem 0.5rem"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.square}"
+    height: "30px"
+    padding: "0 12px"
+  button-outline:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.square}"
+    height: "30px"
+    padding: "0 12px"
+  button-danger:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.error}"
+    rounded: "{rounded.square}"
+    height: "30px"
+    padding: "0 12px"
+  search-field:
+    textColor: "{colors.text}"
+    rounded: "{rounded.square}"
+    height: "32px"
+    padding: "0 12px"
+  section-navigation:
+    textColor: "{colors.secondary-text}"
+    rounded: "{rounded.square}"
+    padding: "0 12px"
+  policy-switch:
+    rounded: "{rounded.square}"
   code-panel:
-    backgroundColor: "{colors.muted}"
-    textColor: "{colors.foreground}"
-    rounded: "{rounded.lg}"
-    padding: "1rem"
-  scope-summary:
-    backgroundColor: "{colors.muted}"
-    textColor: "{colors.foreground}"
-    rounded: "{rounded.lg}"
-    padding: "1rem"
+    textColor: "{colors.text}"
+    rounded: "{rounded.square}"
+    padding: "8px 12px"
+  work-pane:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.square}"
+  keycap:
+    textColor: "{colors.secondary-text}"
+    rounded: "{rounded.keycap}"
+    height: "18px"
+    padding: "0 5px"
 ---
 
 # Design System: Codemode
 
 ## Overview
 
-**Creative North Star: "Software distribution index"**
+**Creative North Star: "The approved transparent control plane"**
 
-The control plane pairs a slate-blue navigation rail with white work surfaces, compact controls and visible record state. Geist supplies the interface voice; borders and spacing organize tables, forms and execution evidence.
+The owner-approved control-plane proposal is the visual authority: [proposal](https://artifacts.microapps.space/a/hkwwwp90n0dt), preserved in `docs/proposal/control-plane.html`. Its final v5 overrides supersede the earlier daytime design. This document records the implemented replacement; release qualification is recorded separately in `docs/proposal/implementation.md`.
 
-This records the implemented daytime interface. The direction is an implementation assumption documented in the surface brief, without recorded user aesthetic approval. Generated dark-mode variables exist in the stylesheet, but the application exposes no theme switch; they are outside this recorded active palette.
+The interface is an Operate surface. Compact lists, readable code, explicit connection states and a visible path through stacked panes carry the work. A continuous ribbon shader sits behind transparent work regions, with cobalt, violet, teal, bronze and crimson section hues. Raster decoration is not used.
 
 **Key Characteristics:**
 
-- Slate-blue navigation and white work surfaces.
-- Compact controls with explicit text labels and status.
-- Tables, ruled sections and responsive detail columns.
-- Endpoint membership shown as a live scope summary.
+- Transparent square work surfaces
+- One moving list cursor and tab underline
+- Self-hosted M PLUS 1p and JetBrains Mono
+- Visible state and precise recovery
 
 ## Colors
 
-Cool slate frames a neutral working palette. Frontmatter values preserve the stylesheet's normative OKLCH notation.
-
 ### Primary
 
-- **Charcoal action** (`primary`, `primary-foreground`): filled save, add, sign-in and authorize controls.
-- **Slate navigation** (`sidebar`, `sidebar-foreground`): persistent navigation; the lighter `sidebar-accent` and its foreground identify active and hovered items. `sidebar-border` and `sidebar-ring` support its boundaries and focus.
-- **Destructive red** (`destructive`): removal actions, failed states, validation and error notices. Destructive buttons and badges use translucent red fills; they retain red text.
+Section-tinted light colors focus, selection and active navigation. The hue follows Sessions (cobalt), Integrations (violet), Workspaces (teal), Scripts (bronze) and Tokens (crimson), as defined by `Backdrop`. The primary button uses its stronger fill; the accent wash remains a separate selection token.
 
 ### Neutral
 
-- **White work surface** (`background`, `card`, `popover` and their foregrounds): page canvas, alerts and overlay content.
-- **Quiet gray** (`muted`, `muted-foreground`): code and scope panels, hover fills, descriptions and metadata.
-- **Pale boundary** (`border`, `input`): table rules, section rules and control outlines. `ring` marks keyboard focus.
-- **Blue selection** (`selection`, `selection-foreground`): browser text selection. Carets use `primary`; scrollbars use `border` over transparency.
+Night ground, transparent work surfaces, light text and fine rules use the normative frontmatter values and `ui/src/index.css`. Text has three levels: primary identity, secondary working content and quieter metadata. Fine rules separate regions without darkening their fills. Accent text, cursor wash, focus and tab underline derive from the current section's `--hue`. Rose indicates failures and blocks; amber marks attention. The unused success primitive remains in the stylesheet and is not a current state treatment.
 
-**The State in Words Rule.** Status badges always name the state; red accompanies error states rather than replacing their label.
+**The Final Override Rule.** The final ground, transparent surfaces, line opacities and accent mix override the earlier base declarations in the stylesheet. Do not copy the earlier base declarations in isolation.
 
 ## Typography
 
-**Heading and Body Font:** self-hosted Geist Variable, with sans-serif fallback. The existing rendered-font capture confirms the custom Geist face rendered.
+M PLUS 1p is self-hosted at 300, 400 and 500 for interface text. JetBrains Mono is self-hosted at 400 and 500 for Python, identifiers, timestamps, measurements and keyboard hints. Latin and Latin Extended M PLUS subsets are bundled; other scripts fall back to system fonts. The proposal’s document-only display samples are not a shipped application type role.
 
-**Code Font:** platform monospace for Python, JSON, namespaces, endpoint addresses and execution identifiers.
-
-### Hierarchy
-
-- **Headline:** page titles use the frontmatter headline role with balanced wrapping.
-- **Title:** section headings use the title role; the brand uses the same size and weight.
-- **Body:** descriptive paragraphs use the body role. Page-heading descriptions stop at the observed text container width (42rem).
-- **Label:** controls, navigation, table content and field labels use the compact label size. Table content and helper copy use regular weight; field labels use medium weight and snug leading.
-- **Metadata:** secondary namespace lines and compact record details use the metadata role. State badges use its size with medium weight.
-- **Code:** preformatted evidence uses the code role and wraps long content. Numeric tool counts and durations use tabular numerals.
-
-**The Data Type Rule.** Monospace identifies code and machine identifiers; ordinary interface copy uses Geist.
+The stylesheet defines an 11, 12, 13, 14, 16, 20, 28, 40 and 64px scale; its two largest sizes are not normal application headings. Page headings are 28px/300. Pane titles are 20px/400; tool and script titles use 17px/400 mono at 1.4 line height. List rows use 14px; controls and metadata use 11–13px. Functional column, group and code labels use 11px/500 with .08em tracking; code panels use 12px mono at 1.6 line height. Keep long identifiers wrapped in details and ellipsized in compact rows.
 
 ## Layout
 
-The desktop shell has a left navigation rail (16rem) and a ruled top bar (3.5rem high). The rail defaults open and can move off canvas. Work content fills the remaining width, centers within its maximum width (80rem), and uses mobile padding (1.25rem), increasing at the medium breakpoint to desktop padding (2.25rem). The main vertical gap is 1.75rem.
+The desktop shell has a 48px top bar, 228px rail and 30px status bar. Lists begin at full width. Two-pane screens use 46/54 proportions. Sessions use 36/64, then 20/32/48 when an execution opens. Detail headings stay above their scrolling bodies; list column headings stay above independently scrolling rows. Standard rows are 40px; timeline lanes are 44px.
 
-At widths below 48rem, navigation opens in a left sheet (18rem wide); choosing a route closes it. Heading and action groups wrap. Tables retain their columns inside a horizontal scrolling container. The viewport minimum is 20rem, and long identifiers can break within the content area.
-
-Detail pages stack until the large breakpoint (64rem), then use two columns with a 2:1 ratio, a minimum aside width (15rem) and a gap (2.5rem). Forms stop at 42rem and separate field groups by 1.25rem. The sign-in panel stops at 28rem, with padding and gaps of 1.75rem.
-
-Spacing follows the inherited quarter-rem rhythm, including half steps for compact controls. Table headings are 2.5rem high; table cells use 0.5rem padding. Heading descriptions begin 0.5rem below their title.
+The 4/8/12/16/24/32/48/72px spacing scale governs the composition. At 1000px and below, the top pane occupies the available width. At 767px and below, search wraps into the top bar's second row, navigation remains visible as a horizontal section strip, and less important columns disappear. Source configuration, OAuth consent, authentication and script editing retain the same typography, square controls and ruled sections.
 
 ## Elevation & Depth
 
-Working records are flat, divided by fine rules and muted tonal panels. The sign-in panel uses the small ambient shadow. Sheets use the larger overlay shadow; confirmation dialogs use a faint foreground outline (1px). These are soft, offset shadows; focus rings signal keyboard state separately. Exact shadow values and transition timings live in the sidecar.
+Depth comes from pane widths, fine boundary rules and the shared shader. Keep work regions transparent. **The Transparent Work Region Rule.** Work panes stay transparent; small control and code backings retain their observed washes. The selected list cursor and current section have a restrained hue wash; key focus and selected boundaries use small accent glows. Text uses a slight offset shadow for legibility over the wave.
 
-The mobile sheet uses a restrained dark backdrop with a small supported backdrop blur. Its transition lasts 200ms; sheet-backdrop opacity and ordinary control transitions last 150ms. Confirmation dialogs use a 100ms fade and subtle zoom. Reduced-motion preference shortens animation and transition durations to 0.01ms. No page-entry sequence is implemented.
-
-**The Flat Records Rule.** Record lists and detail sections use borders and spacing for separation; elevation belongs to the sign-in panel and overlays.
+The shader pauses in hidden tabs and renders one static frame for reduced motion, with a gradient fallback if WebGL cannot initialize. It caps device-pixel ratio at 2 and releases its resources on unmount. Hardware frame-rate and idle-CPU acceptance remain external checks, not design-document claims.
 
 ## Shapes
 
-Controls and code panels use gently rounded corners from the large radius. Navigation items use the medium radius; the sign-in panel uses the extra-large radius. State badges use the largest recorded radius on a short capsule. Fine single-pixel borders define inputs, tables, panels and overlays.
-
-Icons are Lucide SVGs: ordinary control icons are 1rem; the brand mark is 1.5rem. Compact controls keep icon and label alignment consistent.
+Work surfaces, buttons, inputs and code panels have square corners. Keycaps alone use 3px corners and a stronger lower rule. States are plain words rather than filled pills. The shared grid has one gliding cursor; tabs share one moving underline. Vendor illustrations use the supplied ring and tick geometry and Simple Icons paths. Custom sources use an SVG plug. The prototype's initial-letter fallback remains in the implementation for vendors without paths; it is not a reusable icon rule.
 
 ## Components
 
-### Buttons
+### Controls
 
-Compact Base Nova controls. Primary buttons use charcoal with a light foreground; outline controls use a white fill and pale border. Ghost controls inherit their context's text color. Destructive controls use red text over translucent red. Default sizing, padding and corners are in frontmatter; icon buttons are square (2rem).
+Buttons are square, 30px high with 12px horizontal padding and 13px medium UI text. Primary actions have a section-tinted border and primary fill; hover increases that fill and adds the larger glow. Ghost actions stay transparent at rest. Outline actions use the ground fill with a rule; destructive text actions use a rose border and transparent fill. The shared keyboard focus treatment is a two-pixel accent outline offset by two pixels. Disabled controls reduce opacity.
 
-Primary hover reduces its fill to 80% opacity; outline and ghost hover use the muted fill. Destructive hover doubles its red fill opacity. Keyboard focus changes the border to `ring` and adds a translucent ring (3px). Pressed buttons move down 1px unless they expose a popup. Disabled controls stop pointer interaction and use half opacity.
+Search is a 32px square field with a faint white wash, a fine rule, a 14px SVG and 13px UI input. Focus strengthens the rule, wash and small glow. Policy switches use a square 26×14px track and 9×8px slider; blocked state moves the slider left and colors it rose. Code panels use a dark translucent backing and a two-pixel left rule rather than a containing card. There are no reusable filled chips or cards.
 
-### Chips
+### Navigation and panes
 
-State badges are compact text capsules. Normal states use the outline treatment; `error`, `failed`, `timed_out` and `blocked` use the destructive treatment. Underscores become spaces in the visible state name. They are informational labels in the shipped record views.
+**The One Cursor Rule.** Each data grid shares one moving selection cursor; each tab bar shares one underline.
 
-### Cards / Containers
-
-Code and scope panels use a muted fill, fine border, large radius and 1rem padding. Code panels wrap and scroll overflowing evidence. The sign-in panel is a centered white bordered surface with an extra-large radius and small shadow. Ordinary tables and detail sections sit directly on the canvas.
-
-### Inputs / Fields
-
-Inputs have transparent fills and a pale outline. Input text is 1rem on mobile, changing to 0.875rem at the medium breakpoint. Placeholders and descriptions use `muted-foreground`; visible labels sit above fields. Focus uses the same 3px ring as buttons. Invalid controls use a destructive border and translucent red ring. Disabled controls combine reduced opacity, an input-colored fill and disabled interaction.
-
-Error notices pair a problem title with a message inside a bordered white alert. Field errors use destructive text. Empty states provide a title, explanation and an action where applicable; loading views use labeled skeletons.
-
-### Navigation
-
-The rail combines brand, hostname, six labeled destinations and a footer sign-out action. Active routes use the lighter slate fill and medium weight. Hover shares this fill; focus uses the sidebar ring (2px). Compact icons accompany the labels. The top-bar trigger toggles the desktop rail or mobile sheet. A keyboard-visible skip link reaches the main content.
-
-### Current Scope Summary
-
-Endpoint editing includes a muted bordered summary beneath source selection. It names selected source slugs and totals their available tools; an empty selection explicitly states that agents will see no tools. The section uses a polite live region so the current scope updates accessibly as selection changes.
-
-### Tool Scopes and GraphQL
-
-Tool policies include an all/selected scope mode, per-tool inclusion controls and a textual outside-scope state. Desktop uses a ruled table; mobile stacks each record with its name, inclusion, effective policy and override. GraphQL reuses the source connection selector and HTTP credential form. The visual tokens and six navigation destinations are unchanged.
+- **AppShell:** five sections in order: Sessions, Integrations, Workspaces, Scripts, Tokens. The rail shows workspace selection and counts; the responsive top bar retains the workspace chooser. A paginated session count uses `50+` when more sessions exist. Number keys 1–5 switch sections outside editable controls. Workspace selection carries between Workspaces and Scripts.
+- **Breadcrumbs:** begin with the selected workspace and retain section, item and execution context; ancestors are navigation targets.
+- **DataList:** grouped compact rows, one grid focus and active descendant, fixed column headings, Arrow/Home/End navigation, Enter/right to open and left/Escape to return. Keep the cursor inside the scrolling body.
+- **TabBar:** one selected tab and underline; arrow/Home/End keys move tab focus. Brackets switch multi-tab screens.
+- **PaneStack:** animate width and opacity. Mobile shows the deepest pane and restores focus on return. Closed panes cannot take focus. URL state retains selection and depth through refresh and browser history.
+- **Sessions:** list or scaled rolling 96-hour timeline; V switches layouts. Real execution ticks are loaded as paginated metadata. Compact metadata shows duration and time until expiry, with four summary values and an explicit rename action; no retention progress bar. The execution pane exposes code, result, stdout and redacted call previews, with copy and save-as-script actions after the execution evidence.
+- **Workspaces:** tabs select workspaces; grouped tool rows expose allowed/blocked switches. Details show the stored Python signature and source-wide policy actions. Tool/source scopes remain distinct from policy overrides.
+- **Scripts:** list and preview pane lead to the existing revision-protected editor. Deletion requires confirmation and preserves execution history.
+- **Tokens:** agent list, details and personal-token creation pane. New secrets are shown once and disappear when the pane closes. Revocation uses the shared confirmation control.
+- **StatusBar / ConfirmAction:** errors and results appear in the bottom bar. Destructive actions require a second press within three seconds; another status action invalidates the pending confirmation. No modal or toast layer is used.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** reuse the shared controls, page headings, status badges and ruled detail sections.
-- **Do** pair record state with readable text and keep the corrective action near its context.
-- **Do** preserve visible keyboard focus, wrapped identifiers and the mobile navigation sheet.
-- **Do** show endpoint membership and tool count together in the current scope summary.
+- Do follow the exact proposal and final v5 overrides when extending the system.
+- Do preserve keyboard focus, reduced motion, tenant boundaries, write-only secrets and precise errors.
+- Do show real connection and execution state; use explicit loading, empty and failure treatments.
 
 ### Don't:
 
-- **Don't** replace status words with color alone.
-- **Don't** use monospace for ordinary headings, navigation or descriptive copy.
-- **Don't** wrap each record section in an elevated card; retain the flat record structure.
-
-## Account registration extension
-
-Registration and sign-in reuse the centered auth panel and existing Field, Input, Button and ErrorNotice components. Email is shown in the sidebar footer for account identification. Desktop and mobile preserve the incumbent tokens and layout; no new visual tokens or assets were introduced. The narrow registration finish review returned `ship`; see `.impeccable/review/registration-verdict.md`.
+- Don't reintroduce opaque cards, rounded work surfaces, pills, sidebar sheets, toasts or approval dialogs.
+- Don't replace the proposal shader, fonts, glyph geometry or section hues with a new direction.
+- Don't claim provider consent, external-client acceptance or M-series performance from local fixtures.

@@ -1,4 +1,3 @@
-import { SourcePresets } from "./source-presets"
 import { useState } from "react"
 import { Link, getRouteApi, useRouter } from "@tanstack/react-router"
 import {
@@ -6,18 +5,12 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query"
-import { Plus, RefreshCw, ArrowLeft } from "lucide-react"
+import { RefreshCw, ArrowLeft } from "lucide-react"
 import { z } from "zod"
-import { sourcesQuery, sourceQuery, workspacesQuery } from "./queries"
+import { sourceQuery, workspacesQuery } from "./queries"
 import type { Source } from "./queries"
 import { created, nothing, write } from "@/lib/api"
-import {
-  PageHeader,
-  Blank,
-  StateBadge,
-  ErrorNotice,
-  date,
-} from "@/components/common"
+import { PageHeader, StateBadge, ErrorNotice, date } from "@/components/common"
 import { ConfirmAction } from "@/components/confirm-action"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,115 +23,9 @@ import {
 } from "@/components/ui/field"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
+
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-const listRoute = getRouteApi("/_authenticated/sources/")
 const detailRoute = getRouteApi("/_authenticated/sources/$sourceId")
-export function SourcesPage() {
-  const sources = useSuspenseQuery(sourcesQuery).data
-  const { q = "" } = listRoute.useSearch()
-  const navigate = listRoute.useNavigate()
-  const visible = sources.filter((source) =>
-    `${source.slug} ${source.pythonName}`
-      .toLowerCase()
-      .includes(q.toLowerCase())
-  )
-  return (
-    <>
-      <PageHeader
-        title="Sources"
-        description="Connect tools once. Keep their catalogues synchronized."
-        action={
-          <Button render={<Link to="/sources/new" />}>
-            <Plus data-icon="inline-start" />
-            Add source
-          </Button>
-        }
-      />
-      <SourcePresets />
-      <Field className="max-w-sm">
-        <FieldLabel htmlFor="source-search">Find a source</FieldLabel>
-        <Input
-          id="source-search"
-          type="search"
-          value={q}
-          onChange={(e) =>
-            void navigate({ search: { q: e.target.value }, replace: true })
-          }
-          placeholder="Name or Python namespace"
-        />
-      </Field>
-      {sources.length === 0 ? (
-        <Blank
-          title="Connect your first source"
-          description="Add an MCP server, OpenAPI document or GraphQL endpoint. Link its account when credentials are required."
-        >
-          <Button render={<Link to="/sources/new" />}>Add source</Button>
-        </Blank>
-      ) : visible.length === 0 ? (
-        <Blank
-          title="No sources match"
-          description="Try a different name or clear the filter."
-        />
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Source</TableHead>
-              <TableHead>Connection</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Tools</TableHead>
-              <TableHead>Last sync</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.map((source) => (
-              <TableRow key={source.id}>
-                <TableCell>
-                  <Link
-                    className="font-medium underline-offset-4 hover:underline"
-                    to="/sources/$sourceId"
-                    params={{ sourceId: source.id }}
-                  >
-                    {source.slug}
-                  </Link>
-                  <p className="font-mono text-xs text-muted-foreground">
-                    tools.{source.pythonName}
-                  </p>
-                </TableCell>
-                <TableCell>
-                  {source.kind === "mcp_http"
-                    ? "Remote MCP"
-                    : source.kind === "openapi"
-                      ? "OpenAPI"
-                      : source.kind === "graphql"
-                        ? "GraphQL"
-                        : "Local stdio"}
-                </TableCell>
-                <TableCell>
-                  <StateBadge state={source.status} />
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {source.toolCount}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {date(source.syncedAt)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </>
-  )
-}
 export function NewSourcePage() {
   return (
     <>
@@ -394,7 +281,7 @@ function SourceEditor({ source }: { source?: Source }) {
                 {kind === "openapi"
                   ? "Use an OpenAPI 3.x JSON or YAML document. Local references are supported."
                   : kind === "graphql"
-                    ? "Exposes query and mutation tools. Mutations require approval by default. Link credentials on the account page."
+                    ? "Exposes query and mutation tools. Tools default to allow and can be blocked per workspace. Link credentials on the account page."
                     : "Use the Streamable HTTP endpoint. Enter credentials on the account page."}
               </FieldDescription>
             </Field>

@@ -2,7 +2,7 @@ mod store;
 pub use super::broker::Tool;
 use super::{
     accounts::Accounts,
-    broker::{Authority, Broker, Credentials, Target},
+    broker::{Broker, Credentials, Target},
     catalogue::{Catalogue, Definition, stubs},
     workspaces::Workspaces,
 };
@@ -269,89 +269,29 @@ impl Sources {
         timeout: Duration,
         workspace: Uuid,
     ) -> (u32, crate::infrastructure::sandbox::CallResult) {
-        self.dispatch_authorized(
-            execution,
-            seq,
-            call,
-            timeout,
-            workspace,
-            Authority::Unapproved,
-        )
-        .await
-    }
-    pub(crate) async fn dispatch_authorized(
-        &self,
-        execution: Uuid,
-        seq: usize,
-        call: crate::infrastructure::sandbox::PendingCall,
-        timeout: Duration,
-        workspace: Uuid,
-        authority: Authority,
-    ) -> (u32, crate::infrastructure::sandbox::CallResult) {
         let tool = match self.lookup(&call.path).await {
             Some(tool) => Ok(tool),
             None => Err(self.unknown(&call.path, workspace).await),
         };
         self.broker
-            .dispatch(execution, seq, call, tool, timeout, workspace, authority)
+            .dispatch(execution, seq, call, tool, timeout, workspace)
             .await
-    }
-
-    pub(crate) async fn prepare(
-        &self,
-        calls: Vec<crate::infrastructure::sandbox::PendingCall>,
-        workspace: Uuid,
-    ) -> Result<Vec<super::broker::Prepared>, Error> {
-        use super::policies::Action;
-        let allowed = self.allowed_sources(workspace).await?;
-        let mut prepared = Vec::with_capacity(calls.len());
-        for call in calls {
-            let tool = self.lookup(&call.path).await;
-            let (binding, error, needs_approval) = match tool {
-                Some(tool)
-                    if allowed
-                        .as_ref()
-                        .is_none_or(|ids| ids.contains(&tool.source_id)) =>
-                {
-                    let action = self
-                        .policies
-                        .effective(
-                            workspace,
-                            tool.source_id,
-                            &tool.definition.upstream_name,
-                            tool.definition.read_only,
-                            tool.definition.destructive,
-                        )
-                        .await?;
-                    let error = if action == Action::Block {
-                        Some(super::broker::unavailable(&call.path))
-                    } else {
-                        match serde_json::from_str::<Value>(call.args.get()) {
-                            Ok(args) => tool.validate(&args).err(),
-                            Err(_) => Some("tool arguments are invalid JSON".into()),
-                        }
-                    };
-                    (Some(tool.binding), error, action == Action::Approve)
-                }
-                _ => (None, Some(self.unknown(&call.path, workspace).await), false),
-            };
-            let needs_approval = needs_approval && error.is_none();
-            prepared.push(super::broker::Prepared {
-                call,
-                binding,
-                error,
-                needs_approval,
-            });
-        }
-        Ok(prepared)
     }
 
     pub fn policies(&self) -> &super::policies::Policies {
         &self.policies
     }
-    pub(crate) fn main_hostname(&self) -> &str {
-        self.workspaces.main_hostname()
+
+    pub async fn tool_names(&self, source: Uuid) -> Vec<String> {
+        self.tools
+            .read()
+            .await
+            .values()
+            .filter(|tool| tool.source_id == source)
+            .map(|tool| tool.definition.path.clone())
+            .collect()
     }
+
     pub async fn lookup(&self, path: &str) -> Option<Tool> {
         self.tools.read().await.get(path).cloned()
     }
@@ -361,31 +301,10 @@ impl Sources {
     }
 
     pub async fn prelude(&self, allowed: Option<&[Uuid]>) -> String {
-        self.prelude_without(allowed, &std::collections::BTreeSet::new())
-            .await
-    }
-    pub(crate) async fn prelude_scoped(
-        &self,
-        allowed: Option<&[Uuid]>,
-        workspace: Uuid,
-    ) -> Result<String, Error> {
-        let blocked = self
-            .policies
-            .blocked(workspace)
-            .await?
-            .into_iter()
-            .collect();
-        Ok(self.prelude_without(allowed, &blocked).await)
-    }
-    async fn prelude_without(
-        &self,
-        allowed: Option<&[Uuid]>,
-        blocked: &std::collections::BTreeSet<String>,
-    ) -> String {
         let registry = self.tools.read().await;
         let mut groups: BTreeMap<&str, Vec<&Tool>> = BTreeMap::new();
         for (path, tool) in registry.iter() {
-            if blocked.contains(path) || allowed.is_some_and(|ids| !ids.contains(&tool.source_id)) {
+            if allowed.is_some_and(|ids| !ids.contains(&tool.source_id)) {
                 continue;
             }
             if let Some((source, _)) = path.split_once('.') {
@@ -470,7 +389,7 @@ impl Sources {
             }
         }
         if matches.is_empty() {
-            return super::broker::unavailable(path);
+            return super::broker::unavailable(path, workspace);
         }
         format!("unknown tool {path}; available: {}", matches.join(", "))
     }
@@ -545,6 +464,12 @@ impl Sources {
         alias: String,
         stop: &CancellationToken,
     ) -> (Uuid, Option<Connected>) {
+        if record.status == "needs_link" {
+            if let Some(old) = connection.take() {
+                Self::close(old).await;
+            }
+            return (record.id, None);
+        }
         if connection
             .as_ref()
             .is_some_and(|c| c.revision != record.revision)
@@ -560,8 +485,8 @@ impl Sources {
                 if let Transport::OpenApi {url,server_url}=&record.source.transport {
                     let server=server_url.as_ref().ok_or(Error::Config("OpenAPI server is not pinned".into()))?;
                     let loaded=self.load_openapi(url.clone(),Some(server.clone()),alias.clone()).await?;
-                    let compiled=loaded.operations.into_iter().map(|operation| {let binding=binding(&record,&operation.definition,Some(operation.binding()?))?;Ok(Tool {
-                        source_id:record.id,revision:record.revision,binding,definition:operation.definition.clone(),validator:operation.validator.clone(),
+                    let compiled=loaded.operations.into_iter().map(|operation| {Ok(Tool {
+                        source_id:record.id,revision:record.revision,definition:operation.definition.clone(),validator:operation.validator.clone(),
                         target:Target::OpenApi {operation:Arc::new(operation),client:loaded.client.clone(),server:loaded.server.clone(),required:record.source.requires_account},
                     })}).collect::<Result<Vec<_>,Error>>()?;
                     return self.publish(&record,compiled).await;
@@ -571,7 +496,7 @@ impl Sources {
                     let compiled=[super::graphql::Kind::Query,super::graphql::Kind::Mutation].into_iter().map(|kind| {
                         let definition=kind.definition(&alias);
                         let validator=jsonschema::validator_for(&definition.input_schema).map_err(|_|Error::Config("invalid GraphQL input schema".into()))?;
-                        Ok(Tool {source_id:record.id,revision:record.revision,binding:binding(&record,&definition,None)?,definition,validator:Arc::new(validator),target:Target::Graphql {kind,client:client.clone(),url:url.clone(),required:record.source.requires_account}})
+                        Ok(Tool {source_id:record.id,revision:record.revision,definition,validator:Arc::new(validator),target:Target::Graphql {kind,client:client.clone(),url:url.clone(),required:record.source.requires_account}})
                     }).collect::<Result<Vec<_>,Error>>()?;
                     return self.publish(&record,compiled).await;
                 }
@@ -704,9 +629,7 @@ impl Sources {
                 read_only: hints.and_then(|h| h.read_only_hint).unwrap_or(false),
                 destructive: hints.and_then(|h| h.destructive_hint).unwrap_or(false),
             };
-            let binding = binding(record, &definition, None)?;
             compiled.push(Tool {
-                binding,
                 source_id: record.id,
                 revision: record.revision,
                 definition,
@@ -783,15 +706,4 @@ mod tests {
             assert!(config.validate().is_err());
         }
     }
-}
-
-fn binding(
-    record: &Record,
-    definition: &Definition,
-    wire: Option<[u8; 32]>,
-) -> Result<[u8; 32], Error> {
-    use sha2::Digest;
-    let bytes = serde_json::to_vec(&(record.id, record.revision, &record.source, definition, wire))
-        .map_err(|_| Error::Config("tool identity could not be encoded".into()))?;
-    Ok(sha2::Sha256::digest(bytes).into())
 }

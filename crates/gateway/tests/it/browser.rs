@@ -19,7 +19,7 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
         .await
         .unwrap();
     let auth = Auth::new(db.clone());
-    let (_, agent_token) = auth.create("agent", "test.example").await.unwrap();
+    let (agent_id, agent_token) = auth.create("agent", "test.example").await.unwrap();
     let accounts = Accounts::new(db.clone(), Some([73; 32]), "test".into()).unwrap();
     let endpoints =
         codemode_core::components::workspaces::Workspaces::new(db.clone(), "test.example".into())
@@ -37,11 +37,8 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
         .await
         .unwrap();
     let state = State {
+        agent_sessions: codemode_core::components::agent_sessions::AgentSessions::new(db.clone()),
         scripts: codemode_core::components::scripts::Scripts::new(db.clone()),
-        approvals: codemode_core::components::execution::approvals::Approvals::new(
-            db.clone(),
-            [73; 32],
-        ),
         oauth: Arc::new(codemode_core::components::auth::oauth::OAuth::new(
             db.clone(),
             "test.example".into(),
@@ -99,15 +96,23 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
             reqwest::Method::DELETE,
             "/api/workspaces/00000000-0000-0000-0000-000000000000/scripts/00000000-0000-0000-0000-000000000000",
         ),
-        (reqwest::Method::GET, "/api/approvals"),
+        (reqwest::Method::GET, "/api/sessions"),
+        (reqwest::Method::GET, "/api/session-activity"),
+        (
+            reqwest::Method::PUT,
+            "/api/workspaces/00000000-0000-0000-0000-000000000000/policies/source",
+        ),
         (
             reqwest::Method::GET,
-            "/api/approvals/00000000-0000-0000-0000-000000000000",
+            "/api/sessions/00000000-0000-0000-0000-000000000000",
         ),
         (
-            reqwest::Method::POST,
-            "/api/approvals/00000000-0000-0000-0000-000000000000",
+            reqwest::Method::PATCH,
+            "/api/sessions/00000000-0000-0000-0000-000000000000",
         ),
+        (reqwest::Method::GET, "/api/oauth-apps"),
+        (reqwest::Method::PUT, "/api/oauth-apps/github"),
+        (reqwest::Method::DELETE, "/api/oauth-apps/github"),
     ] {
         let response = request(method, path)
             .bearer_auth(&agent_token)
@@ -167,6 +172,70 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
         assert!(set_cookie.contains(flag));
     }
     let cookie = set_cookie.split(';').next().unwrap().to_owned();
+    let session_id:Uuid=sqlx::query_scalar("INSERT INTO agent_sessions(token_id,workspace_id,client) SELECT id,workspace_id,name FROM access_tokens WHERE id=$1 RETURNING id").bind(agent_id).fetch_one(&pool).await.unwrap();
+    let execution_id:Uuid=sqlx::query_scalar("INSERT INTO executions(token_id,session_id,code,title,result,output,status,tool_calls,finished_at) VALUES($1,$2,'# API history','API history','42','hello','completed',1,now()) RETURNING id").bind(agent_id).bind(session_id).fetch_one(&pool).await.unwrap();
+    sqlx::query("INSERT INTO tool_calls(execution_id,seq,path,args_redacted,outcome,preview) VALUES($1,0,'fixture.read','{}','ok','preview')").bind(execution_id).execute(&pool).await.unwrap();
+    let response = request(reqwest::Method::GET, "/api/sessions?q=API%20history")
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let page = response.json::<serde_json::Value>().await.unwrap();
+    assert_eq!(page["sessions"].as_array().unwrap().len(), 1);
+    assert_eq!(page["sessions"][0]["title"], "API history");
+    let response = request(reqwest::Method::GET, &format!("/api/sessions/{session_id}"))
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let detail = response.json::<serde_json::Value>().await.unwrap();
+    assert_eq!(detail["executions"][0]["result"], "42");
+    assert_eq!(detail["executions"][0]["output"], "hello");
+    assert_eq!(detail["executions"][0]["calls"][0]["preview"], "preview");
+    let path = format!("/api/sessions/{session_id}");
+    let response = request(reqwest::Method::PATCH, &path)
+        .header("cookie", &cookie)
+        .header("origin", "https://evil.example")
+        .json(&serde_json::json!({"title":"wrong origin"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    for (title, status) in [
+        ("", StatusCode::BAD_REQUEST),
+        ("Renamed session", StatusCode::NO_CONTENT),
+    ] {
+        let response = request(reqwest::Method::PATCH, &path)
+            .header("cookie", &cookie)
+            .json(&serde_json::json!({"title":title}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), status);
+    }
+    let response = request(reqwest::Method::GET, "/api/sessions?q=Renamed")
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    let renamed = response.json::<serde_json::Value>().await.unwrap();
+    assert_eq!(renamed["sessions"][0]["title"], "Renamed session");
+    assert_eq!(
+        renamed["sessions"][0]["expiresAt"],
+        page["sessions"][0]["expiresAt"]
+    );
+    let response = request(
+        reqwest::Method::GET,
+        &format!("/api/sessions?q={}", "x".repeat(1025)),
+    )
+    .header("cookie", &cookie)
+    .send()
+    .await
+    .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
     let response = request(reqwest::Method::GET, "/api/tokens")
         .header("cookie", &cookie)
         .send()
@@ -185,7 +254,9 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
         vec![
             "audience",
             "id",
+            "lastUsedAt",
             "name",
+            "oauth",
             "resource",
             "revoked",
             "workspaceId"
@@ -203,7 +274,7 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
     assert_eq!(response.status(), StatusCode::OK);
     let source_info = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(source_info["pythonName"], "fixture");
-    assert_eq!(source_info["status"], "pending");
+    assert_eq!(source_info["status"], "needs_link");
     let response = request(
         reqwest::Method::POST,
         &format!("/api/sources/{source}/sync"),
@@ -294,27 +365,28 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
             .unwrap()
             .is_none()
     );
-    let response = request(
-        reqwest::Method::POST,
-        "/api/approvals/00000000-0000-0000-0000-000000000000",
-    )
-    .header("cookie", &cookie)
-    .header("origin", "https://evil.example")
-    .json(&serde_json::json!({"pauseId":Uuid::nil(),"decisions":[{"callId":1,"allow":true}]}))
-    .send()
-    .await
-    .unwrap();
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    let response = request(reqwest::Method::GET, "/api/approvals")
-        .header("cookie", &cookie)
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(
-        response.json::<serde_json::Value>().await.unwrap(),
-        serde_json::json!([])
-    );
+    for (method, path) in [
+        (reqwest::Method::GET, "/api/approvals"),
+        (
+            reqwest::Method::GET,
+            "/api/approvals/00000000-0000-0000-0000-000000000000",
+        ),
+        (
+            reqwest::Method::POST,
+            "/api/approvals/00000000-0000-0000-0000-000000000000",
+        ),
+    ] {
+        for signed_in in [false, true] {
+            let mut response = request(method.clone(), path);
+            if signed_in {
+                response = response.header("cookie", &cookie);
+            }
+            assert_eq!(
+                response.send().await.unwrap().status(),
+                StatusCode::NOT_FOUND
+            );
+        }
+    }
     let response = request(reqwest::Method::PUT, &endpoint_path)
         .header("cookie", &cookie)
         .json(&serde_json::json!({"name":"Work projects","sourceIds":[]}))
@@ -383,13 +455,9 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    assert!(
-        response
-            .json::<Vec<serde_json::Value>>()
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    let executions = response.json::<Vec<serde_json::Value>>().await.unwrap();
+    assert_eq!(executions.len(), 1);
+    assert_eq!(executions[0]["id"], execution_id.to_string());
     let response = request(reqwest::Method::POST, "/api/tokens")
         .header("cookie", &cookie)
         .json(&serde_json::json!({"name":"browser-created","administration":true}))

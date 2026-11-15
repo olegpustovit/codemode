@@ -24,6 +24,7 @@ const ALPHA: &str = "provider_credential_alpha";
 const BETA: &str = "provider_credential_beta";
 #[derive(Clone, Default)]
 struct Provider {
+    requests: Arc<AtomicUsize>,
     rotated: Arc<AtomicBool>,
     calls: Arc<AtomicUsize>,
     agent_tokens: Arc<AtomicUsize>,
@@ -33,6 +34,7 @@ async fn authenticate_provider(
     request: Request,
     next: Next,
 ) -> Response {
+    provider.requests.fetch_add(1, Ordering::SeqCst);
     let expected = if provider.rotated.load(Ordering::SeqCst) {
         BETA
     } else {
@@ -175,8 +177,14 @@ async fn linked_credentials_dispatch_rotate_redact_and_stop_after_unlink(pool: s
     assert!(
         unlinked
             .unwrap_err()
+            .to_string()
             .contains(&format!("/sources/{source}/accounts"))
     );
+    sources.ready().await;
+    assert_eq!(provider.requests.load(Ordering::SeqCst), 0);
+    let unlinked_record = sources.get(source).await.unwrap().unwrap();
+    assert_eq!(unlinked_record.status, "needs_link");
+    assert!(unlinked_record.last_error.is_none());
     accounts.link_bearer(source, ALPHA.into()).await.unwrap();
     let stored: (Vec<u8>, Vec<u8>) =
         sqlx::query_as("SELECT ciphertext,nonce FROM accounts WHERE source_id=$1")
@@ -193,6 +201,15 @@ async fn linked_credentials_dispatch_rotate_redact_and_stop_after_unlink(pool: s
     );
     sources.wake();
     ready(&sources, source).await;
+    let entries = codemode_core::components::integrations::list(&sources)
+        .await
+        .unwrap();
+    let entry = entries
+        .iter()
+        .find(|entry| entry.source_id == Some(source))
+        .unwrap();
+    assert!(entry.tool_names.iter().any(|name| name == "private.echo"));
+    assert!(entry.entry.url.is_empty());
     let (_, echo) = sources
         .dispatch(
             execution,
@@ -212,7 +229,7 @@ async fn linked_credentials_dispatch_rotate_redact_and_stop_after_unlink(pool: s
             workspace,
         )
         .await;
-    let failure = failure.unwrap_err();
+    let failure = failure.unwrap_err().to_string();
     assert!(failure.contains("[REDACTED]"));
     assert!(!failure.contains(ALPHA));
     accounts.link_bearer(source, BETA.into()).await.unwrap();

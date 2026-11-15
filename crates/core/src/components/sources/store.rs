@@ -27,17 +27,31 @@ impl Sources {
         .fetch_all(&self.db.0)
         .await
         .map_err(DbError::from)?;
+        let linked: std::collections::BTreeSet<_> = self
+            .accounts
+            .list()
+            .await?
+            .into_iter()
+            .map(|account| account.source_id)
+            .collect();
         Ok(rows
             .into_iter()
-            .map(|row| Record {
-                id: row.id,
-                source: row.config.0,
-                status: row.status,
-                last_error: row.last_error,
-                synced_at: row.synced_at,
-                tool_count: row.tool_count,
-                revision: row.revision,
-                python_name: row.python_name,
+            .map(|row| {
+                let needs_link = row.config.0.requires_account && !linked.contains(&row.id);
+                Record {
+                    id: row.id,
+                    source: row.config.0,
+                    status: if needs_link {
+                        "needs_link".into()
+                    } else {
+                        row.status
+                    },
+                    last_error: if needs_link { None } else { row.last_error },
+                    synced_at: row.synced_at,
+                    tool_count: row.tool_count,
+                    revision: row.revision,
+                    python_name: row.python_name,
+                }
             })
             .collect())
     }
@@ -51,6 +65,9 @@ impl Sources {
     }
 
     pub async fn save(&self, id: Option<Uuid>, mut source: Source) -> Result<Uuid, Error> {
+        if id.is_none() {
+            source.slug.make_ascii_lowercase();
+        }
         self.ensure_names().await?;
         Config {
             sources: vec![source.clone()],

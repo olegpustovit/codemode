@@ -155,16 +155,8 @@ async fn openapi_source_pins_server_dispatches_encrypted_credentials_and_never_f
     tasks.spawn(async move {
         sync.run(sync_stop).await;
     });
-    wait(&sources, id).await;
-    assert_eq!(
-        catalogue
-            .search("thing", false, None, None)
-            .await
-            .unwrap()
-            .tools
-            .len(),
-        1
-    );
+    sources.ready().await;
+    assert_eq!(sources.get(id).await.unwrap().unwrap().status, "needs_link");
     let auth = Auth::new(db.clone());
     let (_, token) = auth.create("test", "test.example").await.unwrap();
     let principal = auth
@@ -182,7 +174,6 @@ async fn openapi_source_pins_server_dispatches_encrypted_credentials_and_never_f
         codemode_core::infrastructure::sandbox::MontySandbox::new(
             &binary,
             Duration::from_secs(1),
-            [73; 32],
             32768,
         )
         .await
@@ -195,13 +186,12 @@ async fn openapi_source_pins_server_dispatches_encrypted_credentials_and_never_f
         tasks.clone(),
         stop.clone(),
         Default::default(),
-        [73; 32],
     ));
     let accounts = Accounts::new(db.clone(), Some([73; 32]), "test".into()).unwrap();
     let unlinked = execution
         .execute(
             principal.clone(),
-            "return await tools.api.putThing(id='x',body={'value':'x'})".into(),
+            "return await _call('api.putThing', '{}')".into(),
         )
         .await
         .unwrap();
@@ -211,7 +201,7 @@ async fn openapi_source_pins_server_dispatches_encrypted_credentials_and_never_f
             .error
             .as_deref()
             .unwrap()
-            .contains("link it at https://test.example/sources/")
+            .contains("https://test.example/sources/")
     );
     assert!(state.calls.lock().unwrap().is_empty());
     for (credential, header, query) in [
@@ -250,6 +240,15 @@ async fn openapi_source_pins_server_dispatches_encrypted_credentials_and_never_f
         accounts.link_http(id, credential).await.unwrap();
         sources.wake();
         wait(&sources, id).await;
+        assert_eq!(
+            catalogue
+                .search("thing", false, None, None)
+                .await
+                .unwrap()
+                .tools
+                .len(),
+            1
+        );
         let result=execution.execute(principal.clone(),"return await tools.api.putThing(id='a/b',filter='x&y',X_Trace='trace',body={'value':'ok','password':'agent-input-secret'})".into()).await.unwrap();
         assert_eq!(result.status, "completed", "{:?}", result.error);
         assert_eq!(

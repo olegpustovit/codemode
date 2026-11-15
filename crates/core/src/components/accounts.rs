@@ -6,7 +6,11 @@ use chacha20poly1305::{
 use secrecy::{ExposeSecret, SecretBox, SecretString};
 use std::collections::BTreeMap;
 use uuid::Uuid;
+mod apps;
 mod oauth;
+pub use apps::OAuthAppInput;
+mod oauth_error;
+pub use oauth_error::OAuthStage;
 mod rest;
 pub use oauth::OAuthCompletion;
 pub use rest::HttpCredential;
@@ -21,14 +25,18 @@ pub enum Error {
     Authentication,
     #[error("source does not exist")]
     NotFound,
-    #[error("upstream authorization unavailable; retry linking the account")]
-    OAuth,
+    #[error("upstream authorization failed at {stage}: {detail}")]
+    OAuth { stage: OAuthStage, detail: String },
     #[error("invalid or expired authorization callback")]
     State,
     #[error("source or account changed; retry linking the account")]
     Changed,
     #[error("account authorization is busy; retry shortly")]
     Busy,
+    #[error("provider does not support OAuth-app configuration")]
+    Provider,
+    #[error(transparent)]
+    Registry(#[from] super::providers::Error),
     #[error(transparent)]
     Database(#[from] DbError),
 }

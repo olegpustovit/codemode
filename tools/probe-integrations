@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Qualify declared connection methods using discovery only; never register or consent."""
+import concurrent.futures
+import json
+from pathlib import Path
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+REGISTRY = Path(__file__).resolve().parents[1] / 'crates/core/integrations.json'
+LIMIT = 1_048_576
+
+
+def request(url, initialize=False):
+    if urllib.parse.urlsplit(url).scheme != 'https':
+        raise ValueError('discovery requires HTTPS')
+    data = None
+    if initialize:
+        data = json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {
+            'protocolVersion': '2025-11-25', 'capabilities': {},
+            'clientInfo': {'name': 'codemode-discovery-probe', 'version': '1'},
+        }}).encode()
+    req = urllib.request.Request(url, data=data, headers={
+        'Accept': 'application/json, text/event-stream', 'Content-Type': 'application/json',
+    })
+    try:
+        response = urllib.request.urlopen(req, timeout=8)
+    except urllib.error.HTTPError as error:
+        response = error
+    with response:
+        # An SSE initialization response can keep its connection open indefinitely.
+        if initialize and 'text/event-stream' in response.headers.get('content-type', ''):
+            body = b''
+            for _ in range(256):
+                line = response.readline(LIMIT + 1)
+                if len(line) > LIMIT:
+                    raise ValueError('discovery response exceeds 1 MB')
+                if line.startswith(b'data:'):
+                    body = line[5:].strip()
+                    break
+        else:
+            body = response.read(LIMIT + 1)
+        if len(body) > LIMIT:
+            raise ValueError('discovery response exceeds 1 MB')
+        return response.status, response.headers, body
+
+
+def document(url):
+    status, _, body = request(url)
+    if status != 200:
+        raise ValueError(f'metadata returned HTTP {status}')
+    result = json.loads(body)
+    if not isinstance(result, dict):
+        raise ValueError('metadata must be a JSON object')
+    return result
+
+
+def one_click(metadata):
+    if not (metadata.get('registration_endpoint') or metadata.get('client_id_metadata_document_supported') is True):
+        raise ValueError('declared one-click but neither DCR nor client-ID documents are supported')
+    if metadata.get('registration_endpoint') and urllib.parse.urlsplit(metadata['registration_endpoint']).scheme != 'https':
+        raise ValueError('registration_endpoint must be HTTPS')
+    if 'S256' not in metadata.get('code_challenge_methods_supported', []):
+        raise ValueError('declared one-click but S256 PKCE is not advertised')
+    for field in ['authorization_endpoint', 'token_endpoint']:
+        if urllib.parse.urlsplit(metadata.get(field, '')).scheme != 'https':
+            raise ValueError(f'{field} must be an HTTPS endpoint')
+
+
+def probe(entry):
+    try:
+        status, headers, _ = request(entry['url'])
+        methods = entry['methods']
+        if 'open' in methods:
+            status, _, body = request(entry['url'], initialize=True)
+            payload = json.loads(body)
+            if status != 200 or not isinstance(payload, dict) or not isinstance(payload.get('result'), dict):
+                raise ValueError(f'declared open but unauthenticated initialization returned HTTP {status} or no result')
+            return entry['slug'], True, 'open: unauthenticated initialization passed'
+        if status != 401:
+            raise ValueError(f'authenticated MCP endpoint returned HTTP {status}, expected 401')
+        if 'one_click' not in methods:
+            return entry['slug'], True, 'API key: authentication challenge present; token/app acceptance needs owner consent'
+        challenge = headers.get('www-authenticate', '')
+        advertised = re.search(r'\bresource_metadata="([^"]+)"', challenge, re.I)
+        parts = urllib.parse.urlsplit(entry['url'])
+        resource_url = advertised.group(1) if advertised else urllib.parse.urlunsplit((parts.scheme, parts.netloc, '/.well-known/oauth-protected-resource' + parts.path.rstrip('/'), '', ''))
+        resource = document(resource_url)
+        if not isinstance(resource.get('resource'), str) or resource['resource'].rstrip('/') != entry['url'].rstrip('/'):
+            raise ValueError('protected-resource metadata does not match the MCP URL')
+        servers = resource.get('authorization_servers', [])
+        if not isinstance(servers, list) or not servers:
+            raise ValueError('no authorization server advertised')
+        failures = []
+        for issuer in servers:
+            if not isinstance(issuer, str):
+                raise ValueError('authorization-server identifiers must be strings')
+            parsed = urllib.parse.urlsplit(issuer)
+            if parsed.scheme != 'https':
+                raise ValueError('authorization server requires HTTPS')
+            endpoint = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, '/.well-known/oauth-authorization-server' + parsed.path.rstrip('/'), '', ''))
+            try:
+                metadata = document(endpoint)
+                if not isinstance(metadata.get('issuer'), str) or metadata['issuer'].rstrip('/') != issuer.rstrip('/'):
+                    raise ValueError('authorization-server issuer does not match')
+                one_click(metadata)
+                return entry['slug'], True, 'one-click discovery passed; registration/consent were not attempted'
+            except (ValueError, urllib.error.URLError, TimeoutError) as error:
+                failures.append(str(error))
+        raise ValueError('; '.join(failures))
+    except (ValueError, KeyError, TypeError, urllib.error.URLError, TimeoutError) as error:
+        return entry['slug'], False, str(error)
+
+
+def main():
+    entries = json.loads(REGISTRY.read_text())
+    wanted = set(sys.argv[1:])
+    if wanted - {entry['slug'] for entry in entries}:
+        raise SystemExit('unknown integration slug')
+    selected = [entry for entry in entries if not wanted or entry['slug'] in wanted]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(probe, selected))
+    for slug, ok, detail in results:
+        print(f'{"PASS" if ok else "FAIL"} {slug}: {detail}')
+    return 0 if all(ok for _, ok, _ in results) else 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

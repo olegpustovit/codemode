@@ -1,390 +1,280 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-14T04:35:16.019008+00:00",
+  "generatedAt": "2026-11-15T02:09:29.247030+00:00",
   "title": "Design System: Codemode",
   "extensions": {
     "colorMeta": {
-      "background": {
+      "ground": {
         "role": "neutral",
-        "displayName": "White work surface",
+        "displayName": "Night ground",
         "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
+          "color-mix(in oklch,var(--c-bg) 25%,#000)",
+          "color-mix(in oklch,var(--c-bg) 45%,#000)",
+          "color-mix(in oklch,var(--c-bg) 65%,#000)",
+          "color-mix(in oklch,var(--c-bg) 85%,#000)",
+          "color-mix(in oklch,var(--c-bg) 85%,#fff)",
+          "color-mix(in oklch,var(--c-bg) 65%,#fff)",
+          "color-mix(in oklch,var(--c-bg) 40%,#fff)",
+          "color-mix(in oklch,var(--c-bg) 15%,#fff)"
         ]
       },
-      "foreground": {
+      "surface": {
         "role": "neutral",
-        "displayName": "Foreground",
+        "displayName": "Transparent work surface"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Primary identity",
         "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
+          "color-mix(in oklch,var(--c-text) 25%,#000)",
+          "color-mix(in oklch,var(--c-text) 45%,#000)",
+          "color-mix(in oklch,var(--c-text) 65%,#000)",
+          "color-mix(in oklch,var(--c-text) 85%,#000)",
+          "color-mix(in oklch,var(--c-text) 85%,#fff)",
+          "color-mix(in oklch,var(--c-text) 65%,#fff)",
+          "color-mix(in oklch,var(--c-text) 40%,#fff)",
+          "color-mix(in oklch,var(--c-text) 15%,#fff)"
         ]
       },
-      "card": {
+      "secondary-text": {
         "role": "neutral",
-        "displayName": "Card",
+        "displayName": "Working content",
         "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
+          "color-mix(in oklch,var(--c-text-2) 25%,#000)",
+          "color-mix(in oklch,var(--c-text-2) 45%,#000)",
+          "color-mix(in oklch,var(--c-text-2) 65%,#000)",
+          "color-mix(in oklch,var(--c-text-2) 85%,#000)",
+          "color-mix(in oklch,var(--c-text-2) 85%,#fff)",
+          "color-mix(in oklch,var(--c-text-2) 65%,#fff)",
+          "color-mix(in oklch,var(--c-text-2) 40%,#fff)",
+          "color-mix(in oklch,var(--c-text-2) 15%,#fff)"
         ]
       },
-      "card-foreground": {
+      "quiet-text": {
         "role": "neutral",
-        "displayName": "Card foreground",
+        "displayName": "Quiet metadata",
         "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
+          "color-mix(in oklch,var(--c-text-3) 25%,#000)",
+          "color-mix(in oklch,var(--c-text-3) 45%,#000)",
+          "color-mix(in oklch,var(--c-text-3) 65%,#000)",
+          "color-mix(in oklch,var(--c-text-3) 85%,#000)",
+          "color-mix(in oklch,var(--c-text-3) 85%,#fff)",
+          "color-mix(in oklch,var(--c-text-3) 65%,#fff)",
+          "color-mix(in oklch,var(--c-text-3) 40%,#fff)",
+          "color-mix(in oklch,var(--c-text-3) 15%,#fff)"
         ]
       },
-      "popover": {
+      "line": {
         "role": "neutral",
-        "displayName": "Popover",
+        "displayName": "Fine rule",
         "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
+          "color-mix(in oklch,var(--c-line) 25%,#000)",
+          "color-mix(in oklch,var(--c-line) 45%,#000)",
+          "color-mix(in oklch,var(--c-line) 65%,#000)",
+          "color-mix(in oklch,var(--c-line) 85%,#000)",
+          "color-mix(in oklch,var(--c-line) 85%,#fff)",
+          "color-mix(in oklch,var(--c-line) 65%,#fff)",
+          "color-mix(in oklch,var(--c-line) 40%,#fff)",
+          "color-mix(in oklch,var(--c-line) 15%,#fff)"
         ]
       },
-      "popover-foreground": {
+      "strong-line": {
         "role": "neutral",
-        "displayName": "Popover foreground",
+        "displayName": "Emphasis rule",
         "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
+          "color-mix(in oklch,var(--c-line-2) 25%,#000)",
+          "color-mix(in oklch,var(--c-line-2) 45%,#000)",
+          "color-mix(in oklch,var(--c-line-2) 65%,#000)",
+          "color-mix(in oklch,var(--c-line-2) 85%,#000)",
+          "color-mix(in oklch,var(--c-line-2) 85%,#fff)",
+          "color-mix(in oklch,var(--c-line-2) 65%,#fff)",
+          "color-mix(in oklch,var(--c-line-2) 40%,#fff)",
+          "color-mix(in oklch,var(--c-line-2) 15%,#fff)"
         ]
       },
-      "primary": {
+      "accent-text": {
         "role": "primary",
-        "displayName": "Charcoal action",
+        "displayName": "Section-tinted light",
         "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
+          "color-mix(in oklch,var(--c-accent-text) 25%,#000)",
+          "color-mix(in oklch,var(--c-accent-text) 45%,#000)",
+          "color-mix(in oklch,var(--c-accent-text) 65%,#000)",
+          "color-mix(in oklch,var(--c-accent-text) 85%,#000)",
+          "color-mix(in oklch,var(--c-accent-text) 85%,#fff)",
+          "color-mix(in oklch,var(--c-accent-text) 65%,#fff)",
+          "color-mix(in oklch,var(--c-accent-text) 40%,#fff)",
+          "color-mix(in oklch,var(--c-accent-text) 15%,#fff)"
         ]
       },
-      "primary-foreground": {
-        "role": "neutral",
-        "displayName": "Primary foreground",
-        "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
-        ]
-      },
-      "muted": {
-        "role": "neutral",
-        "displayName": "Quiet gray",
-        "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
-        ]
-      },
-      "muted-foreground": {
-        "role": "neutral",
-        "displayName": "Muted foreground",
-        "tonalRamp": [
-          "oklch(0.15 0.0048 255)",
-          "oklch(0.25 0.0084 255)",
-          "oklch(0.35 0.0108 255)",
-          "oklch(0.45 0.012 255)",
-          "oklch(0.6 0.012 255)",
-          "oklch(0.75 0.0096 255)",
-          "oklch(0.87 0.006 255)",
-          "oklch(0.95 0.0024 255)"
-        ]
-      },
-      "destructive": {
-        "role": "error",
-        "displayName": "Destructive red",
-        "tonalRamp": [
-          "oklch(0.15 0.076 27.325)",
-          "oklch(0.25 0.133 27.325)",
-          "oklch(0.35 0.171 27.325)",
-          "oklch(0.45 0.19 27.325)",
-          "oklch(0.6 0.19 27.325)",
-          "oklch(0.75 0.152 27.325)",
-          "oklch(0.87 0.095 27.325)",
-          "oklch(0.95 0.038 27.325)"
-        ]
-      },
-      "border": {
-        "role": "neutral",
-        "displayName": "Pale boundary",
-        "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
-        ]
-      },
-      "input": {
-        "role": "neutral",
-        "displayName": "Input",
-        "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
-        ]
-      },
-      "ring": {
-        "role": "neutral",
-        "displayName": "Ring",
-        "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
-        ]
-      },
-      "sidebar": {
+      "accent-wash": {
         "role": "primary",
-        "displayName": "Slate navigation",
+        "displayName": "Selection wash",
         "tonalRamp": [
-          "oklch(0.15 0.014 255)",
-          "oklch(0.25 0.0245 255)",
-          "oklch(0.35 0.0315 255)",
-          "oklch(0.45 0.035 255)",
-          "oklch(0.6 0.035 255)",
-          "oklch(0.75 0.028 255)",
-          "oklch(0.87 0.0175 255)",
-          "oklch(0.95 0.007 255)"
+          "color-mix(in oklch,var(--c-accent-wash) 25%,#000)",
+          "color-mix(in oklch,var(--c-accent-wash) 45%,#000)",
+          "color-mix(in oklch,var(--c-accent-wash) 65%,#000)",
+          "color-mix(in oklch,var(--c-accent-wash) 85%,#000)",
+          "color-mix(in oklch,var(--c-accent-wash) 85%,#fff)",
+          "color-mix(in oklch,var(--c-accent-wash) 65%,#fff)",
+          "color-mix(in oklch,var(--c-accent-wash) 40%,#fff)",
+          "color-mix(in oklch,var(--c-accent-wash) 15%,#fff)"
         ]
       },
-      "sidebar-foreground": {
+      "primary-fill": {
         "role": "primary",
-        "displayName": "Sidebar foreground",
+        "displayName": "Primary control fill",
         "tonalRamp": [
-          "oklch(0.15 0.0024 255)",
-          "oklch(0.25 0.0042 255)",
-          "oklch(0.35 0.0054 255)",
-          "oklch(0.45 0.006 255)",
-          "oklch(0.6 0.006 255)",
-          "oklch(0.75 0.0048 255)",
-          "oklch(0.87 0.003 255)",
-          "oklch(0.95 0.0012 255)"
+          "color-mix(in oklch,var(--primary) 25%,#000)",
+          "color-mix(in oklch,var(--primary) 45%,#000)",
+          "color-mix(in oklch,var(--primary) 65%,#000)",
+          "color-mix(in oklch,var(--primary) 85%,#000)",
+          "color-mix(in oklch,var(--primary) 85%,#fff)",
+          "color-mix(in oklch,var(--primary) 65%,#fff)",
+          "color-mix(in oklch,var(--primary) 40%,#fff)",
+          "color-mix(in oklch,var(--primary) 15%,#fff)"
         ]
       },
-      "sidebar-accent": {
-        "role": "primary",
-        "displayName": "Sidebar accent",
-        "tonalRamp": [
-          "oklch(0.15 0.018 255)",
-          "oklch(0.25 0.0315 255)",
-          "oklch(0.35 0.0405 255)",
-          "oklch(0.45 0.045 255)",
-          "oklch(0.6 0.045 255)",
-          "oklch(0.75 0.036 255)",
-          "oklch(0.87 0.0225 255)",
-          "oklch(0.95 0.009 255)"
-        ]
-      },
-      "sidebar-accent-foreground": {
-        "role": "primary",
-        "displayName": "Sidebar accent foreground",
-        "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
-        ]
-      },
-      "sidebar-border": {
-        "role": "primary",
-        "displayName": "Sidebar border",
-        "tonalRamp": [
-          "oklch(0.15 0.014 255)",
-          "oklch(0.25 0.0245 255)",
-          "oklch(0.35 0.0315 255)",
-          "oklch(0.45 0.035 255)",
-          "oklch(0.6 0.035 255)",
-          "oklch(0.75 0.028 255)",
-          "oklch(0.87 0.0175 255)",
-          "oklch(0.95 0.007 255)"
-        ]
-      },
-      "sidebar-ring": {
-        "role": "primary",
-        "displayName": "Sidebar ring",
-        "tonalRamp": [
-          "oklch(0.15 0 0)",
-          "oklch(0.25 0 0)",
-          "oklch(0.35 0 0)",
-          "oklch(0.45 0 0)",
-          "oklch(0.6 0 0)",
-          "oklch(0.75 0 0)",
-          "oklch(0.87 0 0)",
-          "oklch(0.95 0 0)"
-        ]
-      },
-      "selection": {
+      "control-hover": {
         "role": "neutral",
-        "displayName": "Blue selection",
+        "displayName": "Control hover",
         "tonalRamp": [
-          "oklch(0.15 0.018 255)",
-          "oklch(0.25 0.0315 255)",
-          "oklch(0.35 0.0405 255)",
-          "oklch(0.45 0.045 255)",
-          "oklch(0.6 0.045 255)",
-          "oklch(0.75 0.036 255)",
-          "oklch(0.87 0.0225 255)",
-          "oklch(0.95 0.009 255)"
+          "color-mix(in oklch,var(--c-hover) 25%,#000)",
+          "color-mix(in oklch,var(--c-hover) 45%,#000)",
+          "color-mix(in oklch,var(--c-hover) 65%,#000)",
+          "color-mix(in oklch,var(--c-hover) 85%,#000)",
+          "color-mix(in oklch,var(--c-hover) 85%,#fff)",
+          "color-mix(in oklch,var(--c-hover) 65%,#fff)",
+          "color-mix(in oklch,var(--c-hover) 40%,#fff)",
+          "color-mix(in oklch,var(--c-hover) 15%,#fff)"
         ]
       },
-      "selection-foreground": {
-        "role": "neutral",
-        "displayName": "Selection foreground",
+      "error": {
+        "role": "semantic",
+        "displayName": "Failure rose",
         "tonalRamp": [
-          "oklch(0.15 0.012 255)",
-          "oklch(0.25 0.021 255)",
-          "oklch(0.35 0.027 255)",
-          "oklch(0.45 0.03 255)",
-          "oklch(0.6 0.03 255)",
-          "oklch(0.75 0.024 255)",
-          "oklch(0.87 0.015 255)",
-          "oklch(0.95 0.006 255)"
+          "color-mix(in oklch,var(--c-bad) 25%,#000)",
+          "color-mix(in oklch,var(--c-bad) 45%,#000)",
+          "color-mix(in oklch,var(--c-bad) 65%,#000)",
+          "color-mix(in oklch,var(--c-bad) 85%,#000)",
+          "color-mix(in oklch,var(--c-bad) 85%,#fff)",
+          "color-mix(in oklch,var(--c-bad) 65%,#fff)",
+          "color-mix(in oklch,var(--c-bad) 40%,#fff)",
+          "color-mix(in oklch,var(--c-bad) 15%,#fff)"
+        ]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Attention amber",
+        "tonalRamp": [
+          "color-mix(in oklch,var(--c-warn) 25%,#000)",
+          "color-mix(in oklch,var(--c-warn) 45%,#000)",
+          "color-mix(in oklch,var(--c-warn) 65%,#000)",
+          "color-mix(in oklch,var(--c-warn) 85%,#000)",
+          "color-mix(in oklch,var(--c-warn) 85%,#fff)",
+          "color-mix(in oklch,var(--c-warn) 65%,#fff)",
+          "color-mix(in oklch,var(--c-warn) 40%,#fff)",
+          "color-mix(in oklch,var(--c-warn) 15%,#fff)"
         ]
       }
     },
     "typographyMeta": {
       "headline": {
-        "displayName": "Page title",
-        "purpose": "Page headings with balanced wrapping."
-      },
-      "title": {
-        "displayName": "Section title",
-        "purpose": "Section headings and the brand."
-      },
-      "body": {
-        "displayName": "Body",
-        "purpose": "Descriptive paragraphs."
-      },
-      "label": {
-        "displayName": "Compact interface",
-        "purpose": "Controls, field labels, navigation and table text; weight varies by role."
-      },
-      "metadata": {
-        "displayName": "Record metadata",
-        "purpose": "Secondary namespace lines and compact record details."
+        "displayName": "Page heading",
+        "purpose": "Section identity"
       },
       "code": {
-        "displayName": "Code evidence",
-        "purpose": "Preformatted Python and JSON."
+        "displayName": "Python and identifiers",
+        "purpose": "Code, data and keyboard hints"
+      },
+      "title": {
+        "displayName": "Pane title",
+        "purpose": "20px UI identity; mono tool/script titles are a local 17px override"
+      },
+      "label": {
+        "displayName": "Functional label",
+        "purpose": "Column heads, groups and code labels; not a decorative eyebrow"
+      },
+      "body": {
+        "displayName": "Working body",
+        "purpose": "Rows and interface content"
       }
     },
     "shadows": [
       {
-        "name": "sign-in-panel",
-        "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
-        "purpose": "Small ambient shadow on the sign-in panel."
+        "name": "glow-1",
+        "value": "0 0 5px rgba(var(--hue),.40)",
+        "purpose": "Selected edges and focus"
       },
       {
-        "name": "sheet",
-        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
-        "purpose": "Lifted mobile navigation sheet."
+        "name": "glow-2",
+        "value": "0 0 12px rgba(var(--hue),.35)",
+        "purpose": "Selected timeline bars"
+      },
+      {
+        "name": "lift",
+        "value": "0 1px 2px rgba(0,0,0,.45)",
+        "purpose": "Text over the shader"
+      },
+      {
+        "name": "shell-text",
+        "value": "0 1px 2px rgba(2,3,9,.8)",
+        "purpose": "Shell text over the ribbon; the rail separately uses lift"
       }
     ],
     "motion": [
       {
-        "name": "control-transition",
-        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
-        "purpose": "Inherited control state transitions and sheet backdrop opacity."
+        "name": "t-1",
+        "value": "120ms",
+        "purpose": "Small control transitions"
       },
       {
-        "name": "sheet-transition",
-        "value": "200ms cubic-bezier(0.4, 0, 0.2, 1)",
-        "purpose": "Navigation sheet translation and opacity."
+        "name": "t-2",
+        "value": "200ms",
+        "purpose": "Cursor and tab underline"
       },
       {
-        "name": "confirmation-dialog-duration",
-        "value": "100ms",
-        "purpose": "Confirmation backdrop and popup fade/zoom animations."
+        "name": "t-3",
+        "value": "320ms",
+        "purpose": "Pane widths"
       },
       {
-        "name": "reduced-motion-duration",
-        "value": "0.01ms",
-        "purpose": "Animation and transition duration under prefers-reduced-motion: reduce."
+        "name": "t-4",
+        "value": "600ms",
+        "purpose": "Extended transitions"
+      },
+      {
+        "name": "e-out",
+        "value": "cubic-bezier(.2,.8,.2,1)",
+        "purpose": "Visible-default ease out"
+      },
+      {
+        "name": "reduced-motion",
+        "value": "none",
+        "purpose": "Disable CSS animation and transition; static shader frame"
+      },
+      {
+        "name": "e-io",
+        "value": "cubic-bezier(.65,0,.35,1)",
+        "purpose": "Available source easing token"
+      },
+      {
+        "name": "e-in",
+        "value": "cubic-bezier(.4,0,1,1)",
+        "purpose": "Available final-v5 easing token"
       }
     ],
     "breakpoints": [
       {
-        "name": "sm",
-        "value": "640px"
+        "name": "pane-collapse",
+        "value": "1000px"
       },
       {
-        "name": "md",
-        "value": "768px"
+        "name": "mobile-search",
+        "value": "767px"
       },
       {
-        "name": "lg",
-        "value": "1024px"
+        "name": "compact-timeline",
+        "value": "500px"
       }
     ]
   },
@@ -393,119 +283,110 @@
       "name": "Primary button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Filled control for the main action.",
-      "html": "<button class=\"ds-button-primary\" type=\"button\">Save changes</button>",
-      "css": ".ds-button-primary{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;box-sizing:border-box;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:var(--radius);font-size:.875rem;font-weight:500;line-height:1.25rem;white-space:nowrap;user-select:none;transition:all 150ms cubic-bezier(.4,0,.2,1);outline:none;font-family:'Geist Variable',sans-serif;background:var(--primary);color:var(--primary-foreground);}.ds-button-primary:hover{background:color-mix(in oklab,var(--primary) 80%,transparent);}.ds-button-primary:focus-visible{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent);}.ds-button-primary:active{transform:translateY(1px);}.ds-button-primary:disabled{pointer-events:none;opacity:.5;}"
-    },
-    {
-      "name": "Outline button",
-      "kind": "button",
-      "refersTo": "button-outline",
-      "description": "Bordered control for secondary actions.",
-      "html": "<button class=\"ds-button-outline\" type=\"button\">Sync now</button>",
-      "css": ".ds-button-outline{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;box-sizing:border-box;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:var(--radius);font-size:.875rem;font-weight:500;line-height:1.25rem;white-space:nowrap;user-select:none;transition:all 150ms cubic-bezier(.4,0,.2,1);outline:none;font-family:'Geist Variable',sans-serif;background:var(--background);color:var(--foreground);border-color:var(--border);}.ds-button-outline:hover{background:var(--muted);color:var(--foreground);}.ds-button-outline:focus-visible{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent);}.ds-button-outline:active{transform:translateY(1px);}.ds-button-outline:disabled{pointer-events:none;opacity:.5;}"
+      "description": "Square action using the shared button geometry.",
+      "html": "<button class=\"ds-button-primary\">Add by URL</button>",
+      "css": ".ds-button-primary{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 12px;border:1px solid transparent;border-radius:0;font:500 13px var(--f-ui);white-space:nowrap;cursor:pointer;transition:all 150ms;background:var(--primary);color:var(--c-text);border-color:rgba(var(--hue),.8);}.ds-button-primary:hover{background:rgba(var(--hue),.45);box-shadow:var(--glow-2);}.ds-button-primary:focus-visible{outline:2px solid var(--c-accent-text);outline-offset:2px;box-shadow:none;}.ds-button-primary:active{transform:translateY(1px)}.ds-button-primary:disabled{pointer-events:none;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-button-primary{transition:none!important}}"
     },
     {
       "name": "Ghost button",
       "kind": "button",
       "refersTo": "button-ghost",
-      "description": "Context-colored control for unobtrusive actions.",
-      "html": "<button class=\"ds-button-ghost\" type=\"button\">Sign out</button>",
-      "css": ".ds-button-ghost{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;box-sizing:border-box;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:var(--radius);font-size:.875rem;font-weight:500;line-height:1.25rem;white-space:nowrap;user-select:none;transition:all 150ms cubic-bezier(.4,0,.2,1);outline:none;font-family:'Geist Variable',sans-serif;background:transparent;color:inherit;}.ds-button-ghost:hover{background:var(--muted);color:var(--foreground);}.ds-button-ghost:focus-visible{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent);}.ds-button-ghost:active{transform:translateY(1px);}.ds-button-ghost:disabled{pointer-events:none;opacity:.5;}"
+      "description": "Square action using the shared button geometry.",
+      "html": "<button class=\"ds-button-ghost\">Close</button>",
+      "css": ".ds-button-ghost{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 12px;border:1px solid transparent;border-radius:0;font:500 13px var(--f-ui);white-space:nowrap;cursor:pointer;transition:all 150ms;background:transparent;color:var(--c-text);}.ds-button-ghost:hover{background:var(--muted);color:var(--c-text);}.ds-button-ghost:focus-visible{outline:2px solid var(--c-accent-text);outline-offset:2px;box-shadow:none;}.ds-button-ghost:active{transform:translateY(1px)}.ds-button-ghost:disabled{pointer-events:none;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-button-ghost{transition:none!important}}"
     },
     {
-      "name": "Destructive button",
+      "name": "Outline button",
       "kind": "button",
-      "refersTo": "button-destructive",
-      "description": "Red text over a translucent red fill for removal.",
-      "html": "<button class=\"ds-button-destructive\" type=\"button\">Remove source</button>",
-      "css": ".ds-button-destructive{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;box-sizing:border-box;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:var(--radius);font-size:.875rem;font-weight:500;line-height:1.25rem;white-space:nowrap;user-select:none;transition:all 150ms cubic-bezier(.4,0,.2,1);outline:none;font-family:'Geist Variable',sans-serif;background:color-mix(in oklab,var(--destructive) 10%,transparent);color:var(--destructive);}.ds-button-destructive:hover{background:color-mix(in oklab,var(--destructive) 20%,transparent);}.ds-button-destructive:focus-visible{border-color:color-mix(in oklab,var(--destructive) 40%,transparent);box-shadow:0 0 0 3px color-mix(in oklab,var(--destructive) 20%,transparent);}.ds-button-destructive:active{transform:translateY(1px);}.ds-button-destructive:disabled{pointer-events:none;opacity:.5;}"
+      "refersTo": "button-outline",
+      "description": "Square action using the shared button geometry.",
+      "html": "<button class=\"ds-button-outline\">Save as script</button>",
+      "css": ".ds-button-outline{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 12px;border:1px solid transparent;border-radius:0;font:500 13px var(--f-ui);white-space:nowrap;cursor:pointer;transition:all 150ms;background:var(--c-bg);color:var(--c-text);border-color:var(--c-line);}.ds-button-outline:hover{background:var(--muted);}.ds-button-outline:focus-visible{outline:2px solid var(--c-accent-text);outline-offset:2px;box-shadow:none;}.ds-button-outline:active{transform:translateY(1px)}.ds-button-outline:disabled{pointer-events:none;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-button-outline{transition:none!important}}"
     },
     {
-      "name": "Text input",
+      "name": "Destructive text action",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Square action using the shared button geometry.",
+      "html": "<button class=\"ds-button-danger\">Disconnect</button>",
+      "css": ".ds-button-danger{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 12px;border:1px solid transparent;border-radius:0;font:500 13px var(--f-ui);white-space:nowrap;cursor:pointer;transition:all 150ms;background:transparent;color:var(--c-bad);border-color:rgba(255,140,152,.4);}.ds-button-danger:focus-visible{outline:2px solid var(--c-accent-text);outline-offset:2px;box-shadow:none;}.ds-button-danger:active{transform:translateY(1px)}.ds-button-danger:disabled{pointer-events:none;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-button-danger{transition:none!important}}"
+    },
+    {
+      "name": "Search field",
       "kind": "input",
-      "refersTo": "input",
-      "description": "Visible-label field with a shared focus and validation treatment.",
-      "html": "<label class=\"ds-field-label\" for=\"ds-source-name\">Source name</label><input class=\"ds-input\" id=\"ds-source-name\" placeholder=\"Letters, numbers, dashes and underscores\" />",
-      "css": ".ds-field-label{display:block;margin-bottom:.5rem;font-size:.875rem;font-weight:500;line-height:1.375;font-family:'Geist Variable',sans-serif;}.ds-input{box-sizing:border-box;min-width:0;width:100%;height:2rem;padding:.25rem .625rem;border:1px solid var(--input);border-radius:var(--radius);background:transparent;color:var(--foreground);caret-color:var(--primary);font-size:1rem;line-height:1.5rem;outline:none;transition:color 150ms cubic-bezier(.4,0,.2,1),border-color 150ms cubic-bezier(.4,0,.2,1);font-family:'Geist Variable',sans-serif;}.ds-input::placeholder{color:var(--muted-foreground)}.ds-input:focus-visible{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent)}.ds-input[aria-invalid=\"true\"]{border-color:var(--destructive);box-shadow:0 0 0 3px color-mix(in oklab,var(--destructive) 20%,transparent)}.ds-input:disabled{pointer-events:none;cursor:not-allowed;background:color-mix(in oklab,var(--input) 50%,transparent);opacity:.5}@media(min-width:48rem){.ds-input{font-size:.875rem;line-height:1.25rem}}"
+      "refersTo": "search-field",
+      "description": "Top-bar search with a quiet wash and focus glow.",
+      "html": "<label class=\"ds-search\"><svg aria-hidden=\"true\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input aria-label=\"Search sessions\" placeholder=\"Search sessions\"/></label>",
+      "css": ".ds-search{display:flex;align-items:center;gap:var(--s-2);height:32px;padding:0 var(--s-3);border:1px solid var(--c-line);background:rgba(255,255,255,.05);color:var(--c-text-3)}.ds-search svg{flex:none}.ds-search input{min-width:0;width:100%;background:transparent;border:0;outline:0;color:var(--c-text);font:400 13px var(--f-ui)}.ds-search input::placeholder{color:var(--c-text-3)}.ds-search:focus-within{border-color:var(--c-accent-text);background:rgba(255,255,255,.07);box-shadow:var(--glow-1)}"
     },
     {
-      "name": "Rail navigation item",
+      "name": "Section navigation",
       "kind": "nav",
-      "refersTo": "navigation",
-      "description": "Active source destination in the slate navigation rail.",
-      "html": "<nav class=\"ds-navigation\" aria-label=\"Control plane\"><a class=\"ds-navigation-link\" href=\"#sources\" aria-current=\"page\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 22v-5\"/><path d=\"M15 8V2\"/><path d=\"M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z\"/><path d=\"M9 8V2\"/></svg><span>Sources</span></a></nav>",
-      "css": ".ds-navigation{width:16rem;background:var(--sidebar);color:var(--sidebar-foreground);font-family:'Geist Variable',sans-serif;}.ds-navigation-link{box-sizing:border-box;display:flex;align-items:center;gap:.5rem;height:2rem;padding:.5rem;border-radius:calc(var(--radius) * .8);font-size:.875rem;line-height:1.25rem;color:inherit;text-decoration:none;outline:none;transition:width 150ms cubic-bezier(.4,0,.2,1),height 150ms cubic-bezier(.4,0,.2,1),padding 150ms cubic-bezier(.4,0,.2,1)}.ds-navigation-link[aria-current=\"page\"],.ds-navigation-link:hover,.ds-navigation-link:active{background:var(--sidebar-accent);color:var(--sidebar-accent-foreground)}.ds-navigation-link[aria-current=\"page\"]{font-weight:500}.ds-navigation-link:focus-visible{box-shadow:0 0 0 2px var(--sidebar-ring)}.ds-navigation-link svg{width:1rem;height:1rem;flex-shrink:0}"
+      "refersTo": "section-navigation",
+      "description": "Rail selection; mobile lays these links in one scrolling row.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Sections\"><a href=\"#sessions\" aria-current=\"page\">Sessions</a><a href=\"#integrations\">Integrations</a></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:2px}.ds-nav a{position:relative;display:flex;align-items:center;min-height:36px;padding:0 12px;color:var(--c-text-2);font:500 14px var(--f-ui);text-decoration:none;transition:color var(--t-1),background var(--t-1)}.ds-nav a:hover{color:var(--c-text);background:var(--c-hover)}.ds-nav a[aria-current=page]{color:var(--c-text);background:linear-gradient(90deg,rgba(var(--hue),.26),rgba(var(--hue),.04))}.ds-nav a[aria-current=page]::before{content:\"\";position:absolute;left:0;top:6px;bottom:6px;width:2px;background:var(--c-accent-text);box-shadow:var(--glow-1)}.ds-nav a:focus-visible{outline:2px solid var(--c-accent-text);outline-offset:2px}@media(max-width:767px){.ds-nav{flex-direction:row;overflow-x:auto}.ds-nav a{flex:none}}@media(prefers-reduced-motion:reduce){.ds-nav{transition:none!important}}"
     },
     {
-      "name": "State badge",
-      "kind": "chip",
-      "refersTo": "state-badge",
-      "description": "Informational normal state.",
-      "html": "<span class=\"ds-state-badge\">ready</span>",
-      "css": ".ds-state-badge{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;height:1.25rem;padding:.125rem .5rem;border:1px solid var(--border);border-radius:calc(var(--radius) * 2.6);font-size:.75rem;font-weight:500;line-height:1rem;white-space:nowrap;color:var(--foreground);font-family:'Geist Variable',sans-serif;}"
+      "name": "Policy switch",
+      "kind": "custom",
+      "refersTo": "policy-switch",
+      "description": "Square track; aria-pressed indicates allowed state.",
+      "html": "<button class=\"ds-policy\" aria-pressed=\"true\"><i aria-hidden=\"true\"></i>Allowed</button>",
+      "css": ".ds-policy{display:inline-flex;align-items:center;gap:8px;border:0;padding:0;background:transparent;color:var(--c-text);font:400 13px var(--f-ui);cursor:pointer}.ds-policy i{position:relative;width:26px;height:14px;border:1px solid var(--c-line-2);background:rgba(255,255,255,.04)}.ds-policy i::after{content:\"\";position:absolute;top:2px;left:13px;width:9px;height:8px;background:var(--c-text);transition:left var(--t-2) var(--e-out)}.ds-policy[aria-pressed=false] i::after{left:2px;background:var(--c-bad)}.ds-policy:focus-visible{outline:2px solid var(--c-accent-text);outline-offset:2px}.ds-policy:disabled{cursor:default;opacity:.6}@media(prefers-reduced-motion:reduce){.ds-policy{transition:none!important}}"
     },
     {
-      "name": "Failed state badge",
-      "kind": "chip",
-      "refersTo": "state-badge-destructive",
-      "description": "Informational error state.",
-      "html": "<span class=\"ds-state-badge-destructive\">failed</span>",
-      "css": ".ds-state-badge-destructive{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;height:1.25rem;padding:.125rem .5rem;border:1px solid transparent;border-radius:calc(var(--radius) * 2.6);font-size:.75rem;font-weight:500;line-height:1rem;white-space:nowrap;color:var(--destructive);background:color-mix(in oklab,var(--destructive) 10%,transparent);font-family:'Geist Variable',sans-serif;}"
-    },
-    {
-      "name": "Code evidence panel",
+      "name": "Ruled code panel",
       "kind": "custom",
       "refersTo": "code-panel",
-      "description": "Wrapped Python or JSON evidence on a muted bordered surface.",
-      "html": "<pre class=\"ds-code-panel\">print(\"execution output\")</pre>",
-      "css": ".ds-code-panel{padding:1rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--muted);color:var(--foreground);overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,monospace;font-size:.8125rem;line-height:1.65}"
+      "description": "Monospaced execution evidence on a small translucent backing.",
+      "html": "<pre class=\"ds-code\"><code><span class=\"ds-comment\"># Execution evidence</span>\n<span class=\"ds-keyword\">return</span> 42</code></pre>",
+      "css": ".ds-code{border:0;border-left:2px solid var(--c-line-2);border-radius:0;background:rgba(2,3,9,.55);color:var(--c-text);padding:8px 12px;margin:0 0 12px;font:400 12px/1.6 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere}.ds-code code{font:inherit}.ds-comment{color:var(--c-text-3)}.ds-keyword{color:var(--c-accent-text)}"
     },
     {
-      "name": "Current scope summary",
+      "name": "Keyboard hint",
       "kind": "custom",
-      "refersTo": "scope-summary",
-      "description": "Live endpoint membership and available tool count beneath selection.",
-      "html": "<section class=\"ds-scope-summary\" aria-live=\"polite\"><h2>Current scope</h2><p>No sources selected. Agents will see no tools.</p><p class=\"ds-scope-count\">Available tools: 0</p></section>",
-      "css": ".ds-scope-summary{padding:1rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--muted);color:var(--foreground);font-family:'Geist Variable',sans-serif;}.ds-scope-summary h2{margin:0;font-size:1.125rem;font-weight:600;line-height:1.5}.ds-scope-summary p{margin:.5rem 0 0;font-size:.875rem;line-height:1.6}.ds-scope-count{color:var(--muted-foreground)}"
+      "refersTo": "keycap",
+      "description": "Compact keyboard hint beside a real action.",
+      "html": "<span class=\"ds-key\">Esc</span>",
+      "css": ".ds-key{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border:1px solid var(--c-line-2);border-bottom-width:2px;border-radius:3px;font:500 10px/1 var(--f-mono);color:var(--c-text-2)}"
     }
   ],
   "narrative": {
-    "northStar": "Software distribution index",
-    "overview": "The control plane pairs a slate-blue navigation rail with white work surfaces, compact controls and visible record state. Geist supplies the interface voice; borders and spacing organize tables, forms and execution evidence.\n\nThis records the implemented daytime interface. The direction is an implementation assumption documented in the surface brief, without recorded user aesthetic approval. Generated dark-mode variables exist in the stylesheet, but the application exposes no theme switch; they are outside this recorded active palette.",
+    "northStar": "The approved transparent control plane",
+    "overview": "The owner-approved control-plane proposal is the visual authority: [proposal](https://artifacts.microapps.space/a/hkwwwp90n0dt), preserved in `docs/proposal/control-plane.html`. Its final v5 overrides supersede the earlier daytime design. This document records the implemented replacement; release qualification is recorded separately in `docs/proposal/implementation.md`.\n\nThe interface is an Operate surface. Compact lists, readable code, explicit connection states and a visible path through stacked panes carry the work. A continuous ribbon shader sits behind transparent work regions, with cobalt, violet, teal, bronze and crimson section hues. Raster decoration is not used.",
     "keyCharacteristics": [
-      "Slate-blue navigation and white work surfaces.",
-      "Compact controls with explicit text labels and status.",
-      "Tables, ruled sections and responsive detail columns.",
-      "Endpoint membership shown as a live scope summary."
+      "Transparent square work surfaces",
+      "One moving list cursor and tab underline",
+      "Self-hosted M PLUS 1p and JetBrains Mono",
+      "Visible state and precise recovery"
     ],
     "rules": [
       {
-        "name": "The State in Words Rule",
-        "body": "Status badges always name the state; red accompanies error states rather than replacing their label.",
+        "name": "Final Override",
+        "body": "The final ground, transparent surfaces, line opacities and accent mix override the earlier base declarations in the stylesheet. Do not copy the earlier base declarations in isolation.",
         "section": "colors"
       },
       {
-        "name": "The Data Type Rule",
-        "body": "Monospace identifies code and machine identifiers; ordinary interface copy uses Geist.",
-        "section": "typography"
+        "name": "Transparent Work Region",
+        "body": "Work panes stay transparent; small control and code backings retain their observed washes. The selected list cursor and current section have a restrained hue wash; key focus and selected boundaries use small accent glows. Text uses a slight offset shadow for legibility over the wave.",
+        "section": "elevation"
       },
       {
-        "name": "The Flat Records Rule",
-        "body": "Record lists and detail sections use borders and spacing for separation; elevation belongs to the sign-in panel and overlays.",
-        "section": "elevation"
+        "name": "One Cursor",
+        "body": "Each data grid shares one moving selection cursor; each tab bar shares one underline.",
+        "section": "components"
       }
     ],
     "dos": [
-      "Do reuse the shared controls, page headings, status badges and ruled detail sections.",
-      "Do pair record state with readable text and keep the corrective action near its context.",
-      "Do preserve visible keyboard focus, wrapped identifiers and the mobile navigation sheet.",
-      "Do show endpoint membership and tool count together in the current scope summary."
+      "Do follow the exact proposal and final v5 overrides when extending the system.",
+      "Do preserve keyboard focus, reduced motion, tenant boundaries, write-only secrets and precise errors.",
+      "Do show real connection and execution state; use explicit loading, empty and failure treatments."
     ],
     "donts": [
-      "Don't replace status words with color alone.",
-      "Don't use monospace for ordinary headings, navigation or descriptive copy.",
-      "Don't wrap each record section in an elevated card; retain the flat record structure."
+      "Don't reintroduce opaque cards, rounded work surfaces, pills, sidebar sheets, toasts or approval dialogs.",
+      "Don't replace the proposal shader, fonts, glyph geometry or section hues with a new direction.",
+      "Don't claim provider consent, external-client acceptance or M-series performance from local fixtures."
     ]
   }
 }

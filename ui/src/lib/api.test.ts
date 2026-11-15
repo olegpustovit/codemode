@@ -6,12 +6,13 @@ describe("navigation boundaries", () => {
       "/sources",
       "/authorize?client_id=https%3A%2F%2Fclient.example",
       "/executions/123",
-      "/approvals/123",
+      "/sessions?selected=123",
     ])
       expect(safeReturnPath(path)).toBe(path)
     for (const path of [
       "https://evil.example",
       "//evil.example",
+      "/approvals/123",
       "/\\evil.example",
       "/api/tokens",
       "/sources\n",

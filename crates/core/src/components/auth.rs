@@ -29,6 +29,8 @@ pub struct Token {
     pub workspace_id: Option<Uuid>,
     pub resource: String,
     pub revoked: bool,
+    pub oauth: bool,
+    pub last_used_at: Option<String>,
 }
 
 impl Auth {
@@ -92,7 +94,9 @@ impl Auth {
     }
 
     pub async fn list(&self) -> Result<Vec<Token>, Error> {
-        let rows = sqlx::query!("SELECT id,name,audience,workspace_id,resource,revoked_at IS NOT NULL AS \"revoked!\" FROM access_tokens ORDER BY created_at").fetch_all(&self.db.0).await?;
+        let rows = sqlx::query!(r#"SELECT id,name,audience,workspace_id,resource,revoked_at IS NOT NULL AS "revoked!",oauth_grant IS NOT NULL AS "oauth!",
+            to_char(last_used_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS last_used_at
+            FROM access_tokens ORDER BY created_at"#).fetch_all(&self.db.0).await?;
         Ok(rows
             .into_iter()
             .map(|r| Token {
@@ -102,6 +106,8 @@ impl Auth {
                 workspace_id: r.workspace_id,
                 resource: r.resource,
                 revoked: r.revoked,
+                oauth: r.oauth,
+                last_used_at: r.last_used_at,
             })
             .collect())
     }

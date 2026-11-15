@@ -4,6 +4,7 @@ import {
   Outlet,
 } from "@tanstack/react-router"
 import type { QueryClient } from "@tanstack/react-query"
+import { Backdrop } from "@/components/backdrop"
 import { configQuery } from "@/lib/runtime"
 import { NotFound, Pending, RouteError } from "@/components/common"
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
@@ -13,6 +14,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     component: () => (
       <>
         <HeadContent />
+        <Backdrop />
         <Outlet />
       </>
     ),

@@ -51,7 +51,7 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
                 .join("../../.tools/monty/bin/monty")
         });
     let sandbox = Arc::new(
-        MontySandbox::new(&worker, Duration::from_secs(1), [73; 32], 32768)
+        MontySandbox::new(&worker, Duration::from_secs(1), 32768)
             .await
             .unwrap(),
     );
@@ -64,7 +64,6 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
         tasks.clone(),
         stop.clone(),
         Default::default(),
-        [73; 32],
     ));
     let sessions = Sessions::new(db.clone());
     sessions
@@ -218,6 +217,32 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
         .next()
         .unwrap()
         .to_owned();
+    let denied_registry = request(reqwest::Method::GET, "/api/integrations")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(denied_registry.status(), 401);
+    let registry = request(reqwest::Method::GET, "/api/integrations")
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(registry.status(), 200);
+    let registry = registry.json::<serde_json::Value>().await.unwrap();
+    assert!(
+        registry
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["slug"] == "github" && entry["methods"][0] == "api_key")
+    );
+    let missing = request(reqwest::Method::POST, "/api/integrations/not-a-provider")
+        .header("cookie", &cookie)
+        .header("origin", "https://test.example")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(missing.status(), 404);
     let response = request(reqwest::Method::GET, &consent_path)
         .header("cookie", &cookie)
         .send()
@@ -443,7 +468,7 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
         .json::<serde_json::Value>()
         .await
         .unwrap();
-    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 9);
+    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 10);
     let invoke = |token: String, name: &str, args: serde_json::Value| {
         admin_rpc(
             token,
@@ -451,6 +476,25 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
             serde_json::json!({"name":name,"arguments":args}),
         )
     };
+    let registry = invoke(
+        management_token.into(),
+        "list_integrations",
+        serde_json::json!({}),
+    )
+    .send()
+    .await
+    .unwrap()
+    .json::<serde_json::Value>()
+    .await
+    .unwrap();
+    let registry = tool_result(registry["result"].clone());
+    assert!(
+        registry
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["slug"] == "github" && entry["sourceId"].is_null())
+    );
     let saved=invoke(management_token.into(),"save_source",serde_json::json!({"source":{"slug":"admin-private","kind":"mcp_http","url":"https://fixture.example/mcp","requiresAccount":true}})).send().await.unwrap().json::<serde_json::Value>().await.unwrap();
     let source = tool_result(saved["result"].clone());
     let source_id = source.as_str().unwrap();
@@ -581,7 +625,7 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
     .fetch_all(&pool)
     .await
     .unwrap();
-    assert_eq!(rows.len(), 9);
+    assert_eq!(rows.len(), 10);
     assert!(rows.iter().all(|(_, _, outcome)| outcome != "running"));
     let args = &rows
         .iter()

@@ -1,11 +1,14 @@
 pub mod accounts;
+pub mod agent_sessions;
 pub mod auth;
 pub mod broker;
 pub mod catalogue;
 pub mod execution;
 pub mod graphql;
+pub mod integrations;
 pub mod openapi;
 pub mod policies;
+pub mod providers;
 pub mod scripts;
 pub mod sessions;
 pub mod sources;

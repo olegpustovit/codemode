@@ -35,3 +35,14 @@ The owner requires email/password registration, restricted to the owner address 
 ## Workspaces and management MCP extension
 
 Replace hostname endpoint configuration with human-named workspaces on the single canonical /mcp URL. Preserve the Operate world and existing source checkboxes, scope summary, tool policies and script editors. OAuth consent requires explicit workspace selection and previews the included sources. The separate /mcp-admin resource has an administration consent screen that explains tenant-wide management access and browser-only provider consent. Token creation distinguishes workspace execution and administration. The owner explicitly requested a grid of popular MCP servers; the Sources page adds four standard Nova cards leading to browser account linking. Preserve system tokens, fonts, navigation and forms. No new imagery or approved comp.
+
+## Owner-approved replacement — proposal hkwwwp90n0dt
+
+The owner's instruction to implement the linked proposal 1:1 supersedes the historical daytime direction above. Mode remains Operate. Visual authority is the exact saved prototype in `docs/proposal/control-plane.html`; no new concept selection is needed.
+
+THESIS: A keyboard-driven control plane with session/execution evidence, integrations, workspace reach, scripts and tokens.
+OWN-WORLD: The supplied dark ribbon backdrop; cobalt/violet/teal/bronze/crimson section hues; M PLUS 1p and JetBrains Mono; square transparent surfaces and fine rules.
+FIRST VIEWPORT: 48px top bar, 228px rail, central tabbed list, right pane stack and 30px status bar, matching the prototype.
+SIGNATURE: One moving list cursor, a gliding tab underline and animated pane widths over the exact proposal shader. Reduced motion is immediate.
+SCOPE: All proposal phases A–E, including removal of approvals, retained sessions/results, integration methods and shared keyboard/URL state. See `docs/proposal/implementation.md` for current evidence and outstanding requirements.
+STATUS: All five replacement sections are implemented locally with the shared list/tab/pane kit. DESIGN.md and its sidecar now describe the replacement. Final fidelity/release/Oracle qualification and deployment remain pending; consult docs/proposal/implementation.md for evidence.

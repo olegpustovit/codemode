@@ -1,0 +1,96 @@
+[
+  {
+    "slug": "github",
+    "name": "GitHub",
+    "category": "Development",
+    "description": "Repositories, issues and pull requests.",
+    "url": "https://api.githubcopilot.com/mcp/",
+    "docs": "https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md",
+    "icon": "github",
+    "methods": [
+      "api_key",
+      "oauth_app"
+    ],
+    "oauth": {
+      "authorizationEndpoint": "https://github.com/login/oauth/authorize",
+      "tokenEndpoint": "https://github.com/login/oauth/access_token",
+      "scopes": [
+        "repo",
+        "read:user",
+        "offline_access"
+      ]
+    }
+  },
+  {
+    "slug": "linear",
+    "name": "Linear",
+    "category": "Development",
+    "description": "Issues, projects and team workflows.",
+    "url": "https://mcp.linear.app/mcp",
+    "docs": "https://linear.app/docs/mcp",
+    "icon": "linear",
+    "methods": [
+      "one_click"
+    ]
+  },
+  {
+    "slug": "sentry",
+    "name": "Sentry",
+    "category": "Development",
+    "description": "Errors, performance and issue triage.",
+    "url": "https://mcp.sentry.dev/mcp",
+    "docs": "https://mcp.sentry.dev/",
+    "icon": "sentry",
+    "methods": [
+      "one_click"
+    ]
+  },
+  {
+    "slug": "notion",
+    "name": "Notion",
+    "category": "Knowledge",
+    "description": "Pages, documents and databases.",
+    "url": "https://mcp.notion.com/mcp",
+    "docs": "https://developers.notion.com/guides/mcp/get-started-with-mcp",
+    "icon": "notion",
+    "methods": [
+      "one_click"
+    ]
+  },
+  {
+    "slug": "deepwiki",
+    "name": "DeepWiki",
+    "category": "Knowledge",
+    "description": "Documentation and questions about public repositories.",
+    "url": "https://mcp.deepwiki.com/mcp",
+    "docs": "https://docs.devin.ai/work-with-devin/deepwiki-mcp",
+    "icon": "deepwiki",
+    "methods": [
+      "open"
+    ]
+  },
+  {
+    "slug": "context7",
+    "name": "Context7",
+    "category": "Knowledge",
+    "description": "Current library documentation and code examples.",
+    "url": "https://mcp.context7.com/mcp",
+    "docs": "https://github.com/upstash/context7",
+    "icon": "context7",
+    "methods": [
+      "open"
+    ]
+  },
+  {
+    "slug": "nudge",
+    "name": "Nudge",
+    "category": "Productivity",
+    "description": "Tasks and team workflows.",
+    "url": "https://nudge.microapps.space/mcp",
+    "docs": "https://nudge.microapps.space",
+    "icon": "nudge",
+    "methods": [
+      "one_click"
+    ]
+  }
+]

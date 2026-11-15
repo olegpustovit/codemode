@@ -269,7 +269,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
                 .join("../../.tools/monty/bin/monty")
         });
     let sandbox = Arc::new(
-        MontySandbox::new(&worker, Duration::from_secs(1), [73; 32], 32768)
+        MontySandbox::new(&worker, Duration::from_secs(1), 32768)
             .await
             .unwrap(),
     );
@@ -280,7 +280,6 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         tasks.clone(),
         stop.clone(),
         Default::default(),
-        [73; 32],
     ));
     let state = server::State {
         mcp_tasks: server::Tasks::default(),
@@ -393,7 +392,16 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
                 serde_json::json!({}),
             )
             .await;
-            assert_eq!(listed["tools"].as_array().unwrap().len(), 3);
+            assert_eq!(listed["tools"].as_array().unwrap().len(), 2);
+            assert_eq!(
+                listed["tools"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|t| t["name"].as_str().unwrap())
+                    .collect::<std::collections::BTreeSet<_>>(),
+                std::collections::BTreeSet::from(["search", "execute"])
+            );
         }
         for (host, token, expected) in [
             ("test.example", work_token.as_str(), "alpha.echo"),
@@ -488,14 +496,14 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         "test.example",
         &work_token,
         "tools/call",
-        serde_json::json!({"name":"execute","arguments":{"code":"while True: pass"}}),
+        serde_json::json!({"name":"execute","arguments":{"code":"print('before cancellation')\nawait tools.alpha.echo(value='cancellation marker')\nwhile True: pass"}}),
         true,
     )
     .await;
     let running_id = created["result"]["taskId"].as_str().unwrap();
     tokio::time::timeout(Duration::from_secs(1),async {
         loop {
-            let running:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM executions WHERE token_id=$1 AND code='while True: pass' AND status='running')").bind(work_token_id).fetch_one(&pool).await.unwrap();
+            let running:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM executions e WHERE token_id=$1 AND code LIKE '%while True: pass%' AND status='running' AND EXISTS(SELECT 1 FROM tool_calls c WHERE c.execution_id=e.id AND c.outcome='ok'))").bind(work_token_id).fetch_one(&pool).await.unwrap();
             if running { break; } tokio::task::yield_now().await;
         }
     }).await.unwrap();
@@ -516,10 +524,12 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
     );
     tokio::time::timeout(Duration::from_secs(1),async {
         loop {
-            let finished:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM executions WHERE token_id=$1 AND code='while True: pass' AND status='failed' AND error LIKE '%cancelled%')").bind(work_token_id).fetch_one(&pool).await.unwrap();
+            let finished:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM executions WHERE token_id=$1 AND code LIKE '%while True: pass%' AND status='failed' AND error LIKE '%cancelled%')").bind(work_token_id).fetch_one(&pool).await.unwrap();
             if finished { break; } tokio::task::yield_now().await;
         }
     }).await.unwrap();
+    let output:String=sqlx::query_scalar("SELECT output FROM executions WHERE token_id=$1 AND code LIKE '%while True: pass%' ORDER BY started_at DESC LIMIT 1").bind(work_token_id).fetch_one(&pool).await.unwrap();
+    assert_eq!(output, "before cancellation\n");
     let revision = task_state
         .sources
         .get(ids[0])
@@ -535,17 +545,23 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
             ids[0],
             revision,
             "echo",
-            codemode_core::components::policies::Choice::Approve,
+            codemode_core::components::policies::Choice::Block,
         )
         .await
         .unwrap();
     let before = alpha.load(Ordering::SeqCst);
-    let created=task_rpc(&client,&url,"test.example",&work_token,"tools/call",serde_json::json!({"name":"execute","arguments":{"code":"return await tools.alpha.echo(value='task approval')"}}),true).await;
-    let paused_task = created["result"]["taskId"].as_str().unwrap();
-    let paused =
-        tool_result(terminal_task(&client, &url, &work_token, paused_task).await["result"].clone());
-    assert_eq!(paused["status"], "paused");
-    let execution_id = paused["executionId"].as_str().unwrap();
+    let created=task_rpc(&client,&url,"test.example",&work_token,"tools/call",serde_json::json!({"name":"execute","arguments":{"code":"try:\n    return await tools.alpha.echo(value='task policy')\nexcept PermissionError as e:\n    return str(e)"}}),true).await;
+    let task_id = created["result"]["taskId"].as_str().unwrap();
+    let blocked =
+        tool_result(terminal_task(&client, &url, &work_token, task_id).await["result"].clone());
+    assert_eq!(blocked["status"], "completed");
+    assert!(blocked["result"].as_str().unwrap().contains("blocked"));
+    assert!(
+        blocked["result"]
+            .as_str()
+            .unwrap()
+            .contains(&work.to_string())
+    );
     assert_eq!(alpha.load(Ordering::SeqCst), before);
     let updated = task_rpc(
         &client,
@@ -553,68 +569,23 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         "test.example",
         &work_token,
         "tasks/update",
-        serde_json::json!({"taskId":paused_task,"inputResponses":{"approve":true,"allow":true}}),
+        serde_json::json!({"taskId":task_id,"inputResponses":{"approve":true,"allow":true}}),
         true,
     )
     .await;
     assert!(updated.get("error").is_none());
-    let still_paused = rpc(
-        &client,
-        &url,
-        "test.example",
-        &work_token,
-        "2025-11-25",
-        "tools/call",
-        serde_json::json!({"name":"resume","arguments":{"executionId":execution_id}}),
-    )
-    .await;
-    assert_eq!(tool_result(still_paused)["status"], "paused");
     assert_eq!(alpha.load(Ordering::SeqCst), before);
-    let approvals = task_state.execution.approvals();
-    let detail = approvals
-        .detail(execution_id.parse().unwrap())
-        .await
-        .unwrap();
-    approvals
-        .decide(
-            detail.execution_id,
-            detail.pause_id,
-            detail
-                .calls
-                .iter()
-                .map(
-                    |c| codemode_core::components::execution::approvals::Decision {
-                        call_id: c.call_id,
-                        allow: true,
-                    },
-                )
-                .collect(),
-        )
-        .await
-        .unwrap();
-    let created = task_rpc(
+    let removed = task_rpc(
         &client,
         &url,
         "test.example",
         &work_token,
         "tools/call",
-        serde_json::json!({"name":"resume","arguments":{"executionId":execution_id}}),
-        true,
+        serde_json::json!({"name":"resume","arguments":{"executionId":blocked["executionId"]}}),
+        false,
     )
     .await;
-    let resumed = tool_result(
-        terminal_task(
-            &client,
-            &url,
-            &work_token,
-            created["result"]["taskId"].as_str().unwrap(),
-        )
-        .await["result"]
-            .clone(),
-    );
-    assert_eq!(resumed["status"], "completed");
-    assert_eq!(resumed["result"], "alpha:task approval");
-    assert_eq!(alpha.load(Ordering::SeqCst), before + 1);
+    assert!(removed.get("error").is_some() || removed["isError"] == true);
     task_state
         .sources
         .policies()
@@ -658,7 +629,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
     assert_eq!(result["status"], "failed");
     assert_eq!(alpha.load(Ordering::SeqCst), before);
     let blocked:i64=sqlx::query_scalar("SELECT count(*) FROM tool_calls c JOIN executions e ON e.id=c.execution_id WHERE e.token_id=$1 AND c.outcome='blocked'").bind(work_token_id).fetch_one(&pool).await.unwrap();
-    assert_eq!(blocked, 3);
+    assert_eq!(blocked, 4);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let limited_url = format!("http://{}", listener.local_addr().unwrap());
     let limited_stop = stop.clone();

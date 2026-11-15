@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id FROM executions WHERE session_id=$1 AND ($2::uuid IS NULL OR (started_at,id)<(SELECT started_at,id FROM executions WHERE id=$2 AND session_id=$1)) ORDER BY started_at DESC,id DESC LIMIT 21",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "executions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0c00f82eec6df667bc8cf574d6fd13ed7a4cfa1f40469621fd71cb0320a65f26"
+}

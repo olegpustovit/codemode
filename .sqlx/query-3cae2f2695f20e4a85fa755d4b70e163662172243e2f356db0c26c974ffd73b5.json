@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sources SET revision=revision+1 WHERE kind='mcp_http' AND rtrim(config->>'url','/')=rtrim($1,'/')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3cae2f2695f20e4a85fa755d4b70e163662172243e2f356db0c26c974ffd73b5"
+}

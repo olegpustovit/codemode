@@ -42,7 +42,7 @@ export function PoliciesPage() {
       </Link>
       <PageHeader
         title="Tool policies"
-        description={`Choose which calls are allowed at ${workspace.name}. Read-only tools default to allow; destructive tools require approval.`}
+        description={`Choose which calls are allowed at ${workspace.name}. Tools default to allow; blocked calls raise PermissionError.`}
       />
       <ToolScopeMode
         workspace={workspace}
@@ -204,13 +204,7 @@ function PolicyRow({
       </TableCell>
       <TableCell className="p-0 sm:p-2">
         <StateBadge
-          state={
-            !tool.inScope
-              ? "outside_scope"
-              : tool.effectiveAction === "approve"
-                ? "require_approval"
-                : tool.effectiveAction
-          }
+          state={!tool.inScope ? "outside_scope" : tool.effectiveAction}
         />
       </TableCell>
       <TableCell className="col-span-2 p-0 sm:p-2">
@@ -229,9 +223,6 @@ function PolicyRow({
           >
             <NativeSelectOption value="default">Use default</NativeSelectOption>
             <NativeSelectOption value="allow">Allow</NativeSelectOption>
-            <NativeSelectOption value="approve">
-              Require approval
-            </NativeSelectOption>
             <NativeSelectOption value="block">Block</NativeSelectOption>
           </NativeSelect>
           <Button

@@ -1,4 +1,7 @@
+use super::oauth_error::failure;
 use super::*;
+use OAuthStage::*;
+use base64::{Engine, engine::general_purpose::STANDARD};
 use futures_util::future::BoxFuture;
 use oauth2::{TokenResponse, basic::BasicTokenType};
 use rmcp::transport::auth::{
@@ -36,22 +39,71 @@ struct HttpCredential {
 
 pub enum OAuthCompletion {
     Linked(Uuid),
-    Denied(Uuid),
+    Denied(Uuid, String),
 }
 
 impl Provider {
+    async fn authorize(self) -> Result<(String, String, Pending), Error> {
+        let states = InMemoryStateStore::new();
+        let mut manager = self.manager(InMemoryCredentialStore::new()).await?;
+        manager.set_state_store(states.clone());
+        let scopes = self.metadata.scopes_supported.clone().unwrap_or_default();
+        let refs: Vec<_> = scopes.iter().map(String::as_str).collect();
+        let url = manager
+            .get_authorization_url(&refs)
+            .await
+            .map_err(|error| {
+                failure(
+                    Consent,
+                    error,
+                    &[self.client_secret.as_deref().unwrap_or("")],
+                )
+            })?;
+        let parsed = url::Url::parse(&url)
+            .map_err(|_| failure(Consent, "invalid authorization URL", &[]))?;
+        let csrf = parsed
+            .query_pairs()
+            .find(|(name, _)| name == "state")
+            .map(|(_, value)| value.into_owned())
+            .ok_or_else(|| failure(Consent, "authorization state missing", &[]))?;
+        let authorization = states
+            .load(&csrf)
+            .await
+            .map_err(|error| failure(Consent, error, &[]))?
+            .ok_or_else(|| failure(Consent, "authorization state missing", &[]))?;
+        Ok((
+            url,
+            csrf,
+            Pending {
+                provider: self,
+                authorization,
+            },
+        ))
+    }
     async fn manager(
         &self,
         credentials: InMemoryCredentialStore,
     ) -> Result<AuthorizationManager, Error> {
         let mut manager = AuthorizationManager::new(&self.resource)
             .await
-            .map_err(|_| Error::OAuth)?;
+            .map_err(|_| {
+                failure(
+                    Registration,
+                    "stored OAuth client configuration is invalid",
+                    &[],
+                )
+            })?;
         manager.set_metadata(self.metadata.clone());
         let mut client = OAuthClientConfig::new(&self.client_id, &self.redirect_uri)
             .with_application_type("web");
         client.client_secret = self.client_secret.clone();
-        manager.configure_client(client).map_err(|_| Error::OAuth)?;
+        manager.configure_client(client).map_err(|_| {
+            failure(
+                Registration,
+                "stored OAuth client configuration is invalid",
+                &[],
+            )
+        })?;
         manager.set_credential_store(credentials);
         Ok(manager)
     }
@@ -72,23 +124,48 @@ impl Accounts {
             let url = record.url.ok_or(Error::Invalid)?;
             let redirect_uri = format!("https://{hostname}/api/accounts/oauth/callback");
             let metadata_url = format!("https://{hostname}/oauth/client-metadata.json");
+            let static_app = self.app_for_url(&url).await?;
             let state_store = InMemoryStateStore::new();
+            let mut stage = Probe;
             let discovery = async {
+                if let Some((entry, app)) = static_app {
+                    stage = Consent;
+                    let endpoints = entry.oauth.ok_or(Error::Provider)?;
+                    let mut metadata = AuthorizationMetadata::default();
+                    metadata.authorization_endpoint = endpoints.authorization_endpoint;
+                    metadata.token_endpoint = endpoints.token_endpoint;
+                    metadata.scopes_supported = Some(endpoints.scopes);
+                    metadata.response_types_supported = Some(vec!["code".into()]);
+                    metadata.code_challenge_methods_supported = Some(vec!["S256".into()]);
+                    metadata.additional_fields.insert(
+                        "token_endpoint_auth_methods_supported".into(),
+                        serde_json::json!(["client_secret_post"]),
+                    );
+                    let provider = Provider {
+                        url: url.clone(),
+                        resource: url.clone(),
+                        metadata,
+                        client_id: app.client_id.expose_secret().to_owned(),
+                        client_secret: Some(app.client_secret.expose_secret().to_owned()),
+                        redirect_uri,
+                    };
+                    return provider.authorize().await;
+                }
                 let mut manager = AuthorizationManager::new(&url)
                     .await
-                    .map_err(|_| Error::OAuth)?;
+                    .map_err(|error| failure(stage, error, &[&url]))?;
                 let probe = reqwest::Client::builder()
                     .no_proxy()
                     .redirect(reqwest::redirect::Policy::none())
                     .timeout(Duration::from_secs(5))
                     .build()
-                    .map_err(|_| Error::OAuth)?;
+                    .map_err(|error| failure(stage, error, &[&url]))?;
                 let response = probe
                     .get(&url)
                     .header("accept", "application/json, text/event-stream")
                     .send()
                     .await
-                    .map_err(|_| Error::OAuth)?;
+                    .map_err(|error| failure(stage, error, &[&url]))?;
                 let challenge = (response.status() == reqwest::StatusCode::UNAUTHORIZED)
                     .then(|| {
                         response
@@ -97,10 +174,14 @@ impl Accounts {
                             .and_then(|h| h.to_str().ok())
                     })
                     .flatten();
+                stage = ServerMetadata;
                 let resolution = manager
                     .resolve_metadata_from_challenge(challenge)
                     .await
-                    .map_err(|_| Error::OAuth)?;
+                    .map_err(|error| {
+                        let stage = if matches!(error, rmcp::transport::auth::AuthError::ProtectedResourceMetadataInvalid { .. }) { ResourceMetadata } else { ServerMetadata };
+                        failure(stage, error, &[&url])
+                    })?;
                 let metadata = resolution.metadata;
                 let cimd = metadata
                     .additional_fields
@@ -115,37 +196,46 @@ impl Accounts {
                     .with_application_type("web")
                     .with_scopes(scopes.clone());
                 // The SDK takes application_type from configuration before making its DCR request.
+                stage = Registration;
                 manager
                     .configure_client(identity.clone())
-                    .map_err(|_| Error::OAuth)?;
+                    .map_err(|error| failure(stage, error, &[&url]))?;
                 let client = if cimd {
                     identity
                 } else {
                     manager
                         .register_client("Codemode Gateway", &redirect_uri, &scope_refs)
                         .await
-                        .map_err(|_| Error::OAuth)?
+                        .map_err(|error| failure(stage, error, &[&url]))?
                 };
+                stage = Consent;
                 let authorization_url = manager
                     .get_authorization_url(&scope_refs)
                     .await
-                    .map_err(|_| Error::OAuth)?;
-                let parsed = url::Url::parse(&authorization_url).map_err(|_| Error::OAuth)?;
+                    .map_err(|error| failure(stage, error, &[&url]))?;
+                let parsed = url::Url::parse(&authorization_url)
+                    .map_err(|error| failure(stage, error, &[&url]))?;
                 let csrf = parsed
                     .query_pairs()
                     .find(|(name, _)| name == "state")
                     .map(|(_, value)| value.into_owned())
-                    .ok_or(Error::OAuth)?;
+                    .ok_or_else(|| {
+                        failure(stage, "provider authorization state is incomplete", &[])
+                    })?;
                 let resource = parsed
                     .query_pairs()
                     .find(|(name, _)| name == "resource")
                     .map(|(_, value)| value.into_owned())
-                    .ok_or(Error::OAuth)?;
+                    .ok_or_else(|| {
+                        failure(stage, "provider authorization state is incomplete", &[])
+                    })?;
                 let authorization = state_store
                     .load(&csrf)
                     .await
-                    .map_err(|_| Error::OAuth)?
-                    .ok_or(Error::OAuth)?;
+                    .map_err(|error| failure(stage, error, &[&url]))?
+                    .ok_or_else(|| {
+                        failure(stage, "provider authorization state is incomplete", &[])
+                    })?;
                 let provider = Provider {
                     url: url.clone(),
                     resource,
@@ -163,10 +253,9 @@ impl Accounts {
                     },
                 ))
             };
+            let outcome = tokio::time::timeout(Duration::from_secs(25), discovery).await;
             let (authorization_url, csrf, pending) =
-                tokio::time::timeout(Duration::from_secs(25), discovery)
-                    .await
-                    .map_err(|_| Error::OAuth)??;
+                outcome.map_err(|_| failure(stage, "provider request timed out", &[]))??;
             let encoded = encode(&pending)?;
             let (ciphertext, nonce) = seal(
                 key.expose_secret(),
@@ -200,7 +289,7 @@ impl Accounts {
         session: &'a str,
         code: Option<&'a str>,
         issuer: Option<&'a str>,
-        denied: bool,
+        denied: Option<&'a str>,
     ) -> BoxFuture<'a, Result<OAuthCompletion, Error>> {
         Box::pin(async move {
             if state.len() > 256
@@ -227,7 +316,7 @@ impl Accounts {
             {
                 return Err(Error::State);
             }
-            if code.is_none() && !denied {
+            if code.is_none() && denied.is_none() {
                 return Err(Error::State);
             }
             let taken=sqlx::query!("DELETE FROM upstream_oauth_states WHERE state_hash=$1 AND session_hash=$2 AND expires_at>now()",hash,session)
@@ -235,8 +324,23 @@ impl Accounts {
             if taken != 1 {
                 return Err(Error::State);
             }
-            if denied {
-                return Ok(OAuthCompletion::Denied(row.source_id));
+            let verifier = pending.authorization.pkce_verifier.clone();
+            let basic = STANDARD.encode(format!(
+                "{}:{}",
+                pending.provider.client_id,
+                pending.provider.client_secret.as_deref().unwrap_or("")
+            ));
+            let secrets = [
+                code.unwrap_or(""),
+                state,
+                verifier.as_str(),
+                pending.provider.client_secret.as_deref().unwrap_or(""),
+                basic.as_str(),
+            ];
+            if let Some(reason) = denied {
+                let error = failure(Consent, reason, &secrets);
+                tracing::warn!(error=%error,"upstream authorization declined");
+                return Ok(OAuthCompletion::Denied(row.source_id, error.to_string()));
             }
             let current=sqlx::query_scalar!("SELECT EXISTS(SELECT 1 FROM sources WHERE id=$1 AND revision=$2 AND config->>'url'=$3) AS \"current!\"",row.source_id,row.source_revision,pending.provider.url)
                 .fetch_one(&self.db.0).await.map_err(DbError::from)?;
@@ -249,7 +353,7 @@ impl Accounts {
             states
                 .save(state, pending.authorization)
                 .await
-                .map_err(|_| Error::OAuth)?;
+                .map_err(|error| failure(Store, error, &secrets))?;
             manager.set_state_store(states);
             tokio::time::timeout(
                 Duration::from_secs(25),
@@ -260,13 +364,13 @@ impl Accounts {
                 ),
             )
             .await
-            .map_err(|_| Error::OAuth)?
-            .map_err(|_| Error::OAuth)?;
+            .map_err(|_| failure(Exchange, "provider request timed out", &secrets))?
+            .map_err(|error| failure(Exchange, error, &secrets))?;
             let credentials = store
                 .load()
                 .await
-                .map_err(|_| Error::OAuth)?
-                .ok_or(Error::OAuth)?;
+                .map_err(|error| failure(Store, error, &secrets))?
+                .ok_or_else(|| failure(Store, "provider did not return credentials", &[]))?;
             validate_credentials(&credentials)?;
             let linked = Linked {
                 provider: pending.provider,
@@ -337,31 +441,50 @@ impl Accounts {
             if !credential.refresh_due {
                 return access(&linked.credentials);
             }
+            let basic = STANDARD.encode(format!(
+                "{}:{}",
+                linked.provider.client_id,
+                linked.provider.client_secret.as_deref().unwrap_or("")
+            ));
+            let token = linked
+                .credentials
+                .token_response
+                .as_ref()
+                .ok_or(Error::Authentication)?;
+            let secrets = [
+                linked.provider.client_secret.as_deref().unwrap_or(""),
+                basic.as_str(),
+                token.access_token().secret(),
+                token
+                    .refresh_token()
+                    .map(|t| t.secret().as_str())
+                    .unwrap_or(""),
+            ];
             let store = InMemoryCredentialStore::new();
             store
                 .save(linked.credentials.clone())
                 .await
-                .map_err(|_| Error::OAuth)?;
+                .map_err(|error| failure(Refresh, error, &secrets))?;
             let manager = linked.provider.manager(store.clone()).await?;
             let result = tokio::time::timeout(Duration::from_secs(20), manager.refresh_token())
                 .await
-                .map_err(|_| Error::OAuth)?;
+                .map_err(|error| failure(Refresh, error, &secrets))?;
             match result {
                 Ok(_) => {}
                 Err(
-                    rmcp::transport::auth::AuthError::AuthorizationRequired
-                    | rmcp::transport::auth::AuthError::TokenRefreshRejected(_),
+                    error @ (rmcp::transport::auth::AuthError::AuthorizationRequired
+                    | rmcp::transport::auth::AuthError::TokenRefreshRejected(_)),
                 ) => {
                     self.reject_oauth(source, uri, &credential.nonce).await?;
-                    return Err(Error::OAuth);
+                    return Err(failure(Refresh, error, &secrets));
                 }
-                Err(_) => return Err(Error::OAuth),
+                Err(error) => return Err(failure(Refresh, error, &secrets)),
             }
             linked.credentials = store
                 .load()
                 .await
-                .map_err(|_| Error::OAuth)?
-                .ok_or(Error::OAuth)?;
+                .map_err(|error| failure(Refresh, error, &secrets))?
+                .ok_or_else(|| failure(Store, "refreshed credentials were not stored", &[]))?;
             validate_credentials(&linked.credentials)?;
             self.save_oauth(source, &linked, Some(&credential.nonce), None)
                 .await?;
@@ -557,3 +680,7 @@ mod tests {
         assert!(validate_credentials(&credentials("opaque-access-token", "MAC")).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "static_tests.rs"]
+mod static_tests;

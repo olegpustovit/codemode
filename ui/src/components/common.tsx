@@ -2,7 +2,6 @@ import type { ReactNode } from "react"
 import { Link, useRouter } from "@tanstack/react-router"
 import { useQueryErrorResetBoundary } from "@tanstack/react-query"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -42,15 +41,14 @@ export function ErrorNotice({ error }: { error: unknown }) {
 }
 export function StateBadge({ state }: { state: string }) {
   return (
-    <Badge
-      variant={
-        ["error", "failed", "timed_out", "blocked"].includes(state)
-          ? "destructive"
-          : "outline"
+    <span
+      className="state-label"
+      data-failed={
+        ["error", "failed", "timed_out", "blocked"].includes(state) || undefined
       }
     >
       {state.replaceAll("_", " ")}
-    </Badge>
+    </span>
   )
 }
 export function Blank({
@@ -117,12 +115,13 @@ export function RouteError({ error }: { error: unknown }) {
 }
 export function NotFound() {
   return (
-    <Blank
-      title="Page not found"
-      description="This address does not match a control-plane page."
-    >
-      <Button render={<Link to="/sources" />}>Go to sources</Button>
-    </Blank>
+    <main className="mx-auto flex max-w-xl flex-col gap-5 p-8">
+      <PageHeader
+        title="Page not found"
+        description="This address does not match a control-plane page."
+      />
+      <Button render={<Link to="/integrations" />}>Go to integrations</Button>
+    </main>
   )
 }
 export function date(value: string | null) {

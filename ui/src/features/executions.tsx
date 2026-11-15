@@ -1,9 +1,13 @@
+import type { ReactNode } from "react"
+import { PythonCode } from "@/components/python-code"
 import { Link, getRouteApi } from "@tanstack/react-router"
 import { useSuspenseQuery } from "@tanstack/react-query"
+import { useStatus } from "@/components/status-bar"
+import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
+import type { ExecutionDetail } from "./queries"
 import { executionQuery, executionsQuery } from "./queries"
 import { PageHeader, Blank, StateBadge, date } from "@/components/common"
-import { Button } from "@/components/ui/button"
 import {
   Table,
   TableHeader,
@@ -92,33 +96,43 @@ export function ExecutionsPage() {
 export function ExecutionPage() {
   const { executionId } = detailRoute.useParams()
   const execution = useSuspenseQuery(executionQuery(executionId)).data
+  return <ExecutionContent execution={execution} />
+}
+export function ExecutionContent({
+  execution,
+  embedded = false,
+  action,
+}: {
+  execution: ExecutionDetail
+  embedded?: boolean
+  action?: ReactNode
+}) {
+  const executionId = execution.id
+  const { report } = useStatus()
   return (
     <>
-      <Link
-        to="/executions"
-        search={{}}
-        className="flex items-center gap-2 text-sm text-muted-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Executions
-      </Link>
-      <PageHeader
-        title={`Execution ${executionId.slice(0, 8)}`}
-        description={`Started ${date(execution.startedAt)}`}
-        action={
-          execution.status === "paused" ? (
-            <Button
-              render={
-                <Link to="/approvals/$executionId" params={{ executionId }} />
-              }
-            >
-              Review pending calls
-            </Button>
-          ) : (
-            <StateBadge state={execution.status} />
-          )
-        }
-      />
+      {!embedded && (
+        <Link
+          to="/executions"
+          search={{}}
+          className="flex items-center gap-2 text-sm text-muted-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Executions
+        </Link>
+      )}
+      {embedded ? (
+        <header>
+          <h2>{execution.title ?? "Python execution"}</h2>
+          <StateBadge state={execution.status} />
+        </header>
+      ) : (
+        <PageHeader
+          title={`Execution ${executionId.slice(0, 8)}`}
+          description={`Started ${date(execution.startedAt)}`}
+          action={<StateBadge state={execution.status} />}
+        />
+      )}
       {execution.error && (
         <Alert variant="destructive">
           <AlertTitle>Execution error</AlertTitle>
@@ -128,9 +142,25 @@ export function ExecutionPage() {
       <section className="flex flex-col gap-3">
         <h2>Python code</h2>
         <pre className="code-panel">
-          <code>{execution.code}</code>
+          <PythonCode code={execution.code} />
         </pre>
       </section>
+      {execution.result !== null && (
+        <section className="flex flex-col gap-3">
+          <h2>Result preview</h2>
+          <pre className="code-panel">
+            <code>{execution.result}</code>
+          </pre>
+        </section>
+      )}
+      {execution.output !== null && (
+        <section className="flex flex-col gap-3">
+          <h2>Stdout</h2>
+          <pre className="code-panel">
+            <code>{execution.output || "No output"}</code>
+          </pre>
+        </section>
+      )}
       <section className="flex flex-col gap-5">
         <h2>Tool calls</h2>
         {execution.calls.length === 0 ? (
@@ -157,6 +187,14 @@ export function ExecutionPage() {
               <pre className="code-panel">
                 <code>{JSON.stringify(call.argsRedacted, null, 2)}</code>
               </pre>
+              {call.preview !== null && (
+                <>
+                  <h4>Result preview</h4>
+                  <pre className="code-panel">
+                    <code>{call.preview}</code>
+                  </pre>
+                </>
+              )}
               {call.error && (
                 <p className="text-sm break-words text-destructive">
                   {call.error}
@@ -166,6 +204,25 @@ export function ExecutionPage() {
           ))
         )}
       </section>
+      {embedded && (
+        <div className="detail-actions">
+          {" "}
+          <Button
+            variant="outline"
+            onClick={() =>
+              void navigator.clipboard
+                .writeText(execution.code)
+                .then(() => report("Code copied"))
+                .catch(() =>
+                  report("Copy failed. Select the code and copy it.", "error")
+                )
+            }
+          >
+            Copy code
+          </Button>
+          {action}
+        </div>
+      )}
     </>
   )
 }

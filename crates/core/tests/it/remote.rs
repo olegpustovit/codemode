@@ -135,7 +135,6 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
         codemode_core::infrastructure::sandbox::MontySandbox::new(
             &binary,
             std::time::Duration::from_secs(1),
-            [73; 32],
             32768,
         )
         .await
@@ -148,7 +147,6 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
         tasks.clone(),
         stop.clone(),
         Default::default(),
-        [73; 32],
     ));
     let result = execution
         .execute(

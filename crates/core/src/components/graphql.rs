@@ -28,7 +28,7 @@ impl Kind {
     pub(crate) fn definition(self, namespace: &str) -> Definition {
         let name = self.name();
         let description = format!(
-            "Run a GraphQL {name}. Pass a complete document in query, optional variables, and operationName when the document has multiple operations. Use query with introspection to discover the schema. Only the selected {name} and its fragments are sent. Subscriptions are unsupported. Mutations require approval by default. Returns the data object; GraphQL errors raise ToolError, including partial-data responses."
+            "Run a GraphQL {name}. Pass a complete document in query, optional variables, and operationName when the document has multiple operations. Use query with introspection to discover the schema. Only the selected {name} and its fragments are sent. Subscriptions are unsupported. Tools default to allow and follow the workspace allow/block policy. Returns the data object; GraphQL errors raise ToolError, including partial-data responses."
         );
         let input_schema = serde_json::json!({"type":"object","properties":{
             "query":{"type":"string","minLength":1,"maxLength":DOCUMENT_BYTES,"description":"Complete GraphQL document, at most 64 KiB"},

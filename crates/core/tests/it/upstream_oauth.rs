@@ -135,7 +135,7 @@ async fn begin(context: &Context) -> String {
 }
 async fn complete(context: &Context, state: &str) {
     assert!(
-        matches!(context.accounts.complete_oauth(state,SESSION,Some("fixture-code"),Some(&context.provider.origin),false).await.unwrap(),OAuthCompletion::Linked(id) if id==context.source)
+        matches!(context.accounts.complete_oauth(state,SESSION,Some("fixture-code"),Some(&context.provider.origin),None).await.unwrap(),OAuthCompletion::Linked(id) if id==context.source)
     );
 }
 async fn ready(context: &Context) {
@@ -256,7 +256,7 @@ async fn upstream_oauth_dcr_encrypts_refreshes_once_redacts_and_reauthenticates_
             context.workspace,
         )
         .await;
-    let failed = failed.unwrap_err();
+    let failed = failed.unwrap_err().to_string();
     assert!(failed.contains("[REDACTED]"));
     assert!(!failed.contains("provider-access-2"));
     expire(&pool, context.source).await;
@@ -274,6 +274,7 @@ async fn upstream_oauth_dcr_encrypts_refreshes_once_redacts_and_reauthenticates_
     assert!(
         failed
             .unwrap_err()
+            .to_string()
             .contains(&format!("/sources/{}/accounts", context.source))
     );
     assert_eq!(context.accounts.list().await.unwrap().len(), 1);
@@ -352,7 +353,7 @@ async fn upstream_oauth_cimd_callback_state_is_session_bound_single_use_expiring
                 SESSION,
                 Some("fixture-code"),
                 Some(&context.provider.origin),
-                false
+                None
             )
             .await,
         Err(AccountError::Authentication)
@@ -379,7 +380,7 @@ async fn upstream_oauth_cimd_callback_state_is_session_bound_single_use_expiring
                 "different-browser",
                 Some("fixture-code"),
                 Some(&context.provider.origin),
-                false
+                None
             )
             .await,
         Err(AccountError::State)
@@ -392,7 +393,7 @@ async fn upstream_oauth_cimd_callback_state_is_session_bound_single_use_expiring
                 SESSION,
                 Some("fixture-code"),
                 Some("https://forged.example"),
-                false
+                None
             )
             .await,
         Err(AccountError::State)
@@ -400,7 +401,7 @@ async fn upstream_oauth_cimd_callback_state_is_session_bound_single_use_expiring
     assert!(matches!(
         context
             .accounts
-            .complete_oauth(&state, SESSION, Some("fixture-code"), None, false)
+            .complete_oauth(&state, SESSION, Some("fixture-code"), None, None)
             .await,
         Err(AccountError::State)
     ));
@@ -412,7 +413,7 @@ async fn upstream_oauth_cimd_callback_state_is_session_bound_single_use_expiring
                 SESSION,
                 Some("fixture-code"),
                 Some(&context.provider.origin),
-                false
+                None
             )
             .await
             .unwrap(),
@@ -426,7 +427,7 @@ async fn upstream_oauth_cimd_callback_state_is_session_bound_single_use_expiring
                 SESSION,
                 Some("fixture-code"),
                 Some(&context.provider.origin),
-                false
+                None
             )
             .await,
         Err(AccountError::State)
@@ -436,10 +437,10 @@ async fn upstream_oauth_cimd_callback_state_is_session_bound_single_use_expiring
     assert!(matches!(
         context
             .accounts
-            .complete_oauth(&state, SESSION, None, Some(&context.provider.origin), true)
+            .complete_oauth(&state, SESSION, None, Some(&context.provider.origin), Some("access_denied: account policy rejected access"))
             .await
             .unwrap(),
-        OAuthCompletion::Denied(_)
+        OAuthCompletion::Denied(_, detail) if detail.contains("step 5") && detail.contains("account policy rejected access")
     ));
     let state = begin(&context).await;
     sqlx::query("UPDATE upstream_oauth_states SET expires_at=now()-interval '1 second'")
@@ -454,7 +455,7 @@ async fn upstream_oauth_cimd_callback_state_is_session_bound_single_use_expiring
                 SESSION,
                 Some("fixture-code"),
                 Some(&context.provider.origin),
-                false
+                None
             )
             .await,
         Err(AccountError::State)
@@ -490,7 +491,7 @@ async fn upstream_oauth_cimd_callback_state_is_session_bound_single_use_expiring
                 SESSION,
                 Some("fixture-code"),
                 Some(&context.provider.origin),
-                false
+                None
             )
             .await,
         Err(AccountError::Changed)
@@ -546,5 +547,66 @@ async fn upstream_oauth_refresh_cannot_overwrite_a_replacement_account(pool: sql
         )
         .await;
     assert!(result.is_ok());
+    finish(context).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn upstream_oauth_failures_identify_registration_and_exchange_without_exposing_secrets(
+    pool: sqlx::PgPool,
+) {
+    use codemode_core::components::accounts::OAuthStage;
+    let context = setup(&pool, false).await;
+    context
+        .provider
+        .fail_registration
+        .store(true, Ordering::SeqCst);
+    let error = context
+        .accounts
+        .start_oauth(context.source, "test.example", SESSION)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        AccountError::OAuth {
+            stage: OAuthStage::Registration,
+            ..
+        }
+    ));
+    let text = format!("{error:?}");
+    assert!(text.contains("redirect URI is not accepted"));
+    assert!(!text.contains("registration-secret"));
+    context
+        .provider
+        .fail_registration
+        .store(false, Ordering::SeqCst);
+    let state = begin(&context).await;
+    context.provider.fail_exchange.store(true, Ordering::SeqCst);
+    let result = context
+        .accounts
+        .complete_oauth(
+            &state,
+            SESSION,
+            Some("fixture-code"),
+            Some(&context.provider.origin),
+            None,
+        )
+        .await;
+    let error = match result {
+        Err(error) => error,
+        Ok(_) => panic!("exchange must fail"),
+    };
+    assert!(matches!(
+        error,
+        AccountError::OAuth {
+            stage: OAuthStage::Exchange,
+            ..
+        }
+    ));
+    let text = format!("{error:?}");
+    assert!(text.contains("invalid_grant"));
+    assert!(!text.contains("fixture-code"));
+    assert!(!text.contains(CLIENT_SECRET));
+    assert!(!text.contains(&state));
+    assert!(context.accounts.list().await.unwrap().is_empty());
     finish(context).await;
 }

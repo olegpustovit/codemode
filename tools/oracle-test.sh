@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "$0")/.."
 
 # Reuse authentication so SSH setup does not consume each case's hard deadline.
 ssh() {
@@ -10,16 +11,27 @@ ssh() {
 destination=/home/snowbear/ci/codemode
 if [[ "$1" == --stage ]]; then
   shift
+# Oracle's worker is ARM64 even when the build machine is x86-64.
+monty_bin=.tools/monty-aarch64/bin/monty
+python3 - "$monty_bin" <<'ARCH'
+from pathlib import Path
+import sys
+with Path(sys.argv[1]).open('rb') as binary:
+    header = binary.read(20)
+assert header[:6] == b'\x7fELF\x02\x01' and int.from_bytes(header[18:20], 'little') == 183, 'expected an ARM64 Monty worker'
+ARCH
   ssh -o BatchMode=yes -o ConnectTimeout=5 oracle-vm mkdir -p "$destination"
   scp -q target/aarch64-unknown-linux-gnu/debug/codemode "oracle-vm:$destination/codemode"
   scp -q crates/core/tests/fixtures/stdio.py "oracle-vm:$destination/stdio.py"
-  scp -q .tools/monty/bin/monty "oracle-vm:$destination/monty"
+  scp -q "$monty_bin" "oracle-vm:$destination/monty"
+  worker_version=$(ssh -o BatchMode=yes oracle-vm "$destination/monty" --version)
+  [[ "$worker_version" == "monty-runtime 1.5.0" ]] || { echo "Expected Monty runtime 1.5.0" >&2; exit 1; }
   for executable in "$@"; do
     scp -q "$executable" "oracle-vm:$destination/$(basename "$executable")"
   done
   if [[ "${T_ISOLATED:-0}" == 1 ]]; then
     ssh -o BatchMode=yes oracle-vm mkdir -p "$destination/isolation"
-    scp -q deploy/worker.sh deploy/worker-guard.py tools/worker-seccomp.py .tools/monty/bin/monty "oracle-vm:$destination/isolation/"
+    scp -q deploy/worker.sh deploy/worker-guard.py tools/worker-seccomp.py "$monty_bin" "oracle-vm:$destination/isolation/"
     ssh -o BatchMode=yes oracle-vm 'cd /home/snowbear/ci/codemode/isolation && chmod +x worker.sh && python3 worker-seccomp.py worker.bpf'
   fi
   exit 0

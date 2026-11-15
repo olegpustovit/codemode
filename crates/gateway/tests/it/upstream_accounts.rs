@@ -42,11 +42,8 @@ async fn browser_upstream_linking_requires_its_session_and_exposes_only_account_
         .await
         .unwrap();
     let state = admin::State {
+        agent_sessions: codemode_core::components::agent_sessions::AgentSessions::new(db.clone()),
         scripts: codemode_core::components::scripts::Scripts::new(db.clone()),
-        approvals: codemode_core::components::execution::approvals::Approvals::new(
-            db.clone(),
-            [73; 32],
-        ),
         log: Log::new(db.clone()),
         auth,
         sessions: Arc::new(sessions.clone()),
@@ -110,6 +107,77 @@ async fn browser_upstream_linking_requires_its_session_and_exposes_only_account_
         .next()
         .unwrap()
         .to_owned();
+    let app = serde_json::json!({"clientId":"browser-app-id","clientSecret":"browser-app-secret"});
+    assert_eq!(
+        request(reqwest::Method::GET, "/api/oauth-apps")
+            .bearer_auth(&agent)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        401
+    );
+    assert_eq!(
+        request(reqwest::Method::PUT, "/api/oauth-apps/github")
+            .header("cookie", &cookie)
+            .header("origin", "https://evil.example")
+            .json(&app)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        403
+    );
+    for (provider, body, status) in [
+        ("linear", app.clone(), 400),
+        (
+            "github",
+            serde_json::json!({"clientId":" ","clientSecret":"secret"}),
+            400,
+        ),
+        (
+            "github",
+            serde_json::json!({"clientId":"id","clientSecret":"secret","extra":"unexpected"}),
+            422,
+        ),
+    ] {
+        assert_eq!(
+            request(reqwest::Method::PUT, &format!("/api/oauth-apps/{provider}"))
+                .header("cookie", &cookie)
+                .json(&body)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            status
+        );
+    }
+    assert_eq!(
+        request(reqwest::Method::PUT, "/api/oauth-apps/github")
+            .header("cookie", &cookie)
+            .json(&app)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        204
+    );
+    let response = request(reqwest::Method::GET, "/api/oauth-apps")
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.text().await.unwrap(), r#"["github"]"#);
+    assert_eq!(
+        request(reqwest::Method::DELETE, "/api/oauth-apps/github")
+            .header("cookie", &cookie)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        204
+    );
     let response=request(reqwest::Method::POST,"/api/sources").header("cookie",&cookie).json(&serde_json::json!({"slug":"provider","kind":"mcp_http","url":format!("{}/mcp",provider.origin),"requiresAccount":true})).send().await.unwrap();
     assert_eq!(response.status(), 201);
     let created = response.json::<serde_json::Value>().await.unwrap();
@@ -160,7 +228,7 @@ async fn browser_upstream_linking_requires_its_session_and_exposes_only_account_
     assert_eq!(response.status(), 303);
     assert_eq!(
         response.headers()["location"],
-        format!("/sources/{id}/accounts?oauth=linked")
+        format!("/integrations?selected={id}&detail=open&oauth=linked")
     );
     assert_eq!(response.headers()["cache-control"], "no-store");
     assert_eq!(response.headers()["referrer-policy"], "no-referrer");
@@ -187,6 +255,51 @@ async fn browser_upstream_linking_requires_its_session_and_exposes_only_account_
         .await
         .unwrap();
     assert_eq!(response.status(), 400);
+    let response = request(reqwest::Method::POST, &path)
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    let begin = response.json::<serde_json::Value>().await.unwrap();
+    let csrf = provider.prepare(begin["authorizationUrl"].as_str().unwrap());
+    let query = url::form_urlencoded::Serializer::new(String::new())
+        .extend_pairs([
+            ("state", csrf.as_str()),
+            ("iss", provider.origin.as_str()),
+            ("error", "access_denied"),
+            (
+                "error_description",
+                format!("workspace policy rejected access {csrf}\ntry another app").as_str(),
+            ),
+        ])
+        .finish();
+    let callback = format!("/api/accounts/oauth/callback?{query}");
+    let response = request(reqwest::Method::GET, &callback)
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 303);
+    let location = url::Url::parse(&format!(
+        "https://test.example{}",
+        response.headers()["location"].to_str().unwrap()
+    ))
+    .unwrap();
+    let query: std::collections::HashMap<_, _> = location.query_pairs().into_owned().collect();
+    assert_eq!(query["oauth"], "denied");
+    assert_eq!(query["selected"], id);
+    let detail = &query["oauthError"];
+    assert!(detail.contains("step 5") && detail.contains("workspace policy rejected access"));
+    assert!(!detail.contains(&csrf) && !detail.contains('\n'));
+    assert_eq!(
+        request(reqwest::Method::GET, &callback)
+            .header("cookie", &cookie)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        400
+    );
     assert_eq!(provider.exchanges.load(Ordering::SeqCst), 1);
     stop.cancel();
     tasks.close();

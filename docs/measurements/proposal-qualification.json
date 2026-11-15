@@ -1,0 +1,107 @@
+{
+  "date": "2026-11-15",
+  "candidateSchema": 19,
+  "deployedSchemaBeforeRollout": 16,
+  "native": {
+    "cases": 103,
+    "failures": 0,
+    "buildSeconds": 6.52,
+    "totalSeconds": 10.17,
+    "slowestSeconds": 2.533
+  },
+  "oracleHardened": {
+    "cases": 103,
+    "failures": 0,
+    "buildAndStageSeconds": 48.13,
+    "totalSeconds": 70.09,
+    "slowestSeconds": 4.41,
+    "concurrency": 4,
+    "unitDeadlineSeconds": 2,
+    "integrationDeadlineSeconds": 5
+  },
+  "oracleCoreSlow": {
+    "cases": 90,
+    "failures": 0,
+    "includesExhaustiveCases": 3,
+    "buildAndStageSeconds": 135.6,
+    "totalSeconds": 159.16,
+    "perCaseDeadlineSeconds": 60
+  },
+  "oracleWarmWorkerLatency": {
+    "architecture": "aarch64",
+    "max_us": 1105,
+    "median_us": 282,
+    "p95_us": 437,
+    "samples": 100
+  },
+  "oracleWorkerSoak": {
+    "elapsed_s": 6.429978379,
+    "growth_kib": 268,
+    "rss_kib": [
+      14616,
+      14876,
+      14884,
+      14884,
+      14884,
+      14884,
+      14884,
+      14884,
+      14884,
+      14884,
+      14884
+    ],
+    "runs": 10000,
+    "warmup": 200
+  },
+  "optimizedNativeBrowser": {
+    "flows": 10,
+    "failures": 0,
+    "total": "1.9m",
+    "binaryBuildId": "development",
+    "note": "Final source and UI; production release is rebuilt with its committed build ID."
+  },
+  "ui": {
+    "fingerprint": "76b8f0e8e2e9",
+    "unitCases": 18,
+    "initialGzipJSBytes": 158016,
+    "initialGzipCSSBytes": 14978,
+    "lazyChunkBudgetBytes": 100000
+  },
+  "visual": {
+    "initialDisposition": "fix",
+    "materialFindings": 8,
+    "scoredResolved": 8,
+    "finalDisposition": "ship for scored fixes",
+    "detectorFindings": 0
+  },
+  "crossRunnerRegression": {
+    "cases": 5,
+    "failures": 0,
+    "totalSeconds": 0.18
+  },
+  "discovery": {
+    "overall": "failed",
+    "passing": [
+      "github authentication challenge",
+      "linear",
+      "notion",
+      "deepwiki",
+      "context7"
+    ],
+    "failures": {
+      "sentry": "HTTP 403 instead of 401",
+      "nudge": "HTTP 403 instead of 401"
+    },
+    "providerConsentAttempted": false
+  },
+  "externalAcceptance": {
+    "ownerProviderLinks": "unperformed",
+    "realExternalAgent": "unperformed",
+    "MSeries60fpsAndIdleCPU": "unperformed"
+  },
+  "deployment": {
+    "status": "pending",
+    "preservationPreflight": "implemented, actual restored-backup check pending"
+  },
+  "incrementalBuildBudgets": "historical limitation remains; not claimed passing"
+}

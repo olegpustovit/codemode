@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT name,oauth_grant FROM access_tokens WHERE id=$1 AND workspace_id=$2 AND resource='/mcp' AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "oauth_grant",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "oauth_grant"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "67ef6d87b01ab6cc8d67ed0ace911e2c19f116f3308d461b624da22d5acf0d06"
+}

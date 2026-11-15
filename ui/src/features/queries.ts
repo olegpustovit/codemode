@@ -44,6 +44,8 @@ export const accountSchema = z.object({
   expiresAt: z.string().nullable(),
 })
 export const tokenSchema = z.object({
+  oauth: z.boolean(),
+  lastUsedAt: z.string().nullable(),
   id: z.uuid(),
   name: z.string(),
   audience: z.string(),
@@ -54,6 +56,8 @@ export const tokenSchema = z.object({
 const summary = z.object({
   id: z.uuid(),
   tokenId: z.uuid(),
+  sessionId: z.uuid().nullable(),
+  title: z.string().nullable(),
   status: z.string(),
   error: z.string().nullable(),
   toolCalls: z.number(),
@@ -62,6 +66,8 @@ const summary = z.object({
 })
 const detail = summary.extend({
   code: z.string(),
+  result: z.string().nullable(),
+  output: z.string().nullable(),
   calls: z.array(
     z.object({
       seq: z.number(),
@@ -71,9 +77,11 @@ const detail = summary.extend({
       error: z.string().nullable(),
       startedAt: z.string(),
       durationMs: z.number(),
+      preview: z.string().nullable(),
     })
   ),
 })
+export type ExecutionDetail = z.infer<typeof detail>
 export const sourcesQuery = queryOptions({
   queryKey: ["sources"],
   queryFn: () => api("/api/sources", sourceSchema.array()),
@@ -119,8 +127,9 @@ export const executionQuery = (id: string) =>
     refetchInterval: (query) =>
       query.state.data?.status === "running" ? 2_000 : false,
   })
-const policyAction = z.enum(["allow", "approve", "block"])
+const policyAction = z.enum(["allow", "block"])
 export const toolPolicySchema = z.object({
+  signature: z.string(),
   sourceId: z.uuid(),
   sourceRevision: z.number(),
   upstreamName: z.string(),
@@ -148,43 +157,6 @@ export const policyQuery = (id: string, q = "", cursor?: string) =>
       )
     },
   })
-const approvalSummary = z.object({
-  executionId: z.uuid(),
-  hostname: z.string(),
-  expiresAt: z.string(),
-  pending: z.number(),
-})
-export const approvalsQuery = queryOptions({
-  queryKey: ["approvals"],
-  queryFn: () => api("/api/approvals", approvalSummary.array()),
-  refetchInterval: 5_000,
-})
-export const approvalQuery = (id: string) =>
-  queryOptions({
-    queryKey: ["approvals", id],
-    queryFn: () =>
-      api(
-        `/api/approvals/${id}`,
-        z.object({
-          executionId: z.uuid(),
-          pauseId: z.uuid(),
-          hostname: z.string(),
-          code: z.string(),
-          expiresAt: z.string(),
-          calls: z.array(
-            z.object({
-              callId: z.number(),
-              path: z.string(),
-              args: z.unknown(),
-              error: z.string().nullable(),
-              decision: z.boolean().nullable(),
-            })
-          ),
-        })
-      ),
-    refetchInterval: 5_000,
-  })
-
 export const scriptSummarySchema = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -206,3 +178,99 @@ export const scriptQuery = (workspace: string, id: string) =>
     queryFn: () =>
       api(`/api/workspaces/${workspace}/scripts/${id}`, scriptSchema),
   })
+
+export const integrationSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  category: z.string(),
+  description: z.string(),
+  url: z.string(),
+  docs: z.string(),
+  icon: z.string(),
+  methods: z.array(
+    z.enum(["one_click", "oauth_app", "api_key", "open", "local"])
+  ),
+  oauth: z
+    .object({
+      authorizationEndpoint: z.string(),
+      tokenEndpoint: z.string(),
+      scopes: z.array(z.string()),
+    })
+    .optional(),
+  sourceId: z.uuid().nullable(),
+  state: z.string(),
+  toolCount: z.number(),
+  toolNames: z.array(z.string()).default([]),
+  error: z.string().nullable(),
+})
+export type Integration = z.infer<typeof integrationSchema>
+export const integrationsQuery = queryOptions({
+  queryKey: ["integrations"],
+  queryFn: () => api("/api/integrations", integrationSchema.array()),
+  refetchInterval: 10_000,
+})
+
+export const oauthAppsQuery = queryOptions({
+  queryKey: ["oauth-apps"],
+  queryFn: () => api("/api/oauth-apps", z.array(z.string())),
+})
+
+export const agentSessionSchema = z.object({
+  id: z.uuid(),
+  tokenId: z.uuid(),
+  workspaceId: z.uuid(),
+  workspaceName: z.string(),
+  title: z.string(),
+  client: z.string(),
+  startedAt: z.string(),
+  lastSeenAt: z.string(),
+  expiresAt: z.string(),
+  executions: z.number(),
+  toolCalls: z.number(),
+  failures: z.number(),
+  status: z.string(),
+  sources: z.string().array(),
+})
+export type AgentSession = z.infer<typeof agentSessionSchema>
+export const agentSessionsQuery = (q = "", before?: string) =>
+  queryOptions({
+    queryKey: ["agent-sessions", { q, before }],
+    queryFn: () => {
+      const search = new URLSearchParams({ q })
+      if (before) search.set("before", before)
+      return api(
+        `/api/sessions?${search}`,
+        z.object({
+          sessions: agentSessionSchema.array(),
+          nextCursor: z.uuid().nullable(),
+        })
+      )
+    },
+    refetchInterval: 5_000,
+  })
+export const agentSessionQuery = (id: string, before?: string) =>
+  queryOptions({
+    queryKey: ["agent-sessions", id, { before }],
+    queryFn: () =>
+      api(
+        `/api/sessions/${id}${before ? `?before=${before}` : ""}`,
+        z.object({
+          session: agentSessionSchema,
+          executions: detail.array(),
+          nextCursor: z.uuid().nullable(),
+        })
+      ),
+    refetchInterval: 5_000,
+  })
+
+export const sessionActivitySchema = z.object({
+  executions: z.array(
+    z.object({
+      id: z.uuid(),
+      sessionId: z.uuid(),
+      startedAt: z.string(),
+      status: z.string(),
+    })
+  ),
+  nextCursor: z.uuid().nullable(),
+})

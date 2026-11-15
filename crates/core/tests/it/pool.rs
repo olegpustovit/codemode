@@ -19,9 +19,7 @@ fn binary() -> PathBuf {
 }
 
 async fn sandbox(deadline: Duration) -> MontySandbox {
-    MontySandbox::new(&binary(), deadline, [73; 32], 32768)
-        .await
-        .unwrap()
+    MontySandbox::new(&binary(), deadline, 32768).await.unwrap()
 }
 
 fn record(name: &str, value: serde_json::Value) {
@@ -341,40 +339,6 @@ async fn serial_warm_run_starts_under_5ms() {
     );
     assert!(micros[99] < 5000, "warm start took {} us", micros[99]);
     sb.pool.close().await;
-}
-
-#[tokio::test]
-async fn snapshot_restores_in_a_fresh_pool_and_rejects_tampering() {
-    let sb = sandbox(Duration::from_secs(1)).await;
-    let (run, step) = sb
-        .start_fixture(
-            "print('before')\nr = await tools.stub.echo(value=21)\nreturn r['value'] * 2",
-        )
-        .await
-        .unwrap();
-    let Step::Calls(calls) = step else {
-        panic!("expected call")
-    };
-    let snapshot = sb.snapshot(run).await.unwrap();
-    sb.pool.close().await;
-    let restored = sandbox(Duration::from_secs(1)).await;
-    let mut tampered = snapshot.clone();
-    *tampered.last_mut().unwrap() ^= 1;
-    assert!(matches!(
-        restored.restore(&tampered).await,
-        Err(sandbox::Error::Snapshot)
-    ));
-    let (run, _) = restored.restore(&snapshot).await.unwrap();
-    let (_, step) = restored
-        .resume(run, dispatch_stub(calls).await)
-        .await
-        .unwrap();
-    let Step::Done { result, output, .. } = step else {
-        panic!("expected result")
-    };
-    assert_eq!(result.get(), "42");
-    assert_eq!(output, "before\n");
-    restored.pool.close().await;
 }
 
 #[tokio::test]

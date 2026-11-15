@@ -4,11 +4,19 @@ One control plane where each user connects their own tools once and exposed to a
 
 Implementation plan: https://artifacts.microapps.space/a/saqdh2xm7jcd (revision 5). Read it with `art read saqdh2xm7jcd` before starting a phase: it has the task lists, data model, component behaviour and acceptance checks. This file is the summary.
 
+## Active replacement proposal
+
+The owner requested full implementation of https://artifacts.microapps.space/a/hkwwwp90n0dt, including its final v5 theme and UI kit. The exact reference is `docs/proposal/control-plane.html`; progress/evidence is in `docs/proposal/implementation.md`. This proposal supersedes the historical approval, resume, snapshot persistence and daytime UI requirements below. Local changes are not deployed until the full proposal is qualified; the deployed release remains the schema-16 baseline in Status.
+
+Current execution policy is **allow or block**, default allow for every tool. `/mcp` exposes exactly **search and execute**; approval/resume APIs, UI, paused storage and snapshot signing are removed. Migration 0018 converts legacy `approve`/`ask` overrides to allow and finishes old pauses as failed without replay. Workspace scopes and blocks are enforced at dispatch; blocked calls raise Python `PermissionError` naming the tool and workspace. Browser OAuth consent remains required for linking providers.
+
+OAuth-app client settings are encrypted, tenant-private and write-only. The registry pins GitHub's static authorization/token endpoints, using PKCE and `client_secret_post`; API-token linking remains supported. Never grant provider consent or manufacture live-provider acceptance.
+
 ## Status
 
 Phases 0–4 and the workspace/administration extension are implemented and deployed on `oracle-vm` under smdctl, loopback `127.0.0.1:2093`, at `https://codemode.microapps.space`. Current schema: **16**. Release SHA-256: `20e07441525c8d2125baa1b3aaaf41d6d4d50bd50d298e98df011b3f8e85390b`. UI fingerprint: `f22d8e0dde58`. The React frontend is embedded in this Rust binary.
 
-Current qualification passes **90 native**, **90 hardened Oracle** checks and **seven optimized-binary browser workflows**, including tenant isolation, mandatory OAuth workspace selection, administration-resource separation, both MCP eras, provider presets, policies, approvals and saved scripts. The fresh visual reviewer returned **ship** with no material fixes. See `docs/status.md` and `docs/measurements/workspaces-qualification.json`. Incremental build latency currently exceeds the 10 s core / 5 s gateway targets; keep that limitation visible rather than claiming those budgets pass.
+Deployed release qualification passes **90 native**, **90 hardened Oracle** checks and **seven optimized-binary browser workflows**, including tenant isolation, mandatory OAuth workspace selection, administration-resource separation, both MCP eras, provider presets, policies, approvals and saved scripts. The fresh visual reviewer returned **ship** with no material fixes. See `docs/status.md` and `docs/measurements/workspaces-qualification.json`. Incremental build latency currently exceeds the 10 s core / 5 s gateway targets; keep that limitation visible rather than claiming those budgets pass.
 
 The owner authorized continuing through manual gates. Live-provider consent and external-client acceptance remain unperformed; do not create production fixtures or grant provider consent on the user's behalf. Custom domains and wildcard Caddy acceptance are superseded by the owner's single-host workspace decision. Existing source connections, IDs, credentials, policies, scripts and audit history survive the workspace migration. Deployment preserves the registered user and does not create accounts.
 
@@ -16,7 +24,7 @@ The owner authorized continuing through manual gates. Live-provider consent and 
 
 - Control-plane access uses email and password. With no users, show registration; the first registered account has `admin: true`. There is no super-admin role or tenant-isolation bypass.
 - Registration permits exactly `ursus95@gmail.com` and email addresses at `olegpustovit.com` (case-insensitive).
-- Each user owns a private tenant: connected MCPs, linked upstream OAuth accounts and credentials, catalogue, workspaces, agent tokens, policies, scripts, approvals and execution history.
+- Each user owns a private tenant: connected MCPs, linked upstream OAuth accounts and credentials, catalogue, workspaces, agent tokens, policies, scripts and execution history.
 - Agent OAuth consent grants access only to the signed-in user's tenant. A shared hostname never implies shared tools or credentials.
 - The shared administrator password is retired. Existing sessions and agent tokens are revoked when tenancy is introduced.
 
@@ -35,7 +43,7 @@ Follow the `build-rust-stack` skill for workspace layout, components, errors, co
 
 ## MCP surface
 
-The `/mcp` execution surface has exactly three tools. Do not add more without asking.
+The `/mcp` execution surface has exactly two tools. Do not add more without asking.
 
 The owner also authorized a separate `/mcp-admin` management surface: workspace CRUD, source CRUD/sync, account metadata and browser account-link URLs. It requires its own OAuth resource and `admin` scope (or a management PAT), never an ordinary `/mcp` token. Management always stays within the signed-in user’s tenant; the first-user admin attribute grants no cross-tenant access. Never return credentials or grant provider consent through a tool. Audit every management invocation.
 
@@ -43,16 +51,15 @@ The owner also authorized a separate `/mcp-admin` management surface: workspace 
 |---|---|---|
 | `search` | `query`, `detail`, `cursor` | Full-text search over the tools this caller may reach. Returns path, one-line description, input type. `detail: "full"` adds output type and docs. |
 | `execute` | `code` | Runs Python in the sandbox. The only capability is the `tools` object. Returns the return value plus captured output, truncated at a fixed budget. |
-| `resume` | `executionId` | Continues an execution that paused for approval. |
 
 ## Components
 
-- **MCP front**: `rmcp` service on axum. No MCP sessions; a paused execution is addressed by its own id. One endpoint must serve both a 2026-07-28 client and a 2025-11-25 client.
+- **MCP front**: `rmcp` service on axum. No MCP transport sessions; agent activity sessions are inferred by the gateway. One endpoint must serve both a 2026-07-28 client and a 2025-11-25 client.
 - **Sources**: remote MCP over Streamable HTTP, local stdio MCP servers, OpenAPI specs (Phase 3), and GraphQL query/mutation sources (Phase 4).
 - **Catalogue**: tool JSON Schemas converted to Python stub signatures, indexed in Postgres full-text search. Schemas the generator cannot express fall back to `Any`.
 - **Sandbox**: a Monty worker from a warm pool. On a tool call the worker pauses and hands the gateway the pending calls; the gateway runs them concurrently on Tokio and resumes the worker. Keep it behind a `Sandbox` interface so the engine can be replaced.
 - **Tool broker**: validates arguments against the tool's JSON Schema, applies policy, attaches credentials, calls upstream, writes the audit row.
-- **Control plane**: sources, linked accounts, policies, execution log, approvals.
+- **Control plane**: integrations, linked accounts, workspace policies, agent sessions and execution history.
 
 ## Rules that must hold
 
@@ -60,8 +67,8 @@ The owner also authorized a separate `/mcp-admin` management surface: workspace 
 - **The sandbox has no network and no secrets.** Its single exit is the broker. Credentials are attached on the host side at dispatch.
 - **Never pass the agent's token to an upstream.** Every upstream gets its own linked credential, stored in Postgres and encrypted with a key from the service environment.
 - **Tokens are bound to a workspace and resource.** OAuth consent selects a workspace for `/mcp`; its source membership and policies govern search and dispatch. `/mcp-admin` requires separate management authorization. The canonical host publishes protected-resource metadata for each path.
-- **The gateway validates every frame from a worker** and signs any snapshot it stores; Monty snapshots are not authenticated.
-- **Approvals happen in the browser.** The agent can collect the answer through `resume` but can never supply it. Never replay a paused execution: replaying repeats side effects.
+- **The gateway validates every frame from a worker.** Workers remain isolated; execution snapshots are not stored.
+- **Policies are allow or block, default allow.** Blocked calls fail before upstream dispatch with `PermissionError`. Provider OAuth consent still happens in the browser.
 - **Every execution is audited**: the code, each tool call with redacted arguments, timing and outcome.
 - **Tool failures surface as Python exceptions** the code can catch, with precise messages. Nobody type-checks model code, so error quality is the feedback loop.
 - **Pin Monty and `rmcp` to exact versions.** Both change APIs between minors; `rmcp` has a history of security advisories, so check them when upgrading.
@@ -85,7 +92,7 @@ The gateway is network-bound. Write plain owned code everywhere except three pat
 
 ## Policy defaults
 
-Per tool: allow, require approval, or block. GET requests and tools marked read-only are allowed; tools marked destructive ask first.
+Per tool: allow or block, default allow. Workspace source/tool scopes still constrain both search and dispatch.
 
 ## Workspaces and connection URLs
 
@@ -97,7 +104,9 @@ Per tool: allow, require approval, or block. GET requests and tools marked read-
 - Keep existing IDs, sources, credentials, memberships, scripts, policies and audit history during migration. Legacy custom-host grants are revoked rather than silently reassigned to a different OAuth resource.
 - Agent auth: OAuth 2.1 with PKCE, client ID metadata documents first, dynamic client registration for older clients, personal tokens for headless agents.
 
-## Plan
+## Historical delivery plan
+
+Approval and snapshot requirements in this original plan are superseded by the active replacement proposal above. The spike results remain historical evidence.
 
 | Phase | Scope | Done when |
 |---|---|---|
@@ -125,5 +134,5 @@ If the pool fails these, the fallback is `deno_core` with TypeScript in a worker
 - Other people will use the gateway; Phase 4 is in scope before shared deployment.
 - `codemode.microapps.space` is configured and ready. Use only this host; the owner explicitly rejected custom domains and wildcard subdomains.
 - Control-plane sign-in is standalone.
-- Paused executions are stored as signed snapshots in Postgres with a short expiry and continue from the paused call. Phase 0 proved snapshot restore and tamper rejection; Phase 3 must preserve these guarantees.
+- The replacement proposal removes paused execution storage and snapshot signing. Historical paused runs finish as failed during migration and are never replayed.
 - Phase 0 measured the per-worker memory cap and worker-failure containment; keep the regression checks when changing the pool.

@@ -1,0 +1,1038 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codemode Control Plane</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@200;300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ================= TOKENS ================= */
+:root,:root[data-theme="light"],:root[data-theme="dark"]{
+  /* color */
+  --c-bg:#03050C;
+  --c-surface:rgba(5,8,18,.80);      /* main work surface: flat, square, lets the backdrop breathe through */
+  --c-surface-2:rgba(7,10,22,.90);   /* detail panel, status bar */
+  --c-hover:rgba(255,255,255,.045);
+  --c-line:rgba(255,255,255,.09);
+  --c-line-2:rgba(255,255,255,.18);
+  --c-text:#F3F5FA; --c-text-2:rgba(243,245,250,.76); --c-text-3:rgba(243,245,250,.56);
+  --c-bad:#FF8C98; --c-warn:#F3CE80; --c-ok:#93E6C4;
+  --hue:41,102,255;                              /* section hue, crossfaded by the backdrop */
+  --c-accent:rgb(var(--hue));
+  --c-accent-text:color-mix(in srgb,rgb(var(--hue)) 45%,#fff);
+  --c-accent-wash:rgba(var(--hue),.16);
+  /* type */
+  --f-ui:"M PLUS 1p",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,monospace;
+  --fs-1:11px; --fs-2:12px; --fs-3:13px; --fs-4:14px; --fs-5:16px; --fs-6:20px; --fs-7:28px; --fs-8:40px; --fs-9:64px;
+  --lh-tight:1.15; --lh-ui:1.45; --lh-read:1.65;
+  --w-light:300; --w-reg:400; --w-med:500;
+  --track-label:.08em;
+  /* space */
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px; --s-8:72px;
+  /* layout */
+  --bar:48px; --status:30px; --side:228px; --detail:392px; --row:40px;
+  /* light */
+  --glow-1:0 0 6px rgba(var(--hue),.45);
+  --glow-2:0 0 16px rgba(var(--hue),.40);
+  --lift:0 1px 2px rgba(0,0,0,.45);
+  /* motion */
+  --t-1:120ms; --t-2:200ms; --t-3:320ms; --t-4:600ms;
+  --e-out:cubic-bezier(.2,.8,.2,1); --e-io:cubic-bezier(.65,0,.35,1); --stagger:16ms;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--c-bg);color:var(--c-text);font:var(--w-reg) var(--fs-4)/var(--lh-ui) var(--f-ui);-webkit-font-smoothing:antialiased;overflow-x:clip}
+#gl{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;display:block;background:radial-gradient(120% 80% at 70% 0%,rgba(var(--hue),.4),transparent 60%),linear-gradient(180deg,#0A1236,#03050C 70%)}
+.layer{position:relative;z-index:1}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+:focus-visible{outline:2px solid var(--c-accent-text);outline-offset:2px}
+code,.mono{font-family:var(--f-mono);font-size:var(--fs-2)}
+.kbd{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border:1px solid var(--c-line-2);border-bottom-width:2px;border-radius:3px;font:var(--w-med) 10px var(--f-mono);color:var(--c-text-2);line-height:1}
+.label{font:var(--w-med) var(--fs-1)/1 var(--f-ui);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--c-text-3)}
+.bad{color:var(--c-bad)}.warn{color:var(--c-warn)}.dim{color:var(--c-text-3)}
+
+/* ================= APP SHELL ================= */
+.proto{position:relative;height:100vh;min-height:680px;max-height:980px;display:grid;grid-template-columns:var(--side) minmax(0,1fr) var(--detail);grid-template-rows:var(--bar) minmax(0,1fr) var(--status);outline:0;border-bottom:1px solid var(--c-line)}
+/* top bar */
+.top{grid-column:1/-1;display:flex;align-items:center;gap:var(--s-4);padding:0 var(--s-4) 0 var(--s-5);background:rgba(0,0,0,.32);border-bottom:1px solid var(--c-line);text-shadow:var(--lift)}
+.brand{width:calc(var(--side) - var(--s-5));flex:none;font:var(--w-med) var(--fs-3) var(--f-ui);letter-spacing:.24em;text-transform:uppercase;display:flex;align-items:center;gap:var(--s-2)}
+.brand i{width:8px;height:8px;background:var(--c-accent-text);box-shadow:var(--glow-2);transition:background var(--t-4) var(--e-io)}
+.wsw{display:flex;align-items:center;gap:var(--s-2);font-size:var(--fs-3);color:var(--c-text-2);padding:6px var(--s-2);border:1px solid transparent}
+.wsw b{color:var(--c-text);font-weight:var(--w-med)}
+.wsw:hover{border-color:var(--c-line-2)}
+.gsearch{display:flex;align-items:center;gap:var(--s-2);flex:1;max-width:460px;height:32px;padding:0 var(--s-3);background:rgba(255,255,255,.05);border:1px solid var(--c-line);color:var(--c-text-3);transition:border-color var(--t-2),background var(--t-2)}
+.gsearch input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--c-text);font:var(--w-reg) var(--fs-3) var(--f-ui)}
+.gsearch input::placeholder{color:var(--c-text-3)}
+.gsearch:focus-within{border-color:var(--c-accent-text);background:rgba(255,255,255,.07);box-shadow:var(--glow-1)}
+.top .sp{flex:1}
+.btn{display:inline-flex;align-items:center;gap:var(--s-2);height:30px;padding:0 var(--s-3);font:var(--w-med) var(--fs-3) var(--f-ui);border:1px solid var(--c-line-2);color:var(--c-text);background:rgba(255,255,255,.03);transition:background var(--t-1),border-color var(--t-1),box-shadow var(--t-2);white-space:nowrap}
+.btn:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3)}
+.btn.pri{background:rgba(var(--hue),.32);border-color:rgba(var(--hue),.8)}
+.btn.pri:hover{background:rgba(var(--hue),.45);box-shadow:var(--glow-2)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.ghost:hover{background:var(--c-hover)}
+.btn.danger{color:var(--c-bad);border-color:rgba(255,140,152,.4)}
+.btn .kbd{margin-left:var(--s-1)}
+.avatar{width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--c-line-2);font:var(--w-med) var(--fs-2) var(--f-ui);color:var(--c-text-2)}
+/* sidebar: floats on the backdrop */
+.side{grid-row:2/4;display:flex;flex-direction:column;padding:var(--s-4) var(--s-3);gap:2px;background:linear-gradient(90deg,rgba(0,0,0,.38),rgba(0,0,0,.18));text-shadow:var(--lift)}
+.nv{position:relative;display:grid;grid-template-columns:20px 1fr auto;align-items:center;gap:var(--s-3);height:36px;padding:0 var(--s-3);color:var(--c-text-2);font:var(--w-med) var(--fs-4) var(--f-ui);transition:color var(--t-1),background var(--t-1)}
+.nv svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.nv .c{font:var(--w-reg) var(--fs-1) var(--f-mono);color:var(--c-text-3)}
+.nv:hover{color:var(--c-text);background:var(--c-hover)}
+.nv[aria-current="page"]{color:var(--c-text);background:linear-gradient(90deg,rgba(var(--hue),.26),rgba(var(--hue),.04))}
+.nv[aria-current="page"]::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;background:var(--c-accent-text);box-shadow:var(--glow-1)}
+.nv[aria-current="page"] svg{filter:drop-shadow(0 0 4px rgba(var(--hue),.7))}
+.side .label{margin:var(--s-5) var(--s-3) var(--s-2)}
+.wsl{display:flex;justify-content:space-between;height:30px;align-items:center;padding:0 var(--s-3);font-size:var(--fs-3);color:var(--c-text-2)}
+.wsl:hover{color:var(--c-text);background:var(--c-hover)}
+.wsl[aria-current="true"]{color:var(--c-text)}
+.wsl[aria-current="true"]::after{content:"✓";color:var(--c-accent-text)}
+.side .foot{margin-top:auto;padding:var(--s-3);font-size:var(--fs-2);color:var(--c-text-3);border-top:1px solid var(--c-line)}
+/* main work surface */
+.main{grid-row:2;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--c-surface);border-left:1px solid var(--c-line);position:relative;overflow:hidden}
+.ph{display:flex;align-items:flex-end;gap:var(--s-4);padding:var(--s-5) var(--s-6) var(--s-3);position:relative}
+.ph .tt{min-width:0;flex:1}
+.crumbs{display:flex;gap:var(--s-2);align-items:center;font-size:var(--fs-2);color:var(--c-text-3);min-height:18px;margin-bottom:var(--s-1)}
+.crumbs button{color:var(--c-text-2)}.crumbs button:hover{color:var(--c-text)}
+.ph h1{margin:0;font:var(--w-light) var(--fs-7)/var(--lh-tight) var(--f-ui);letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 0 22px rgba(var(--hue),.35)}
+.ph p{margin:var(--s-1) 0 0;color:var(--c-text-3);font-size:var(--fs-3)}
+.ph .wm{position:absolute;right:var(--s-6);top:-10px;font:200 120px/1 var(--f-ui);color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.05);pointer-events:none;user-select:none;white-space:nowrap}
+.tabbar{display:flex;align-items:center;gap:var(--s-5);padding:0 var(--s-6);border-bottom:1px solid var(--c-line);position:relative}
+.tab{height:38px;font:var(--w-med) var(--fs-3) var(--f-ui);color:var(--c-text-3);transition:color var(--t-1)}
+.tab sup{font:var(--w-reg) 10px var(--f-mono);margin-left:4px;vertical-align:1px;color:var(--c-text-3)}
+.tab:hover{color:var(--c-text-2)}
+.tab[aria-selected="true"]{color:var(--c-text)}
+.tab-ind{position:absolute;bottom:-1px;left:0;height:2px;background:var(--c-accent-text);box-shadow:var(--glow-1);transition:transform var(--t-2) var(--e-out),width var(--t-2) var(--e-out);transform-origin:0 0}
+.tabbar .sp{flex:1}
+.tabbar .count{font-size:var(--fs-2);color:var(--c-text-3)}
+/* table */
+.thead,.row{display:grid;grid-template-columns:var(--cols);align-items:center;gap:var(--s-4);padding:0 var(--s-6)}
+.thead{height:32px;border-bottom:1px solid var(--c-line)}
+.thead span{font:var(--w-med) var(--fs-1)/1 var(--f-ui);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--c-text-3);white-space:nowrap}
+.r{text-align:right;justify-self:end}
+.list{position:relative;flex:1;min-height:0;overflow:auto;outline:0;scrollbar-width:thin;scrollbar-color:var(--c-line-2) transparent;padding-bottom:var(--s-5)}
+.grp{position:sticky;top:0;z-index:2;height:30px;display:flex;align-items:center;padding:0 var(--s-6);font:var(--w-med) var(--fs-2) var(--f-ui);color:var(--c-text-2);background:rgba(6,9,20,.94);border-bottom:1px solid var(--c-line)}
+.row{position:relative;z-index:1;height:var(--row);border-bottom:1px solid rgba(255,255,255,.045);color:var(--c-text-2);font-size:var(--fs-4);cursor:default}
+.row>*{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .nm{display:flex;align-items:center;gap:var(--s-3);color:var(--c-text)}
+.row .nm span{overflow:hidden;text-overflow:ellipsis}
+.row .gl{width:16px;height:16px;flex:none;fill:currentColor;opacity:.9}
+.row .gl.t{display:grid;place-items:center;font:var(--w-med) 9.5px var(--f-mono);border:1px solid currentColor;opacity:.75}
+.row .num{font:var(--w-reg) var(--fs-3) var(--f-mono);color:var(--c-text-2)}
+.row:hover{background:var(--c-hover)}
+.row[aria-selected="true"]{color:var(--c-text)}
+.row[aria-selected="true"] .nm{text-shadow:var(--glow-1)}
+.cursor{position:absolute;left:0;right:0;top:0;z-index:0;pointer-events:none;background:linear-gradient(90deg,rgba(var(--hue),.24),rgba(var(--hue),.07) 70%,rgba(var(--hue),.03));transition:transform var(--t-2) var(--e-out),height var(--t-2) var(--e-out)}
+.cursor::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--c-accent-text);box-shadow:var(--glow-1)}
+.empty{padding:var(--s-8) var(--s-6);color:var(--c-text-3);font-size:var(--fs-4);max-width:52ch}
+.empty b{display:block;font:var(--w-light) var(--fs-7)/1.1 var(--f-ui);color:var(--c-text);margin-bottom:var(--s-2)}
+/* switch */
+.sw{display:inline-flex;align-items:center;gap:var(--s-2);font-size:var(--fs-3)}
+.sw i{width:26px;height:14px;border:1px solid var(--c-line-2);position:relative;display:inline-block;background:rgba(255,255,255,.04)}
+.sw i::after{content:"";position:absolute;top:2px;left:13px;width:9px;height:8px;background:var(--c-text);transition:left var(--t-2) var(--e-out),background var(--t-2)}
+.sw.off{color:var(--c-bad)}
+.sw.off i::after{left:2px;background:var(--c-bad)}
+/* detail */
+.det{grid-row:2;min-height:0;overflow:auto;background:var(--c-surface-2);border-left:1px solid var(--c-line);padding:var(--s-5) var(--s-5) var(--s-6);scrollbar-width:thin;scrollbar-color:var(--c-line-2) transparent}
+.det .label{display:block;margin-bottom:var(--s-2)}
+.det h2{margin:0 0 var(--s-1);font:var(--w-reg) var(--fs-6)/1.25 var(--f-ui)}
+.det .meta{font-size:var(--fs-3);color:var(--c-text-3);margin-bottom:var(--s-4)}
+.det .meta.bad{color:var(--c-bad)}
+.det p{margin:0 0 var(--s-4);color:var(--c-text-2);font-size:var(--fs-3);line-height:var(--lh-read)}
+.det h3{margin:var(--s-5) 0 var(--s-2);font:var(--w-med) var(--fs-1)/1 var(--f-ui);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--c-text-3)}
+.art{display:block;width:100%;height:auto;max-height:168px;margin:var(--s-2) 0 var(--s-4)}
+.art .s{stroke:var(--c-text);fill:none}
+.art .f{fill:var(--c-text)}
+.art text{fill:var(--c-text-3);font:10px var(--f-mono)}
+.facts{border-top:1px solid var(--c-line);margin-bottom:var(--s-4)}
+.facts div{display:flex;justify-content:space-between;gap:var(--s-3);padding:var(--s-2) 0;border-bottom:1px solid var(--c-line);font-size:var(--fs-3)}
+.facts span:first-child{color:var(--c-text-3)}
+.facts span:last-child{text-align:right;color:var(--c-text)}
+.acts{display:flex;flex-wrap:wrap;gap:var(--s-2);margin:var(--s-2) 0 var(--s-4)}
+.code{font:var(--fs-2)/1.6 var(--f-mono);color:var(--c-text);background:rgba(0,0,0,.35);border-left:2px solid var(--c-line-2);padding:var(--s-2) var(--s-3);margin:0 0 var(--s-3);white-space:pre-wrap;word-break:break-word}
+.code .c{color:var(--c-text-3)}.code .y{color:var(--c-accent-text)}
+.errl{font:var(--fs-2)/1.6 var(--f-mono);color:var(--c-bad);background:rgba(255,80,100,.08);border-left:2px solid var(--c-bad);padding:var(--s-2) var(--s-3);margin:0 0 var(--s-3);white-space:pre-wrap}
+.calls div{display:flex;justify-content:space-between;font:var(--fs-2) var(--f-mono);padding:5px 0;color:var(--c-text-2);border-bottom:1px solid var(--c-line)}
+.calls div.f{color:var(--c-bad)}
+.stepline{display:grid;grid-template-columns:repeat(7,1fr);margin:var(--s-2) 0 var(--s-4);font:10px var(--f-mono);color:var(--c-text-3)}
+.stepline span{border-top:2px solid var(--c-line-2);padding-top:var(--s-1);margin-right:2px}
+.stepline span.ok{border-color:var(--c-text-2);color:var(--c-text-2)}
+.stepline span.x{border-color:var(--c-bad);color:var(--c-bad);box-shadow:0 -4px 8px -6px var(--c-bad)}
+/* status bar */
+.status{grid-column:2/-1;grid-row:3;display:flex;align-items:center;gap:var(--s-4);padding:0 var(--s-4) 0 var(--s-6);background:rgba(0,0,0,.55);border-top:1px solid var(--c-line);border-left:1px solid var(--c-line);font-size:var(--fs-2);color:var(--c-text-3);overflow:hidden}
+.status .msg{margin-right:auto;color:var(--c-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status .msg.bad{color:var(--c-bad)}
+.status button{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.status button:hover{color:var(--c-text)}
+
+/* ================= MOTION ================= */
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes inR{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes inL{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes dim{from{opacity:.45}to{opacity:1}}
+@keyframes msg{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.a-sec .row,.a-sec .grp{animation:rise var(--t-3) var(--e-out) both;animation-delay:calc(var(--i,0) * var(--stagger))}
+.a-tab .row,.a-tab .grp{animation:rise var(--t-2) var(--e-out) both;animation-delay:calc(var(--i,0) * var(--stagger) / 2)}
+.a-in .row,.a-in .grp,.a-in.ph .tt{animation:inR var(--t-3) var(--e-out) both;animation-delay:calc(var(--i,0) * var(--stagger))}
+.a-out .row,.a-out .grp,.a-out.ph .tt{animation:inL var(--t-3) var(--e-out) both;animation-delay:calc(var(--i,0) * var(--stagger))}
+.a-sec.ph .tt,.a-sec.ph .wm{animation:fade var(--t-3) var(--e-out) both}
+.det.a-swap>*{animation:fade var(--t-2) var(--e-out) both}
+.det.a-sel>*{animation:dim var(--t-1) linear both}
+.status .msg.a-msg{animation:msg var(--t-2) var(--e-out) both}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ================= DOCUMENT ================= */
+.doc{position:relative;z-index:1;background:linear-gradient(180deg,rgba(3,5,12,.70),rgba(3,5,12,.90) 400px)}
+.dw{max-width:1120px;margin:0 auto;padding:var(--s-6) var(--s-5) 120px}
+.intro{display:grid;grid-template-columns:1.1fr 1fr;gap:var(--s-7);padding:var(--s-7) 0 var(--s-6);border-bottom:1px solid var(--c-line)}
+.intro .label{display:block;margin-bottom:var(--s-4)}
+.intro h1{font:var(--w-light) clamp(40px,5.2vw,var(--fs-9))/1.05 var(--f-ui);letter-spacing:-.01em;margin:0}
+.intro h1 b{font-weight:var(--w-reg);color:var(--c-accent-text)}
+.intro p{color:var(--c-text-2);font-size:var(--fs-5);line-height:var(--lh-read);margin:0 0 var(--s-4)}
+.intro ol{margin:0;padding:0;list-style:none;counter-reset:t}
+.intro li{counter-increment:t;display:grid;grid-template-columns:36px 1fr;padding:var(--s-2) 0;border-bottom:1px solid var(--c-line);font-size:var(--fs-4);color:var(--c-text-2);line-height:var(--lh-read)}
+.intro li::before{content:"0" counter(t);font:var(--w-reg) var(--fs-2) var(--f-mono);color:var(--c-accent-text);padding-top:3px}
+.intro li b{color:var(--c-text);font-weight:var(--w-med)}
+.toc{position:sticky;top:0;z-index:5;display:flex;gap:var(--s-5);overflow-x:auto;padding:var(--s-3) 0;background:rgba(3,5,12,.92);border-bottom:1px solid var(--c-line);scrollbar-width:none}
+.toc a{white-space:nowrap;text-decoration:none;font:var(--w-med) var(--fs-2) var(--f-ui);color:var(--c-text-3)}
+.toc a:hover{color:var(--c-text)}
+section.s{display:grid;grid-template-columns:120px minmax(0,1fr);gap:0 var(--s-6);padding:var(--s-8) 0 var(--s-5);border-bottom:1px solid var(--c-line);scroll-margin-top:48px}
+.sn .num{display:block;position:sticky;top:64px;font:200 var(--fs-9)/.9 var(--f-ui);color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.32)}
+.sh{font:var(--w-light) var(--fs-8)/1.1 var(--f-ui);letter-spacing:-.005em;margin:0 0 var(--s-4)}
+.sh b{font-weight:var(--w-reg)}
+.s p{color:var(--c-text-2);font-size:15px;line-height:var(--lh-read);max-width:70ch;margin:0 0 var(--s-4)}
+.s p b,.s li b{color:var(--c-text);font-weight:var(--w-med)}
+h3.h{font:var(--w-med) var(--fs-5)/1.3 var(--f-ui);margin:var(--s-6) 0 var(--s-3)}
+h3.h small{font:var(--w-reg) var(--fs-2) var(--f-ui);color:var(--c-text-3);margin-left:var(--s-2)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:0 var(--s-6)}
+.cols>div{border-top:1px solid var(--c-line-2);padding-top:var(--s-3)}
+ul.l{margin:var(--s-2) 0 var(--s-4);padding:0;list-style:none}
+ul.l li{padding:var(--s-2) 0 var(--s-2) var(--s-5);position:relative;color:var(--c-text-2);font-size:15px;line-height:var(--lh-read);border-bottom:1px solid var(--c-line)}
+ul.l li::before{content:"";position:absolute;left:4px;top:18px;width:8px;height:1px;background:var(--c-accent-text)}
+table.t{width:100%;border-collapse:collapse;font-size:var(--fs-4);margin:var(--s-2) 0 var(--s-5)}
+table.t th{font:var(--w-med) var(--fs-1) var(--f-ui);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--c-text-3);text-align:left;padding:var(--s-2) var(--s-3) var(--s-2) 0;border-bottom:1px solid var(--c-line-2)}
+table.t td{padding:var(--s-2) var(--s-3) var(--s-2) 0;border-bottom:1px solid var(--c-line);vertical-align:top;color:var(--c-text-2);line-height:var(--lh-read)}
+table.t td:first-child{color:var(--c-text)}
+.sql{font:var(--fs-2)/1.7 var(--f-mono);color:var(--c-text-2);background:rgba(0,0,0,.35);border-left:2px solid var(--c-line-2);padding:var(--s-3) var(--s-4);margin:var(--s-2) 0 var(--s-5);white-space:pre;overflow-x:auto}
+.sql .y{color:var(--c-accent-text)}.sql .g{color:var(--c-text)}.sql .c{color:var(--c-text-3)}
+.quote{font:var(--w-light) var(--fs-7)/1.25 var(--f-ui);border-left:2px solid var(--c-accent-text);padding:var(--s-1) 0 var(--s-1) var(--s-5);margin:var(--s-5) 0;max-width:40ch}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s-4);margin:var(--s-4) 0 var(--s-5);counter-reset:f}
+.flow div{border-top:2px solid var(--c-line-2);padding-top:var(--s-3);counter-increment:f;color:var(--c-text-2);font-size:var(--fs-4);line-height:var(--lh-read)}
+.flow div::before{content:"0" counter(f);font:var(--w-reg) var(--fs-2) var(--f-mono);color:var(--c-accent-text)}
+.flow b{display:block;font:var(--w-med) var(--fs-5)/1.3 var(--f-ui);color:var(--c-text);margin:var(--s-1) 0}
+.diag{overflow-x:auto;margin:var(--s-3) 0 var(--s-5)}
+.diag svg{width:100%;height:auto;min-width:700px;display:block}
+.diag .s{stroke:var(--c-text);fill:none;stroke-width:1}
+.diag .d{stroke:var(--c-text);stroke-dasharray:2 4;opacity:.35;fill:none}
+.diag .bg{fill:rgba(3,5,12,.9)}
+.diag text{fill:var(--c-text-3);font:11px var(--f-mono)}
+.diag .t1{fill:var(--c-text);font:var(--w-med) 14px var(--f-ui)}
+.diag .nb{fill:var(--c-text);font:var(--w-med) 10px var(--f-mono);text-anchor:middle;dominant-baseline:central}
+.diag .ok{fill:var(--c-ok)}.diag .x{fill:var(--c-bad)}.diag .q{fill:var(--c-warn)}
+/* kit */
+.kit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 var(--s-6);margin-top:var(--s-3)}
+.spec{border-top:1px solid var(--c-line-2);padding:var(--s-3) 0 var(--s-6);min-width:0}
+.spec .cap{display:flex;justify-content:space-between;gap:var(--s-3);margin-bottom:var(--s-4)}
+.spec .cap b{font:var(--w-med) var(--fs-3) var(--f-ui)}
+.spec .cap code{color:var(--c-text-3);font-size:var(--fs-1);text-align:right}
+.specimen{position:relative;background:var(--c-surface);border:1px solid var(--c-line)}
+.tok{display:grid;grid-template-columns:130px 1fr auto;gap:var(--s-3);align-items:center;padding:6px 0;border-bottom:1px solid var(--c-line);font-size:var(--fs-3)}
+.tok code{color:var(--c-text-3);font-size:var(--fs-1)}
+.tok .dim{font:var(--fs-1) var(--f-mono)}
+.sw-c{height:22px;border:1px solid var(--c-line-2)}
+.mo{display:grid;grid-template-columns:110px 1fr;gap:var(--s-3);align-items:center;padding:6px 0;border-bottom:1px solid var(--c-line);font-size:var(--fs-2)}
+.mo .tr{position:relative;height:12px;border-bottom:1px dashed var(--c-line-2)}
+.mo .tr i{position:absolute;left:0;bottom:-4px;width:8px;height:8px;background:var(--c-accent-text);box-shadow:var(--glow-1);transition-property:left}
+.mo-wrap.go .mo .tr i{left:calc(100% - 8px)}
+@media (max-width:1000px){
+  .proto{height:auto;max-height:none;min-height:0;grid-template-columns:1fr;grid-template-rows:auto}
+  .top{flex-wrap:wrap;padding:var(--s-2) var(--s-4);gap:var(--s-2)}.brand{width:auto}.gsearch{order:5;flex-basis:100%;max-width:none}
+  .side{grid-row:auto;flex-direction:row;overflow-x:auto;padding:var(--s-2)}.side .label,.wsl,.side .foot{display:none}.nv{flex:none}
+  .main{grid-row:auto;height:560px;border-left:0}
+  .ph,.tabbar,.thead,.row,.grp{padding-left:var(--s-4);padding-right:var(--s-4)}
+  .hide-sm{display:none!important}
+  .det{grid-row:auto;border-left:0;border-top:1px solid var(--c-line)}
+  .status{grid-column:1;grid-row:auto;flex-wrap:wrap;padding:var(--s-2) var(--s-4);height:auto}
+  .intro{grid-template-columns:1fr;gap:var(--s-5)}
+  section.s{grid-template-columns:1fr}.sn .num{position:static;font-size:var(--fs-8)}
+  .kit{grid-template-columns:1fr}.flow{grid-template-columns:1fr 1fr}
+}
+
+@media (max-width:1000px){.thead,.row{grid-template-columns:var(--cols-sm,var(--cols))}}
+
+/* ================= v5: no darkening, panes that stack ================= */
+:root,:root[data-theme="light"],:root[data-theme="dark"]{
+  --c-bg:#020309; --c-surface:transparent; --c-surface-2:transparent;
+  --c-line:rgba(200,215,255,.10); --c-line-2:rgba(200,215,255,.20);
+  --c-text-2:rgba(243,245,250,.78); --c-text-3:rgba(243,245,250,.58);
+  --c-accent-text:color-mix(in srgb,rgb(var(--hue)) 40%,#fff);
+  --glow-1:0 0 5px rgba(var(--hue),.40); --glow-2:0 0 12px rgba(var(--hue),.35);
+  --e-in:cubic-bezier(.4,0,1,1);
+}
+#gl{background:linear-gradient(180deg,#060A1E,#020309 70%)}
+.proto{grid-template-columns:var(--side) minmax(0,1fr);grid-template-rows:var(--bar) minmax(0,1fr) var(--status);text-shadow:0 1px 2px rgba(2,3,9,.8)}
+.top{background:transparent}
+.side{background:none;border-right:1px solid var(--c-line)}
+.main{background:none;border-left:0}
+.ph .wm{display:none}
+.status{background:transparent;border-left:0}
+.grp{position:static;background:none;color:var(--c-text-3);font-size:var(--fs-1);letter-spacing:var(--track-label);text-transform:uppercase;height:34px;align-items:flex-end;padding-bottom:6px;border-bottom:1px solid var(--c-line)}
+.row{border-bottom:1px solid rgba(200,215,255,.05)}
+.row .mono{font-size:var(--fs-3)}
+.cursor{background:linear-gradient(90deg,rgba(var(--hue),.30),rgba(var(--hue),.10) 60%,transparent)}
+.doc{background:none}
+.toc{background:rgba(2,3,9,.82);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.btn{background:transparent}
+.btn.sm{height:24px;padding:0 var(--s-2);font-size:var(--fs-2)}
+.nv .c{opacity:.7}
+/* layout toggle */
+.seg{display:flex;align-items:center;gap:2px;margin-right:var(--s-2)}
+.seg button{height:26px;padding:0 var(--s-3);font:var(--w-med) var(--fs-2) var(--f-ui);color:var(--c-text-3);border:1px solid var(--c-line)}
+.seg button[aria-pressed="true"]{color:var(--c-text);border-color:var(--c-accent-text);background:rgba(var(--hue),.18)}
+.seg .kbd{margin-left:var(--s-2)}
+/* stack */
+.stack{flex:1;min-height:0;display:flex;border-top:1px solid var(--c-line)}
+.pane{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:stretch;flex:0 0 100%;overflow:hidden;border-left:1px solid var(--c-line);transition:flex-basis var(--t-3) var(--e-out),opacity var(--t-3) var(--e-out)}
+.pane:first-child{border-left:0}
+.pane.under{opacity:.78}
+.pane.under:hover,.pane.under:focus-within{opacity:1}
+.pane.top:not(:first-child){border-left-color:var(--c-line-2);box-shadow:-1px 0 0 rgba(var(--hue),.35)}
+.pane .thead,.pane .row,.pane .grp{padding-left:var(--s-5);padding-right:var(--s-5)}
+.pane.narrow .ex{display:none}
+.pane .list{flex:1;min-height:0}
+.pane-h{display:flex;align-items:center;gap:var(--s-2);height:40px;padding:0 var(--s-3) 0 var(--s-5);border-bottom:1px solid var(--c-line);flex:none}
+.pane-h .sp{flex:1}
+.pane-top{padding:var(--s-4) var(--s-5) var(--s-2);flex:none}
+.pane-b{flex:1;min-height:0;overflow:auto;padding:var(--s-4) var(--s-5) var(--s-6);scrollbar-width:thin;scrollbar-color:var(--c-line-2) transparent}
+.pane h2{margin:0 0 var(--s-1);font:var(--w-reg) var(--fs-6)/1.25 var(--f-ui)}
+.pane h2.mono{font:var(--w-reg) 17px var(--f-mono)}
+.pane .meta{font-size:var(--fs-3);color:var(--c-text-3);margin-bottom:var(--s-3)}
+.pane .meta.bad{color:var(--c-bad)}
+.pane p{margin:0 0 var(--s-4);color:var(--c-text-2);font-size:var(--fs-3);line-height:var(--lh-read)}
+.pane h3{margin:var(--s-5) 0 var(--s-2);font:var(--w-med) var(--fs-1)/1 var(--f-ui);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--c-text-3)}
+.code{background:rgba(2,3,9,.55)}
+.errl{background:rgba(60,8,20,.45)}
+.stats{display:flex;gap:var(--s-6);margin:var(--s-2) 0 var(--s-1)}
+.stats div{display:flex;flex-direction:column}
+.stats b{font:var(--w-light) var(--fs-7)/1 var(--f-ui)}
+.stats span{font-size:var(--fs-2);color:var(--c-text-3);margin-top:var(--s-2)}
+.stats{margin:var(--s-4) 0 var(--s-3)!important}
+.art.tlsvg{max-height:96px;margin:var(--s-2) 0 0}
+/* stack motion */
+@keyframes pIn{from{opacity:0;transform:translateX(56px)}to{opacity:1;transform:none}}
+@keyframes pOut{from{opacity:1;transform:none}to{opacity:0;transform:translateX(56px)}}
+.pane.p-in{animation:pIn var(--t-3) var(--e-out) both}
+.pane.p-out{animation:pOut var(--t-2) var(--e-in) both}
+.pane.p-in .row{animation:rise var(--t-3) var(--e-out) both;animation-delay:calc(80ms + var(--i,0) * var(--stagger))}
+.a-sel{animation:dim var(--t-1) linear both}
+/* timeline layout */
+.tl-axis,.lane{grid-template-columns:minmax(150px,30%) minmax(0,1fr)!important}
+.tl-axis .trk{position:relative;height:100%;overflow:visible}
+.tl-axis .trk span{position:absolute;bottom:9px;transform:translateX(-50%);font:var(--w-reg) var(--fs-1) var(--f-mono);letter-spacing:0;text-transform:none;color:var(--c-text-3)}
+.tl-axis .trk span.edge{transform:none;color:var(--c-bad);opacity:.75}
+.lane{height:44px}
+.lane .trk{position:relative;height:100%;overflow:visible}
+.lane .trk>i{position:absolute;top:0;bottom:0;width:1px;background:var(--c-line)}
+.lane .bar{position:absolute;top:50%;height:12px;margin-top:-6px;min-width:6px;background:rgba(var(--hue),.45);border:1px solid var(--c-accent-text);transition:background var(--t-2)}
+.lane .bar.has-f{border-color:var(--c-bad)}
+.lane .bar b{position:absolute;top:-4px;bottom:-4px;width:1px;background:var(--c-text);opacity:.8}
+.lane .bar b.f{background:var(--c-bad);opacity:1;width:2px}
+.lane em{position:absolute;top:50%;margin-top:-8px;margin-left:8px;font:normal var(--fs-1) var(--f-mono);color:var(--c-text-3);white-space:nowrap}
+.lane em.lft{margin-left:0;margin-right:8px}
+.lane[aria-selected="true"] .bar{background:rgba(var(--hue),.75);box-shadow:var(--glow-2)}
+.pane.narrow .lane em{display:none}
+@media (max-width:1000px){
+  .proto{grid-template-columns:1fr;grid-template-rows:auto auto auto auto;height:auto;max-height:none;min-height:0}
+  .top,.side,.main,.status{grid-column:1;grid-row:auto}
+  .side{border-right:0;border-bottom:1px solid var(--c-line)}
+  .main{height:620px}
+  .ph .btn{display:none}
+  .pane{flex-basis:100%!important}
+  .pane.under{display:none}
+  .pane .thead,.pane .row,.pane .grp,.pane-top,.pane-b{padding-left:var(--s-4);padding-right:var(--s-4)}
+  .thead,.row{grid-template-columns:var(--cols-n,var(--cols))!important}
+  .ex{display:none!important}
+  .seg .kbd{display:none}
+  .tl-axis,.lane{grid-template-columns:120px minmax(0,1fr)!important}
+  .lane em{display:none}
+  .stats{gap:var(--s-4)}
+  .status{flex-wrap:wrap;height:auto;padding:var(--s-2) var(--s-4)}
+}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-hidden="true"></canvas>
+
+<!-- ================= PROTOTYPE ================= -->
+<div class="layer">
+<div class="proto" id="proto" tabindex="-1" aria-label="Interactive prototype of the Codemode control plane">
+  <header class="top">
+    <div class="brand"><i aria-hidden="true"></i>Codemode</div>
+    <button class="wsw" id="wsw" title="Switch workspace">Workspace <b id="wsName">All sources</b> ▾</button>
+    <label class="gsearch"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="q" placeholder="Search" aria-label="Search this list"><span class="kbd">/</span></label>
+    <span class="sp"></span>
+    <button class="btn" id="copyUrl">Copy agent URL</button>
+    <span class="avatar" title="ursus95">U</span>
+  </header>
+  <nav class="side" id="side" aria-label="Sections"></nav>
+  <main class="main" id="main">
+    <div class="ph" id="ph"></div>
+    <div class="tabbar" id="tabbar" role="tablist"></div>
+    <div class="stack" id="stack"><section class="pane" aria-label="List"></section><section class="pane" aria-label="Details" hidden></section><section class="pane" aria-label="Execution" hidden></section></div>
+  </main>
+  <div class="status" id="status"></div>
+</div>
+
+<!-- ================= DOCUMENT ================= -->
+<div class="doc" id="doc">
+<div class="dw">
+  <header class="intro">
+    <div>
+      <span class="label">Codemode · control plane proposal · v8 · 2026-11-14</span>
+      <h1>A desktop-grade control plane with a <b>console soul</b>.</h1>
+    </div>
+    <div>
+      <p>The prototype above is the proposal. Try it with the keyboard: <span class="kbd">↑</span><span class="kbd">↓</span> move, <span class="kbd">↵</span> or <span class="kbd">→</span> opens a pane, <span class="kbd">Esc</span> or <span class="kbd">←</span> closes it, <span class="kbd">[</span><span class="kbd">]</span> switch tabs, <span class="kbd">V</span> switches the Sessions layout, <span class="kbd">1</span>–<span class="kbd">5</span> switch sections, <span class="kbd">/</span> searches.</p>
+      <ol>
+        <li><span><b>Fix linking.</b> GitHub can't work with today's flow. Nudge's real error is being thrown away.</span></li>
+        <li><span><b>Integrations.</b> 41 vendors, searchable, each with a connection method verified against the real provider.</span></li>
+        <li><span><b>Sessions.</b> Each agent's executions grouped automatically, with results kept for 4 days.</span></li>
+        <li><span><b>Approvals deleted.</b> Tools are either allowed or blocked.</span></li>
+        <li><span><b>Panes that stack.</b> Lists start full width. Opening something slides a pane in from the right and keeps the path visible. Sessions also has a 4-day timeline layout.</span></li>
+      </ol>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Proposal sections">
+    <a href="#ux">01 UX model</a><a href="#broke">02 What broke</a><a href="#integ">03 Integrations</a><a href="#sess">04 Sessions</a><a href="#appr">05 Approvals</a><a href="#vis">06 Visual system</a><a href="#kit">07 UI kit</a><a href="#data">08 Data &amp; API</a><a href="#plan">09 Plan</a><a href="#dec">10 Decisions</a>
+  </nav>
+
+  <!-- 01 UX -->
+  <section class="s" id="ux"><div class="sn"><span class="num">01</span></div><div>
+    <h2 class="sh">UX <b>model</b></h2>
+    <p>The control plane has four jobs. Each one gets a screen with the same shape: <b>a table in the middle, the selected item's detail on the right, and results plus available keys in the status bar.</b> Learn one screen and you know them all.</p>
+    <table class="t">
+      <tr><th>Job</th><th>Screen</th><th>What a good outcome looks like</th></tr>
+      <tr><td>See what my agents did</td><td>Sessions</td><td>Find yesterday's run in 2 keystrokes, see which call failed and why, copy the code or save it as a script.</td></tr>
+      <tr><td>Connect a tool</td><td>Integrations</td><td>Type a vendor name, press Enter, approve at the provider, and come back to "Linked · 37 tools". If it fails, see which step failed and what to do about it.</td></tr>
+      <tr><td>Control what agents can reach</td><td>Workspaces</td><td>Pick a workspace, scan its tools and flip any tool between allow and block with Enter.</td></tr>
+      <tr><td>Connect an agent</td><td>Tokens + top bar</td><td>Copy the <code>/mcp</code> URL from any screen, and see which agents hold access and when they last used it.</td></tr>
+    </table>
+    <h3 class="h">Layout <small>regions, top to bottom</small></h3>
+    <table class="t">
+      <tr><th>Region</th><th>Holds</th><th>Why there</th></tr>
+      <tr><td>Top bar · 48px</td><td>Workspace switcher, search, Copy agent URL, account</td><td>Things you need from every screen. Search filters the current table.</td></tr>
+      <tr><td>Sidebar · 228px</td><td>Five sections with counts, workspace list</td><td>Floats on the backdrop. Its color tells you where you are.</td></tr>
+      <tr><td>Page header</td><td>Breadcrumb, title, one sentence on what the page is for, one primary action</td><td>A new user always knows the purpose and the next step.</td></tr>
+      <tr><td>Tabs + table</td><td>Filters as tabs, a table with column heads, sticky group headers, one cursor</td><td>Columns make lists scannable. Tabs are filters, not separate pages.</td></tr>
+      <tr><td>Pane stack</td><td>Opening an item pushes a pane from the right. Sessions stack three deep: sessions, then a session, then an execution.</td><td>You can see where you came from while you look deeper, and nothing takes space when there's nothing to show.</td></tr>
+      <tr><td>Status bar · 30px</td><td>Last result, confirmations, keys that work right now</td><td>Feedback appears in one predictable place. No toasts, no dialogs.</td></tr>
+    </table>
+    <h3 class="h">Transitions <small>each one answers "what changed?"</small></h3>
+    <ul class="l">
+      <li><b>Section:</b> the backdrop crossfades to the section color (600 ms), the header fades and the rows rise in with a 16 ms stagger.</li>
+      <li><b>Tab:</b> the underline glides to the new tab and the rows rise with half the stagger. Same place, different filter.</li>
+      <li><b>Selection:</b> one cursor glides between rows (200 ms). If a deeper pane is open, it follows the selection with a 120 ms fade, so you can flip through executions with ↑↓.</li>
+      <li><b>Open (push):</b> a pane slides in from the right while the panes behind narrow (320 ms) and dim to 78%. <b>Back (pop):</b> the top pane slides out and the rest widen. The breadcrumb mirrors the stack, and each crumb jumps back to its level.</li>
+      <li><b>Layout switch:</b> List ↔ Timeline re-enters the rows with a stagger. Same data, different shape.</li>
+      <li>Every duration and curve is a token. Under <code>prefers-reduced-motion</code> all of it is instant.</li>
+    </ul>
+    <h3 class="h">Interaction rules</h3>
+    <div class="cols">
+      <div><ul class="l">
+        <li><b>Click opens, arrows browse.</b> A click opens the next pane. ↑↓ moves the selection, and any open pane follows it.</li>
+        <li><b>→ or Enter goes deeper, ← or Esc comes back.</b> <code>[</code> and <code>]</code> switch tabs, and V switches the Sessions layout.</li>
+        <li><b>The status bar always lists the keys that work</b> in the current context, and each one is also clickable. Detail actions show their key too.</li>
+        <li><b>The URL records state</b> (section, tab, selection, drill-down) through TanStack Router search params, so Back works and any view can be linked.</li>
+      </ul></div>
+      <div><ul class="l">
+        <li><b>Status is a word, not a dot.</b> LINKED, NEEDS LINK, FAILED · STEP 6. Only failure gets color.</li>
+        <li><b>Errors say where, what and what next.</b> The step, the provider's message verbatim, and the action that fixes it.</li>
+        <li><b>No modals.</b> Destructive actions ask for a second press within 3 seconds, prompted in the status bar. Results appear there too, instead of toasts.</li>
+        <li><b>Live without sockets.</b> The Sessions list refetches every 5 s while visible (TanStack Query), so new runs appear at the top.</li>
+      </ul></div>
+    </div>
+    <h3 class="h">First run <small>a new tenant with nothing connected</small></h3>
+    <div class="flow">
+      <div><b>Connect a tool</b>Integrations opens with search focused. Popular vendors are listed first.</div>
+      <div><b>Approve at the provider</b>The browser goes to the vendor. On return, the detail shows the tools found.</div>
+      <div><b>Connect an agent</b>Copy agent URL sits in the top bar. The agent's OAuth screen lets you pick a workspace.</div>
+      <div><b>Watch it work</b>Sessions shows "Waiting for the first execution…" and fills in live.</div>
+    </div>
+  </div></section>
+
+  <!-- 02 BROKE -->
+  <section class="s" id="broke"><div class="sn"><span class="num">02</span></div><div>
+    <h2 class="sh">What <b>broke</b></h2>
+    <p>I checked the production logs, the database and both providers' public discovery endpoints. I did not register clients or grant consent anywhere. Linking an account takes seven steps:</p>
+    <div class="diag"><svg viewBox="0 0 980 540" role="img" aria-label="Exploded view of the seven linking steps, showing where GitHub and Nudge fail"><line class="d" x1="60" y1="70" x2="60" y2="474"/><line class="d" x1="360" y1="70" x2="360" y2="474"/><line class="d" x1="210" y1="104" x2="210" y2="110"/><line class="d" x1="210" y1="170" x2="210" y2="176"/><line class="d" x1="210" y1="236" x2="210" y2="242"/><line class="d" x1="210" y1="302" x2="210" y2="308"/><line class="d" x1="210" y1="368" x2="210" y2="374"/><line class="d" x1="210" y1="434" x2="210" y2="440"/><path class="s bg" d="M60,70 L210,44 L360,70 L360,78 L210,104 L60,78 Z"/><path class="s" d="M60,70 L210,96 L360,70 M210,96 L210,104"/><path class="s" opacity=".45" d="M164,70 L210,62 L256,70 L210,78 Z"/><line class="s" x1="360" y1="70" x2="438" y2="70"/><circle class="s" cx="450" cy="70" r="11"/><text class="nb" x="450" y="70">1</text><text class="t1" x="472" y="69">Probe /mcp</text><text x="472" y="86">401 + WWW-Authenticate</text><text class="ok" x="790" y="74">✓ ok</text><text class="ok" x="880" y="74">✓ ok</text><path class="s bg" d="M60,136 L210,110 L360,136 L360,144 L210,170 L60,144 Z"/><path class="s" d="M60,136 L210,162 L360,136 M210,162 L210,170"/><path class="s" opacity=".45" d="M164,136 L210,128 L256,136 L210,144 Z"/><line class="s" x1="360" y1="136" x2="438" y2="136"/><circle class="s" cx="450" cy="136" r="11"/><text class="nb" x="450" y="136">2</text><text class="t1" x="472" y="135">Protected-resource metadata</text><text x="472" y="152">/.well-known/oauth-protected-resource</text><text class="ok" x="790" y="140">✓ ok</text><text class="ok" x="880" y="140">✓ ok</text><path class="s bg" d="M60,202 L210,176 L360,202 L360,210 L210,236 L60,210 Z"/><path class="s" d="M60,202 L210,228 L360,202 M210,228 L210,236"/><path class="s" opacity=".45" d="M164,202 L210,194 L256,202 L210,210 Z"/><line class="s" x1="360" y1="202" x2="438" y2="202"/><circle class="s" cx="450" cy="202" r="11"/><text class="nb" x="450" y="202">3</text><text class="t1" x="472" y="201">Authorization-server metadata</text><text x="472" y="218">RFC 8414 · GitHub returns 404</text><text class="x" x="790" y="206">✕ fails</text><text class="ok" x="880" y="206">✓ ok</text><path class="s bg" d="M60,268 L210,242 L360,268 L360,276 L210,302 L60,276 Z"/><path class="s" d="M60,268 L210,294 L360,268 M210,294 L210,302"/><path class="s" opacity=".45" d="M164,268 L210,260 L256,268 L210,276 Z"/><line class="s" x1="360" y1="268" x2="438" y2="268"/><circle class="s" cx="450" cy="268" r="11"/><text class="nb" x="450" y="268">4</text><text class="t1" x="472" y="267">Client registration</text><text x="472" y="284">dynamic or client-ID document</text><text class="x" x="790" y="272">✕ fails</text><text class="q" x="880" y="272">? hidden</text><path class="s bg" d="M60,334 L210,308 L360,334 L360,342 L210,368 L60,342 Z"/><path class="s" d="M60,334 L210,360 L360,334 M210,360 L210,368"/><path class="s" opacity=".45" d="M164,334 L210,326 L256,334 L210,342 Z"/><line class="s" x1="360" y1="334" x2="438" y2="334"/><circle class="s" cx="450" cy="334" r="11"/><text class="nb" x="450" y="334">5</text><text class="t1" x="472" y="333">Browser consent</text><text x="472" y="350">you approve scopes at the provider</text><text class="" x="790" y="338">·</text><text class="q" x="880" y="338">? hidden</text><path class="s bg" d="M60,400 L210,374 L360,400 L360,408 L210,434 L60,408 Z"/><path class="s" d="M60,400 L210,426 L360,400 M210,426 L210,434"/><path class="s" opacity=".45" d="M164,400 L210,392 L256,400 L210,408 Z"/><line class="s" x1="360" y1="400" x2="438" y2="400"/><circle class="s" cx="450" cy="400" r="11"/><text class="nb" x="450" y="400">6</text><text class="t1" x="472" y="399">Token exchange</text><text x="472" y="416">code + PKCE verifier → tokens</text><text class="" x="790" y="404">·</text><text class="q" x="880" y="404">? hidden</text><path class="s bg" d="M60,466 L210,440 L360,466 L360,474 L210,500 L60,474 Z"/><path class="s" d="M60,466 L210,492 L360,466 M210,492 L210,500"/><path class="s" opacity=".45" d="M164,466 L210,458 L256,466 L210,474 Z"/><line class="s" x1="360" y1="466" x2="438" y2="466"/><circle class="s" cx="450" cy="466" r="11"/><text class="nb" x="450" y="466">7</text><text class="t1" x="472" y="465">Credential stored, first sync</text><text x="472" y="482">per tenant · catalogue built</text><text class="" x="790" y="470">·</text><text class="" x="880" y="470">·</text><text x="790" y="26">GitHub</text><text x="880" y="26">Nudge</text><line class="d" x1="780" y1="36" x2="960" y2="36"/><text x="10" y="528">✕ verified failure   ? fails somewhere in steps 4–6; the code discards the cause   after phase A every error names its step</text></svg></div>
+    <div class="cols">
+      <div><h3 class="h" style="margin-top:4px">GitHub</h3><p>The MCP endpoint points to <code>github.com/login/oauth</code>, which publishes no server metadata (404) and has no automatic client registration. The current flow requires one of the two, so it can never work for GitHub. <b>Fix:</b> paste a fine-grained token (already supported), or register your own GitHub OAuth app once.</p></div>
+      <div><h3 class="h" style="margin-top:4px">Nudge</h3><p>Steps 1 to 3 check out against the live endpoints, and registration is offered. The failure is somewhere in steps 4 to 6, but <code>accounts/oauth.rs</code> converts about 20 different errors into one generic <code>Error::OAuth</code> and logs nothing. <b>Fix:</b> keep the step and the provider's message, log it, show it, then fix the real cause.</p></div>
+      <div><h3 class="h" style="margin-top:4px">Noise</h3><p>Unlinked sources retry sync every 60 s and log 3 lines per source each time. <b>Fix:</b> skip them and show NEEDS LINK. New sources get lowercase slugs, so agents write <code>tools.nudge</code>, not <code>tools.Nudge</code>.</p></div>
+    </div>
+  </div></section>
+
+  <!-- 03 INTEG -->
+  <section class="s" id="integ"><div class="sn"><span class="num">03</span></div><div>
+    <h2 class="sh"><b>Integrations</b></h2>
+    <p>One screen replaces Sources and Accounts. The list is grouped by category, and search matches vendor names, categories and, for linked sources, tool names (so "create issue" finds GitHub, Linear and Jira). The value column shows link state for vendors you've added and the connection method for the rest.</p>
+    <table class="t">
+      <tr><th>Method</th><th>What happens on Enter</th><th>Examples</th></tr>
+      <tr><td>One-click</td><td>Discovery plus client registration, then the provider's consent page. This is today's flow, minus the swallowed errors.</td><td>Notion, Linear, Sentry, Atlassian, Stripe, Vercel</td></tr>
+      <tr><td>OAuth app</td><td>The provider has no client registration. Register an app once at the vendor and paste its ID and secret, which are sealed per tenant. After that, linking is one click.</td><td>GitHub, Slack, Google</td></tr>
+      <tr><td>API key</td><td>Paste a key into a field. It's sealed and never shown again.</td><td>GitHub token, Grafana, Twilio, Todoist</td></tr>
+      <tr><td>Open</td><td>Added immediately, no credentials needed.</td><td>DeepWiki, Context7</td></tr>
+      <tr><td>Local</td><td>stdio server on the host (already supported).</td><td>Postgres</td></tr>
+    </table>
+    <p><b>Registry:</b> <code>crates/core/integrations.json</code> is embedded in the binary and served at <code>/api/integrations</code>, and <code>/mcp-admin</code> reads the same file. <b>Probe:</b> <code>tools/probe-integrations</code> runs discovery only (never registers, never consents) and fails qualification when an entry's declared method doesn't match the provider. That is what stops "nothing works" from happening again. <b>Icons:</b> <code>simple-icons</code> (CC0) per-icon imports, drawn as white glyphs in the list and as large line art in the detail panel. The vendors shown are a starting list; the probe decides what ships.</p>
+  </div></section>
+
+  <!-- 04 SESS -->
+  <section class="s" id="sess"><div class="sn"><span class="num">04</span></div><div>
+    <h2 class="sh"><b>Sessions</b> → executions</h2>
+    <p>A session is a run of executions from one agent grant and workspace, with no gap longer than <b>30 minutes</b>. The gateway infers sessions itself, so agents change nothing. Each execution now keeps its <b>return value, stdout and per-call result previews</b>, which <code>execute</code> already computes and currently discards. Everything is deleted <b>4 days after the session's last activity</b>.</p>
+    <div class="cols">
+      <div><h3 class="h" style="margin-top:4px">Titles without an LLM</h3><p>An execution's title is its first <code># comment</code>, otherwise its tool paths in call order (<code>sentry.list_issues → linear.create_issue</code>). A session's title is its first execution's title, and you can rename it. The client name comes from the OAuth client metadata or the token label.</p></div>
+      <div><h3 class="h" style="margin-top:4px">Stored</h3><p>Code (≤ 64 KB), result (≤ 16 KB), stdout (≤ 16 KB), and per call: redacted args plus a ≤ 2 KB result preview. Stored <b>unencrypted</b> by your decision, scoped by tenant RLS. The nightly backup keeps a copy until it rotates out.</p></div>
+      <div><h3 class="h" style="margin-top:4px">Retention</h3><p><code>expires_at = last_seen_at + 4 days</code>. An hourly sweep deletes expired sessions and cascades to their executions and calls, using the same pattern as <code>sessions.sweep()</code>. The detail panel shows the time remaining as a fact, not as a progress bar.</p></div>
+    </div>
+  <h3 class="h">Layouts <small>V switches between them</small></h3>
+    <ul class="l">
+      <li><b>List:</b> scan by title, agent, counts and status, grouped by day. Best for "what failed?"</li>
+      <li><b>Timeline:</b> the 4-day retention window drawn to scale. Each session is a bar, each execution a tick, and failures are rose. The left edge is where sessions expire. Best for "what ran overnight?" and for spotting overlap.</li>
+      <li><b>Drill-down:</b> session → executions → execution, as stacked panes. With an execution open, ↑↓ steps through executions while the code and result update in place.</li>
+    </ul>
+  </div></section>
+
+  <!-- 05 APPR -->
+  <section class="s" id="appr"><div class="sn"><span class="num">05</span></div><div>
+    <h2 class="sh">Approvals: <b>deleted</b></h2>
+    <div class="quote">Agents run headless. Nobody is there to click approve.</div>
+    <ul class="l">
+      <li>Every tool is <b>allow</b> or <b>block</b>, and the default is allow. A blocked call raises <code>PermissionError</code> in the agent's Python, naming the tool and workspace.</li>
+      <li>Migration: <code>ask → allow</code>. Drop <code>paused_runs</code> and <code>approval_calls</code>, the Approvals page, <code>approval_url</code> and the pause-only snapshot signing.</li>
+      <li><code>/mcp</code> goes from three tools to two: <code>search</code> and <code>execute</code>. About 1,000 lines deleted. AGENTS.md drops the approval and replay rules.</li>
+    </ul>
+  </div></section>
+
+  <!-- 06 VIS -->
+  <section class="s" id="vis"><div class="sn"><span class="num">06</span></div><div>
+    <h2 class="sh">Visual <b>system</b></h2>
+    <p>The layout is a standard desktop web app. The atmosphere comes from three layers behind it: a live shader backdrop, a color per section, and light used only to mark focus. Everything is driven by tokens (§07).</p>
+    <div class="cols">
+      <div><h3 class="h" style="margin-top:0">Backdrop</h3><p>A WebGL1 fragment shader of about 40 lines draws the wave as a ribbon of strands that pinches and twists as it drifts, with a fainter second ribbon behind it. Strands curl through a flow-field warp, and a pulse of light travels along them. A slowly wandering depth of field keeps only a few strands sharp and blurs the rest, so text over the ribbon stays readable. Each strand is a soft gaussian sampled twice per pixel, and where strands bunch up they blend into a glow, so there is no aliasing or moiré. Section colors are deep (cobalt, violet, teal, bronze, crimson) and only tint the field. It renders at device resolution, capped at 2×. It pauses when hidden, draws one static frame under reduced motion, and falls back to a dark gradient without WebGL.</p></div>
+      <div><h3 class="h" style="margin-top:0">Light</h3><p>Glow marks one thing at a time: the current nav item, the selection cursor, the active tab, or the primary button on hover. There are two tokens, <code>--glow-1</code> and <code>--glow-2</code>, both at 45% alpha or less. Only the selected row's name glows. All other text stays flat.</p></div>
+      <div><h3 class="h" style="margin-top:0">Type</h3><p><b>M PLUS 1p</b>, a free Japanese gothic with a console-era feel, at 400 or 500 for everything you read. Weights 200–300 appear only at 28px and up. The hierarchy runs from 28px page title to 13px tabs, 14px rows and 11px caps labels. JetBrains Mono is for code, IDs and counts.</p></div>
+    </div>
+    <ul class="l">
+      <li><b>Square edges everywhere.</b> Surfaces are separated by 1px lines, not radius or shadow.</li>
+      <li><b>Status is a word.</b> Only failure (rose) and attention (amber) get color.</li>
+      <li><b>Legibility:</b> body text holds ≥ 4.5:1 against the work surface at the brightest point of the backdrop. Labels use <code>--c-text-3</code> (56%), never lower.</li>
+      <li><b>Removed:</b> dark overlay surfaces, cards, glass, pills, status dots, drop shadows, rounded corners, modals and toasts. Surfaces are transparent, separated by 1px rules, and a 1px text shadow keeps text crisp over the lines.</li>
+    </ul>
+  </div></section>
+
+  <!-- 07 KIT -->
+  <section class="s" id="kit"><div class="sn"><span class="num">07</span></div><div>
+    <h2 class="sh">UI <b>kit</b></h2>
+    <p>The prototype is built from these tokens and components. In <code>ui/</code> they replace <code>Card</code>, <code>Badge</code>, <code>Alert</code>, <code>Sheet</code>, <code>Sidebar</code> and <code>Toaster</code>. <code>Button</code>, <code>Input</code> and <code>Table</code> are restyled through the tokens. New components: <code>AppShell</code>, <code>SectionNav</code>, <code>TabBar</code> (gliding underline), <code>DataList</code> (one cursor plus a <code>useListNavigation</code> hook with <code>aria-activedescendant</code>), <code>PaneStack</code> (push and pop with animated widths), <code>Timeline</code>, <code>Facts</code>, <code>StatusBar</code> and <code>Backdrop</code>. Tokens live in <code>ui/src/index.css</code> as CSS variables mapped onto the shadcn variable names.</p>
+    <div class="kit" id="kitroot"></div>
+  </div></section>
+
+  <!-- 08 DATA -->
+  <section class="s" id="data"><div class="sn"><span class="num">08</span></div><div>
+    <h2 class="sh">Data <b>&amp; API</b></h2>
+    <h3 class="h" style="margin-top:0">0017 · sessions and stored results</h3>
+<div class="sql"><span class="y">CREATE TABLE</span> <span class="g">agent_sessions</span> (
+  id uuid <span class="y">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  token_id uuid <span class="y">NOT NULL REFERENCES</span> access_tokens <span class="y">ON DELETE CASCADE</span>,
+  workspace_id uuid <span class="y">NOT NULL</span>, client text, title text,
+  started_at timestamptz <span class="y">NOT NULL DEFAULT</span> now(),
+  last_seen_at timestamptz <span class="y">NOT NULL DEFAULT</span> now(),
+  expires_at timestamptz <span class="y">GENERATED ALWAYS AS</span> (last_seen_at + interval '4 days') <span class="y">STORED</span>);
+<span class="y">ALTER TABLE</span> <span class="g">executions</span> <span class="y">ADD</span> session_id uuid <span class="y">REFERENCES</span> agent_sessions <span class="y">ON DELETE CASCADE</span>,
+  <span class="y">ADD</span> title text, <span class="y">ADD</span> result text, <span class="y">ADD</span> output text;
+<span class="y">ALTER TABLE</span> <span class="g">tool_calls</span> <span class="y">ADD</span> preview text;
+<span class="c">-- RLS through token_id, as for executions. Backfill: 30-minute gaps; rows older than 4 days are deleted.</span></div>
+    <h3 class="h">0018 · approvals out</h3>
+<div class="sql"><span class="y">UPDATE</span> tool_policies <span class="y">SET</span> action='allow' <span class="y">WHERE</span> action='ask';
+<span class="y">DROP TABLE</span> approval_calls, paused_runs;   <span class="c">-- + CHECK (action IN ('allow','block'))</span></div>
+    <h3 class="h">Session assignment <small>one statement at execution start</small></h3>
+<div class="sql"><span class="y">WITH</span> s <span class="y">AS</span> (<span class="y">UPDATE</span> agent_sessions <span class="y">SET</span> last_seen_at=now()
+  <span class="y">WHERE</span> id=(<span class="y">SELECT</span> id <span class="y">FROM</span> agent_sessions <span class="y">WHERE</span> token_id=$1 <span class="y">AND</span> workspace_id=$2
+    <span class="y">AND</span> last_seen_at &gt; now()-interval '30 minutes' <span class="y">ORDER BY</span> last_seen_at <span class="y">DESC LIMIT</span> 1 <span class="y">FOR UPDATE</span>)
+  <span class="y">RETURNING</span> id)
+<span class="y">SELECT</span> id <span class="y">FROM</span> s <span class="y">UNION ALL</span>
+<span class="y">SELECT</span> id <span class="y">FROM</span> (<span class="y">INSERT INTO</span> agent_sessions(token_id,workspace_id,client)
+  <span class="y">SELECT</span> $1,$2,$3 <span class="y">WHERE NOT EXISTS</span>(<span class="y">SELECT</span> 1 <span class="y">FROM</span> s) <span class="y">RETURNING</span> id) n;</div>
+    <table class="t">
+      <tr><th>Endpoint</th><th>Purpose</th></tr>
+      <tr><td><code>GET /api/integrations</code></td><td>Registry merged with this tenant's link state.</td></tr>
+      <tr><td><code>POST /api/integrations/:slug</code></td><td>Create a source from a registry entry, with method-specific fields.</td></tr>
+      <tr><td><code>PUT /api/oauth-apps/:provider</code></td><td>Store an OAuth app's client ID and secret, sealed and write-only.</td></tr>
+      <tr><td><code>GET /api/sessions?q=&amp;before=</code></td><td>List with counts and the sources touched.</td></tr>
+      <tr><td><code>GET /api/sessions/:id</code></td><td>Executions with titles, calls, results and previews.</td></tr>
+      <tr><td><code>PATCH /api/sessions/:id</code></td><td>Rename.</td></tr>
+      <tr><td><code>/api/approvals/*</code></td><td>Removed.</td></tr>
+    </table>
+  </div></section>
+
+  <!-- 09 PLAN -->
+  <section class="s" id="plan"><div class="sn"><span class="num">09</span></div><div>
+    <h2 class="sh"><b>Plan</b></h2>
+    <table class="t">
+      <tr><th style="width:56px">Phase</th><th>Scope</th><th>Done when</th></tr>
+      <tr><td>A</td><td><b>Linking that works.</b> <code>Error::OAuth { stage, detail }</code> logged and shown. OAuth-app mode with static endpoints. GitHub token path. Skip unlinked syncs. Lowercase slugs.</td><td>You link GitHub and Nudge yourself and a call succeeds. I never grant consent for you.</td></tr>
+      <tr><td>B</td><td><b>Approvals out.</b> Migration 0018, delete the code paths, two-tool <code>/mcp</code>, update AGENTS.md and qualification.</td><td>A blocked tool raises <code>PermissionError</code>, and no approval route remains.</td></tr>
+      <tr><td>C</td><td><b>Sessions.</b> Migration 0017 with backfill, session assignment, stored results and previews, hourly sweep, title function with a unit test.</td><td>A real agent's runs appear grouped, and a 4-day-old session disappears.</td></tr>
+      <tr><td>D</td><td><b>Shell and kit.</b> <code>Backdrop</code> shader, <code>AppShell</code>, list navigation hook, status bar, URL state, fonts self-hosted with <code>@fontsource</code>. Sessions screen first, then Workspaces, Scripts and Tokens.</td><td>Every screen is usable by keyboard alone. Browser workflows pass. The shader holds 60 fps on the M-series laptop and stays under 5% CPU when idle.</td></tr>
+      <tr><td>E</td><td><b>Integrations.</b> Registry, probe, the Integrations screen and the connect flows per method.</td><td>The probe runs green in qualification, and you connect 3 vendors without help.</td></tr>
+    </table>
+  </div></section>
+
+  <!-- 10 DEC -->
+  <section class="s" id="dec"><div class="sn"><span class="num">10</span></div><div>
+    <h2 class="sh"><b>Decisions</b></h2>
+    <table class="t">
+      <tr><td>Approvals and <code>resume</code></td><td>Deleted</td></tr>
+      <tr><td>Session boundary</td><td>30 minutes idle, per grant and workspace</td></tr>
+      <tr><td>Retention</td><td>4 days after last activity</td></tr>
+      <tr><td>Stored results</td><td>Unencrypted</td></tr>
+      <tr><td>Session key-value store for agents</td><td style="color:var(--warn)">Maybe, after phase C, if agents keep re-fetching the same data</td></tr>
+      <tr><td>Light theme</td><td style="color:var(--warn)">Not proposed. The backdrop is the identity. Say if you want a daylight variant.</td></tr>
+    </table>
+  </div></section>
+</div>
+</div>
+</div>
+
+<script>
+const ICONS = {"airtable":"M11.992 1.966c-.434 0-.87.086-1.28.257L1.779 5.917c-.503.208-.49.908.012 1.116l8.982 3.558a3.266 3.266 0 0 0 2.454 0l8.982-3.558c.503-.196.503-.908.012-1.116l-8.957-3.694a3.255 3.255 0 0 0-1.272-.257zM23.4 8.056a.589.589 0 0 0-.222.045l-10.012 3.877a.612.612 0 0 0-.38.564v8.896a.6.6 0 0 0 .821.552L23.62 18.1a.583.583 0 0 0 .38-.551V8.653a.6.6 0 0 0-.6-.596zM.676 8.095a.644.644 0 0 0-.48.19C.086 8.396 0 8.53 0 8.69v8.355c0 .442.515.737.908.54l6.27-3.006.307-.147 2.969-1.436c.466-.22.43-.908-.061-1.092L.883 8.138a.57.57 0 0 0-.207-.044z","asana":"M18.78 12.653c-2.882 0-5.22 2.336-5.22 5.22s2.338 5.22 5.22 5.22 5.22-2.34 5.22-5.22-2.336-5.22-5.22-5.22zm-13.56 0c-2.88 0-5.22 2.337-5.22 5.22s2.338 5.22 5.22 5.22 5.22-2.338 5.22-5.22-2.336-5.22-5.22-5.22zm12-6.525c0 2.883-2.337 5.22-5.22 5.22-2.882 0-5.22-2.337-5.22-5.22 0-2.88 2.338-5.22 5.22-5.22 2.883 0 5.22 2.34 5.22 5.22z","atlassian":"M7.12 11.084a.683.683 0 00-1.16.126L.075 22.974a.703.703 0 00.63 1.018h8.19a.678.678 0 00.63-.39c1.767-3.65.696-9.203-2.406-12.52zM11.434.386a15.515 15.515 0 00-.906 15.317l3.95 7.9a.703.703 0 00.628.388h8.19a.703.703 0 00.63-1.017L12.63.38a.664.664 0 00-1.196.006z","box":"M.959 5.523c-.54 0-.959.42-.959.899v7.549a4.59 4.59 0 004.613 4.494 4.717 4.717 0 004.135-2.457c.779 1.438 2.337 2.457 4.074 2.457 2.577 0 4.674-2.037 4.674-4.613.06-2.457-2.037-4.495-4.613-4.495-1.738 0-3.295.959-4.074 2.397-.78-1.438-2.338-2.397-4.135-2.397-1.079 0-2.038.36-2.817.899V6.422a.92.92 0 00-.898-.899zM17.602 9.26a.95.95 0 00-.704.158c-.36.3-.479.899-.18 1.318l2.397 3.116-2.396 3.115c-.3.42-.24.96.18 1.26.419.3 1.016.298 1.316-.122l2.039-2.636 2.096 2.697c.3.36.899.419 1.318.12.36-.3.42-.84.121-1.259l-2.338-3.115 2.338-3.057c.3-.419.298-1.018-.121-1.318-.48-.3-1.019-.24-1.318.18l-2.096 2.576-2.04-2.695c-.149-.18-.373-.3-.612-.338zM4.613 11.154c1.558 0 2.817 1.26 2.817 2.758 0 1.558-1.259 2.756-2.817 2.756-1.558 0-2.816-1.198-2.816-2.756 0-1.498 1.258-2.758 2.816-2.758zm8.27 0c1.558 0 2.816 1.26 2.816 2.758-.06 1.558-1.318 2.756-2.816 2.756-1.558 0-2.817-1.198-2.817-2.756 0-1.498 1.259-2.758 2.817-2.758Z","canva":"M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zM6.962 7.68c.754 0 1.337.549 1.405 1.2.069.583-.171 1.097-.822 1.406-.343.171-.48.172-.549.069-.034-.069 0-.137.069-.206.617-.514.617-.926.548-1.508-.034-.378-.308-.618-.583-.618-1.2 0-2.914 2.674-2.674 4.629.103.754.549 1.646 1.509 1.646.308 0 .65-.103.96-.24.5-.264.799-.47 1.097-.8-.073-.885.704-2.046 1.851-2.046.515 0 .926.205.96.583.068.514-.377.582-.514.582s-.378-.034-.378-.17c-.034-.138.309-.07.275-.378-.035-.206-.24-.274-.446-.274-.72 0-1.131.994-1.029 1.611.035.275.172.549.447.549.205 0 .514-.31.617-.755.068-.308.343-.514.583-.514.102 0 .17.034.205.171v.138c-.034.137-.137.548-.102.651 0 .069.034.171.17.171.092 0 .436-.18.777-.459.117-.59.253-1.298.253-1.357.034-.24.137-.48.617-.48.103 0 .171.034.205.171v.138l-.136.617c.445-.583 1.097-.994 1.508-.994.172 0 .309.102.309.274 0 .103 0 .274-.069.446-.137.377-.309.96-.412 1.474 0 .137.035.274.207.274.171 0 .685-.206 1.096-.754l.007-.004c-.002-.068-.007-.134-.007-.202 0-.411.035-.754.104-.994.068-.274.411-.514.617-.514.103 0 .205.069.205.171 0 .035 0 .103-.034.137-.137.446-.24.857-.24 1.269 0 .24.034.582.102.788 0 .034.035.069.07.069.068 0 .548-.445.89-1.028-.308-.206-.48-.549-.48-.96 0-.72.446-1.097.858-1.097.343 0 .617.24.617.72 0 .308-.103.65-.274.96h.102a.77.77 0 0 0 .584-.24.293.293 0 0 1 .134-.117c.335-.425.83-.74 1.41-.74.48 0 .924.205.959.582.068.515-.378.618-.515.618l-.002-.002c-.138 0-.377-.035-.377-.172 0-.137.309-.068.274-.376-.034-.206-.24-.275-.446-.275-.686 0-1.13.891-1.028 1.611.034.275.171.583.445.583.206 0 .515-.308.652-.754.068-.274.343-.514.583-.514.103 0 .17.034.205.171 0 .069 0 .206-.137.652-.17.308-.171.48-.137.617.034.274.171.48.309.583.034.034.068.102.068.102 0 .069-.034.138-.137.138-.034 0-.068 0-.103-.035-.514-.205-.72-.548-.789-.891-.205.24-.445.377-.72.377-.445 0-.89-.411-.96-.926a1.609 1.609 0 0 1 .075-.649c-.203.13-.422.203-.623.203h-.17c-.447.652-.927 1.098-1.27 1.303a.896.896 0 0 1-.377.104c-.068 0-.171-.035-.205-.104-.095-.152-.156-.392-.193-.667-.481.527-1.145.805-1.453.805-.343 0-.548-.206-.582-.55v-.376c.102-.754.377-1.2.377-1.337a.074.074 0 0 0-.069-.07c-.24 0-1.028.824-1.166 1.373l-.103.445c-.068.309-.377.515-.582.515-.103 0-.172-.035-.206-.172v-.137l.046-.233c-.435.31-.87.508-1.075.508-.308 0-.48-.172-.514-.412-.206.274-.445.412-.754.412-.352 0-.696-.24-.862-.593-.244.275-.523.553-.852.764-.48.309-1.028.549-1.68.549-.582 0-1.097-.309-1.371-.583-.412-.377-.651-.96-.686-1.509-.205-1.68.823-3.84 2.4-4.8.378-.205.755-.343 1.132-.343zm9.77 3.291c-.104 0-.172.172-.172.343 0 .274.137.583.309.755a1.74 1.74 0 0 0 .102-.583c0-.343-.137-.515-.24-.515z","cloudflare":"M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727","confluence":"M.87 18.257c-.248.382-.53.875-.763 1.245a.764.764 0 0 0 .255 1.04l4.965 3.054a.764.764 0 0 0 1.058-.26c.199-.332.454-.763.733-1.221 1.967-3.247 3.945-2.853 7.508-1.146l4.957 2.337a.764.764 0 0 0 1.028-.382l2.364-5.346a.764.764 0 0 0-.382-1 599.851 599.851 0 0 1-4.965-2.361C10.911 10.97 5.224 11.185.87 18.257zM23.131 5.743c.249-.405.531-.875.764-1.25a.764.764 0 0 0-.256-1.034L18.675.404a.764.764 0 0 0-1.058.26c-.195.335-.451.763-.734 1.225-1.966 3.246-3.945 2.85-7.508 1.146L4.437.694a.764.764 0 0 0-1.027.382L1.046 6.422a.764.764 0 0 0 .382 1c1.039.49 3.105 1.467 4.965 2.361 6.698 3.246 12.392 3.029 16.738-4.04z","discord":"M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z","figma":"M15.852 8.981h-4.588V0h4.588c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.491-4.49 4.491zM12.735 7.51h3.117c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-3.117V7.51zm0 1.471H8.148c-2.476 0-4.49-2.014-4.49-4.49S5.672 0 8.148 0h4.588v8.981zm-4.587-7.51c-1.665 0-3.019 1.355-3.019 3.019s1.354 3.02 3.019 3.02h3.117V1.471H8.148zm4.587 15.019H8.148c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h4.588v8.98zM8.148 8.981c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h3.117V8.981H8.148zM8.172 24c-2.489 0-4.515-2.014-4.515-4.49s2.014-4.49 4.49-4.49h4.588v4.441c0 2.503-2.047 4.539-4.563 4.539zm-.024-7.51a3.023 3.023 0 0 0-3.019 3.019c0 1.665 1.365 3.019 3.044 3.019 1.705 0 3.093-1.376 3.093-3.068v-2.97H8.148zm7.704 0h-.098c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h.098c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.49-4.49 4.49zm-.097-7.509c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h.098c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-.098z","github":"M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12","gitlab":"m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0537.8585.8585 0 0 0-.3362.4049L.4332 9.5015l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.03.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.4619-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z","gmail":"M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z","googlecalendar":"M18.316 5.684H24v12.632h-5.684V5.684zM5.684 24h12.632v-5.684H5.684V24zM18.316 5.684V0H1.895A1.894 1.894 0 0 0 0 1.895v16.421h5.684V5.684h12.632zm-7.207 6.25v-.065c.272-.144.5-.349.687-.617s.279-.595.279-.982c0-.379-.099-.72-.3-1.025a2.05 2.05 0 0 0-.832-.714 2.703 2.703 0 0 0-1.197-.257c-.6 0-1.094.156-1.481.467-.386.311-.65.671-.793 1.078l1.085.452c.086-.249.224-.461.413-.633.189-.172.445-.257.767-.257.33 0 .602.088.816.264a.86.86 0 0 1 .322.703c0 .33-.12.589-.36.778-.24.19-.535.284-.886.284h-.567v1.085h.633c.407 0 .748.109 1.02.327.272.218.407.499.407.843 0 .336-.129.614-.387.832s-.565.327-.924.327c-.351 0-.651-.103-.897-.311-.248-.208-.422-.502-.521-.881l-1.096.452c.178.616.505 1.082.977 1.401.472.319.984.478 1.538.477a2.84 2.84 0 0 0 1.293-.291c.382-.193.684-.458.902-.794.218-.336.327-.72.327-1.149 0-.429-.115-.797-.344-1.105a2.067 2.067 0 0 0-.881-.689zm2.093-1.931l.602.913L15 10.045v5.744h1.187V8.446h-.827l-2.158 1.557zM22.105 0h-3.289v5.184H24V1.895A1.894 1.894 0 0 0 22.105 0zm-3.289 23.5l4.684-4.684h-4.684V23.5zM0 22.105C0 23.152.848 24 1.895 24h3.289v-5.184H0v3.289z","googledrive":"M12.01 1.485c-2.082 0-3.754.02-3.743.047.01.02 1.708 3.001 3.774 6.62l3.76 6.574h3.76c2.081 0 3.753-.02 3.742-.047-.005-.02-1.708-3.001-3.775-6.62l-3.76-6.574zm-4.76 1.73a789.828 789.861 0 0 0-3.63 6.319L0 15.868l1.89 3.298 1.885 3.297 3.62-6.335 3.618-6.33-1.88-3.287C8.1 4.704 7.255 3.22 7.25 3.214zm2.259 12.653-.203.348c-.114.198-.96 1.672-1.88 3.287a423.93 423.948 0 0 1-1.698 2.97c-.01.026 3.24.042 7.222.042h7.244l1.796-3.157c.992-1.734 1.85-3.23 1.906-3.323l.104-.167h-7.249z","grafana":"M23.02 10.59a8.578 8.578 0 0 0-.862-3.034 8.911 8.911 0 0 0-1.789-2.445c.337-1.342-.413-2.505-.413-2.505-1.292-.08-2.113.4-2.416.62-.052-.02-.102-.044-.154-.064-.22-.089-.446-.172-.677-.247-.231-.073-.47-.14-.711-.197a9.867 9.867 0 0 0-.875-.161C14.557.753 12.94 0 12.94 0c-1.804 1.145-2.147 2.744-2.147 2.744l-.018.093c-.098.029-.2.057-.298.088-.138.042-.275.094-.413.143-.138.055-.275.107-.41.166a8.869 8.869 0 0 0-1.557.87l-.063-.029c-2.497-.955-4.716.195-4.716.195-.203 2.658.996 4.33 1.235 4.636a11.608 11.608 0 0 0-.607 2.635C1.636 12.677.953 15.014.953 15.014c1.926 2.214 4.171 2.351 4.171 2.351.003-.002.006-.002.006-.005.285.509.615.994.986 1.446.156.19.32.371.488.548-.704 2.009.099 3.68.099 3.68 2.144.08 3.553-.937 3.849-1.173a9.784 9.784 0 0 0 3.164.501h.08l.055-.003.107-.002.103-.005.003.002c1.01 1.44 2.788 1.646 2.788 1.646 1.264-1.332 1.337-2.653 1.337-2.94v-.058c0-.02-.003-.039-.003-.06.265-.187.52-.387.758-.6a7.875 7.875 0 0 0 1.415-1.7c1.43.083 2.437-.885 2.437-.885-.236-1.49-1.085-2.216-1.264-2.354l-.018-.013-.016-.013a.217.217 0 0 1-.031-.02c.008-.092.016-.18.02-.27.011-.162.016-.323.016-.48v-.253l-.005-.098-.008-.135a1.891 1.891 0 0 0-.01-.13c-.003-.042-.008-.083-.013-.125l-.016-.124-.018-.122a6.215 6.215 0 0 0-2.032-3.73 6.015 6.015 0 0 0-3.222-1.46 6.292 6.292 0 0 0-.85-.048l-.107.002h-.063l-.044.003-.104.008a4.777 4.777 0 0 0-3.335 1.695c-.332.4-.592.84-.768 1.297a4.594 4.594 0 0 0-.312 1.817l.003.091c.005.055.007.11.013.164a3.615 3.615 0 0 0 .698 1.82 3.53 3.53 0 0 0 1.827 1.282c.33.098.66.14.971.137.039 0 .078 0 .114-.002l.063-.003c.02 0 .041-.003.062-.003.034-.002.065-.007.099-.01.007 0 .018-.003.028-.003l.031-.005.06-.008a1.18 1.18 0 0 0 .112-.02c.036-.008.072-.013.109-.024a2.634 2.634 0 0 0 .914-.415c.028-.02.056-.041.085-.065a.248.248 0 0 0 .039-.35.244.244 0 0 0-.309-.06l-.078.042c-.09.044-.184.083-.283.116a2.476 2.476 0 0 1-.475.096c-.028.003-.054.006-.083.006l-.083.002c-.026 0-.054 0-.08-.002l-.102-.006h-.012l-.024.006c-.016-.003-.031-.003-.044-.006-.031-.002-.06-.007-.091-.01a2.59 2.59 0 0 1-.724-.213 2.557 2.557 0 0 1-.667-.438 2.52 2.52 0 0 1-.805-1.475 2.306 2.306 0 0 1-.029-.444l.006-.122v-.023l.002-.031c.003-.021.003-.04.005-.06a3.163 3.163 0 0 1 1.352-2.29 3.12 3.12 0 0 1 .937-.43 2.946 2.946 0 0 1 .776-.101h.06l.07.002.045.003h.026l.07.005a4.041 4.041 0 0 1 1.635.49 3.94 3.94 0 0 1 1.602 1.662 3.77 3.77 0 0 1 .397 1.414l.005.076.003.075c.002.026.002.05.002.075 0 .024.003.052 0 .07v.065l-.002.073-.008.174a6.195 6.195 0 0 1-.08.639 5.1 5.1 0 0 1-.267.927 5.31 5.31 0 0 1-.624 1.13 5.052 5.052 0 0 1-3.237 2.014 4.82 4.82 0 0 1-.649.066l-.039.003h-.287a6.607 6.607 0 0 1-1.716-.265 6.776 6.776 0 0 1-3.4-2.274 6.75 6.75 0 0 1-.746-1.15 6.616 6.616 0 0 1-.714-2.596l-.005-.083-.002-.02v-.056l-.003-.073v-.096l-.003-.104v-.07l.003-.163c.008-.22.026-.45.054-.678a8.707 8.707 0 0 1 .28-1.355c.128-.444.286-.872.473-1.277a7.04 7.04 0 0 1 1.456-2.1 5.925 5.925 0 0 1 .953-.763c.169-.111.343-.213.524-.306.089-.05.182-.091.273-.135.047-.02.093-.042.138-.062a7.177 7.177 0 0 1 .714-.267l.145-.045c.049-.015.098-.026.148-.041.098-.029.197-.052.296-.076.049-.013.1-.02.15-.033l.15-.032.151-.028.076-.013.075-.01.153-.024c.057-.01.114-.013.171-.023l.169-.021c.036-.003.073-.008.106-.01l.073-.008.036-.003.042-.002c.057-.003.114-.008.171-.01l.086-.006h.023l.037-.003.145-.007a7.999 7.999 0 0 1 1.708.125 7.917 7.917 0 0 1 2.048.68 8.253 8.253 0 0 1 1.672 1.09l.09.077.089.078c.06.052.114.107.171.159.057.052.112.106.166.16.052.055.107.107.159.164a8.671 8.671 0 0 1 1.41 1.978c.012.026.028.052.04.078l.04.078.075.156c.023.051.05.1.07.153l.065.15a8.848 8.848 0 0 1 .45 1.34.19.19 0 0 0 .201.142.186.186 0 0 0 .172-.184c.01-.246.002-.532-.024-.856z","hubspot":"M18.164 7.93V5.084a2.198 2.198 0 001.267-1.978v-.067A2.2 2.2 0 0017.238.845h-.067a2.2 2.2 0 00-2.193 2.193v.067a2.196 2.196 0 001.252 1.973l.013.006v2.852a6.22 6.22 0 00-2.969 1.31l.012-.01-7.828-6.095A2.497 2.497 0 104.3 4.656l-.012.006 7.697 5.991a6.176 6.176 0 00-1.038 3.446c0 1.343.425 2.588 1.147 3.607l-.013-.02-2.342 2.343a1.968 1.968 0 00-.58-.095h-.002a2.033 2.033 0 102.033 2.033 1.978 1.978 0 00-.1-.595l.005.014 2.317-2.317a6.247 6.247 0 104.782-11.134l-.036-.005zm-.964 9.378a3.206 3.206 0 113.215-3.207v.002a3.206 3.206 0 01-3.207 3.207z","huggingface":"M1.4446 11.5059c0 1.1021.1673 2.1585.4847 3.1563-.0378-.0028-.0691-.0058-.1058-.0058-.4209 0-.8015.16-1.0704.4512-.3454.3737-.4984.8335-.4316 1.293a1.576 1.576 0 0 0 .2148.5978c-.2319.1864-.4018.4456-.4844.7578-.0646.2448-.131.7543.2149 1.2794a1.4552 1.4552 0 0 0-.0625.1055c-.208.3923-.2207.8372-.0371 1.25.2783.6258.9696 1.1175 2.3126 1.6467.8356.3292 1.5988.5411 1.6056.543 1.1046.2847 2.104.4277 2.969.4277 1.4173 0 2.4754-.3849 3.1525-1.1446 1.538.2651 2.791.1403 3.592.006.6773.7555 1.7332 1.1387 3.1467 1.1387.8649 0 1.8643-.143 2.969-.4278.0068-.0019.77-.2138 1.6056-.543 1.343-.5292 2.0343-1.0208 2.3126-1.6466.1836-.4129.171-.8577-.037-1.25a1.4685 1.4685 0 0 0-.0626-.1056c.346-.525.2795-1.0346.2149-1.2793-.0826-.3122-.2525-.5714-.4844-.7579.11-.1816.1831-.3788.2148-.5977.0669-.4595-.0862-.9193-.4316-1.293-.2688-.2913-.6495-.4513-1.0704-.4513-.0209 0-.0376.0008-.0588.0018.3162-.9966.4846-2.0518.4846-3.1523 0-5.807-4.7362-10.5144-10.5789-10.5144-5.8426 0-10.5788 4.7073-10.5788 10.5144Zm10.5788-9.4831c5.2727 0 9.5476 4.246 9.5476 9.483a9.4201 9.4201 0 0 1-.2696 2.2365c-.0039-.0047-.0079-.011-.0117-.0156-.274-.3255-.6679-.5059-1.1075-.5059-.352 0-.714.1155-1.0763.3438-.2403.1517-.5058.422-.7793.7598-.2534-.3492-.608-.5832-1.0137-.6465a1.5174 1.5174 0 0 0-.2344-.0176c-.9263 0-1.4828.7993-1.6935 1.5177-.1046.2426-.6065 1.3482-1.3614 2.0978-1.1681 1.1601-1.4458 2.3534-.8396 3.6382-.843.1029-1.5836.0927-2.365-.006.5906-1.212.3626-2.4388-.8426-3.6322-.755-.7496-1.2568-1.8552-1.3614-2.0978-.2107-.7184-.7673-1.5177-1.6935-1.5177-.078 0-.1568.0054-.2344.0176-.4057.0633-.7604.2973-1.0137.6465-.2735-.3379-.539-.6081-.7794-.7598-.3622-.2283-.7243-.3438-1.0762-.3438-.4266 0-.8094.171-1.0821.4786a9.4208 9.4208 0 0 1-.2598-2.1936c0-5.237 4.2749-9.483 9.5475-9.483zM8.6443 7.0036c-.4838.0043-.9503.2667-1.1934.7227-.3536.6633-.1006 1.4873.5645 1.84.351.1862.4883-.5261.836-.6485.3107-.1095.841.399 1.0078.086.3536-.6634.1025-1.4874-.5625-1.84a1.3659 1.3659 0 0 0-.6524-.1602Zm6.8403 0c-.2199-.002-.4426.05-.6504.1602-.665.3526-.9181 1.1766-.5645 1.84.1669.313.6971-.1955 1.0079-.086.3476.1224.4867.8347.838.6485.6649-.3527.916-1.1767.5624-1.84-.243-.456-.7096-.7184-1.1934-.7227Zm-9.7565 1.418a.8768.8768 0 0 0-.877.877c0 .4846.3925.877.877.877a.8768.8768 0 0 0 .877-.877.8768.8768 0 0 0-.877-.877zm12.6434 0c-.4845 0-.879.3925-.879.877 0 .4846.3945.877.879.877a.8768.8768 0 0 0 .877-.877.8768.8768 0 0 0-.877-.877zM8.7927 11.459c-.179-.003-.2793.1107-.2793.416 0 .8097.3874 2.125 1.4279 2.924.207-.7123 1.3453-1.2832 1.5079-1.2012.2315.1167.2191.4417.6074.7266.3884-.285.374-.6098.6056-.7266.1627-.082 1.3009.4889 1.5079 1.2012 1.0404-.799 1.4278-2.1144 1.4278-2.924 0-1.2212-1.583.6402-3.5413.6485-1.4686-.0061-2.7266-1.0558-3.2639-1.0645zM4.312 14.4768c.5792.365 1.6964 2.2751 2.1056 3.0177.1371.2488.371.3536.582.3536.4188 0 .7465-.4138.0391-.9395-1.0636-.791-.6914-2.0846-.1836-2.1642a.4302.4302 0 0 1 .0664-.004c.4616 0 .666.7892.666.7892s.5959 1.4898 1.6213 2.508c.942.9356 1.062 1.703.4961 2.6661-.0164-.004-.0159.0236-.1484.2149-.1853.2673-.4322.4688-.7188.6152-.5062.2269-1.1397.2696-1.7833.2696-1.037 0-2.1017-.1824-2.6975-.336-.0293-.0075-3.6505-.9567-3.1916-1.8224.0771-.1454.2033-.2031.3633-.2031.6463 0 1.823.9551 2.3283.9551.113 0 .196-.0865.2285-.2031.2249-.8045-3.2787-1.0522-2.9846-2.1642.0519-.1967.193-.2757.3907-.2754.854 0 2.7704 1.4923 3.172 1.4923.0307 0 .0525-.0085.0645-.0274.2012-.3227.1096-.5865-1.3087-1.4395-1.4182-.8533-2.4315-1.329-1.8653-1.9416.0651-.0707.1574-.1015.2695-.1015.8611.0002 2.8948 1.84 2.8948 1.84s.5487.5683.8809.5683c.0762 0 .1416-.0315.1855-.1054.2355-.3946-2.1858-2.2183-2.3224-2.971-.0926-.51.0641-.7676.3555-.7676-.0006.008.1701-.0285.4942.1759zm16.2257.5918c-.1366.7526-2.5579 2.5764-2.3224 2.9709.044.074.1092.1055.1855.1055.3321 0 .881-.5684.881-.5684s2.0336-1.8397 2.8947-1.84c.1121 0 .2044.0308.2695.1016.5662.6125-.447 1.0882-1.8653 1.9415-1.4183.853-1.51 1.1168-1.3087 1.4396.012.0188.0337.0273.0644.0273.4016 0 2.3181-1.4923 3.1721-1.4923.1977-.0002.3388.0787.3907.2754.294 1.112-3.2095 1.3597-2.9846 2.1642.0325.1166.1156.2032.2285.2032.5054 0 1.682-.9552 2.3283-.9552.16 0 .2862.0577.3633.2032.459.8656-3.1623 1.8149-3.1916 1.8224-.5958.1535-1.6605.336-2.6975.336-.6351 0-1.261-.0409-1.7638-.2599-.2949-.1472-.5488-.3516-.7383-.625-.0411-.0682-.1026-.1476-.1426-.205-.5726-.9679-.455-1.7371.4903-2.676 1.0254-1.0182 1.6212-2.508 1.6212-2.508s.2044-.7891.666-.7891a.4318.4318 0 0 1 .0665.0039c.5078.0796.88 1.3732-.1836 2.1642-.7074.5257-.3797.9395.039.9395.211 0 .445-.1047.5821-.3535.4092-.7426 1.5264-2.6527 2.1056-3.0178.5588-.3524.99-.1816.8497.5918z","intercom":"M21 0H3C1.343 0 0 1.343 0 3v18c0 1.658 1.343 3 3 3h18c1.658 0 3-1.342 3-3V3c0-1.657-1.342-3-3-3zm-5.801 4.399c0-.44.36-.8.802-.8.44 0 .8.36.8.8v10.688c0 .442-.36.801-.8.801-.443 0-.802-.359-.802-.801V4.399zM11.2 3.994c0-.44.357-.799.8-.799s.8.359.8.799v11.602c0 .44-.357.8-.8.8s-.8-.36-.8-.8V3.994zm-4 .405c0-.44.359-.8.799-.8.443 0 .802.36.802.8v10.688c0 .442-.36.801-.802.801-.44 0-.799-.359-.799-.801V4.399zM3.199 6c0-.442.36-.8.802-.8.44 0 .799.358.799.8v7.195c0 .441-.359.8-.799.8-.443 0-.802-.36-.802-.8V6zM20.52 18.202c-.123.105-3.086 2.593-8.52 2.593-5.433 0-8.397-2.486-8.521-2.593-.335-.288-.375-.792-.086-1.128.285-.334.79-.375 1.125-.09.047.041 2.693 2.211 7.481 2.211 4.848 0 7.456-2.186 7.479-2.207.334-.289.839-.25 1.128.086.289.336.25.84-.086 1.128zm.281-5.007c0 .441-.36.8-.801.8-.441 0-.801-.36-.801-.8V6c0-.442.361-.8.801-.8.441 0 .801.357.801.8v7.195z","jira":"M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z","linear":"M2.886 4.18A11.982 11.982 0 0 1 11.99 0C18.624 0 24 5.376 24 12.009c0 3.64-1.62 6.903-4.18 9.105L2.887 4.18ZM1.817 5.626l16.556 16.556c-.524.33-1.075.62-1.65.866L.951 7.277c.247-.575.537-1.126.866-1.65ZM.322 9.163l14.515 14.515c-.71.172-1.443.282-2.195.322L0 11.358a12 12 0 0 1 .322-2.195Zm-.17 4.862 9.823 9.824a12.02 12.02 0 0 1-9.824-9.824Z","netlify":"M6.49 19.04h-.23L5.13 17.9v-.23l1.73-1.71h1.2l.15.15v1.2L6.5 19.04ZM5.13 6.31V6.1l1.13-1.13h.23L8.2 6.68v1.2l-.15.15h-1.2L5.13 6.31Zm9.96 9.09h-1.65l-.14-.13v-3.83c0-.68-.27-1.2-1.1-1.23-.42 0-.9 0-1.43.02l-.07.08v4.96l-.14.14H8.9l-.13-.14V8.73l.13-.14h3.7a2.6 2.6 0 0 1 2.61 2.6v4.08l-.13.14Zm-8.37-2.44H.14L0 12.82v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14Zm17.14 0h-6.58l-.14-.14v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14ZM11.05 6.55V1.64l.14-.14h1.65l.14.14v4.9l-.14.14h-1.65l-.14-.13Zm0 15.81v-4.9l.14-.14h1.65l.14.13v4.91l-.14.14h-1.65l-.14-.14Z","notion":"M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z","paypal":"M7.016 19.198h-4.2a.562.562 0 0 1-.555-.65L5.093.584A.692.692 0 0 1 5.776 0h7.222c3.417 0 5.904 2.488 5.846 5.5-.006.25-.027.5-.066.747A6.794 6.794 0 0 1 12.071 12H8.743a.69.69 0 0 0-.682.583l-.325 2.056-.013.083-.692 4.39-.015.087zM19.79 6.142c-.01.087-.01.175-.023.261a7.76 7.76 0 0 1-7.695 6.598H9.007l-.283 1.795-.013.083-.692 4.39-.134.843-.014.088H6.86l-.497 3.15a.562.562 0 0 0 .555.65h3.612c.34 0 .63-.249.683-.585l.952-6.031a.692.692 0 0 1 .683-.584h2.126a6.793 6.793 0 0 0 6.707-5.752c.306-1.95-.466-3.744-1.89-4.906z","postgresql":"M23.5594 14.7228a.5269.5269 0 0 0-.0563-.1191c-.139-.2632-.4768-.3418-1.0074-.2321-1.6533.3411-2.2935.1312-2.5256-.0191 1.342-2.0482 2.445-4.522 3.0411-6.8297.2714-1.0507.7982-3.5237.1222-4.7316a1.5641 1.5641 0 0 0-.1509-.235C21.6931.9086 19.8007.0248 17.5099.0005c-1.4947-.0158-2.7705.3461-3.1161.4794a9.449 9.449 0 0 0-.5159-.0816 8.044 8.044 0 0 0-1.3114-.1278c-1.1822-.0184-2.2038.2642-3.0498.8406-.8573-.3211-4.7888-1.645-7.2219.0788C.9359 2.1526.3086 3.8733.4302 6.3043c.0409.818.5069 3.334 1.2423 5.7436.4598 1.5065.9387 2.7019 1.4334 3.582.553.9942 1.1259 1.5933 1.7143 1.7895.4474.1491 1.1327.1441 1.8581-.7279.8012-.9635 1.5903-1.8258 1.9446-2.2069.4351.2355.9064.3625 1.39.3772a.0569.0569 0 0 0 .0004.0041 11.0312 11.0312 0 0 0-.2472.3054c-.3389.4302-.4094.5197-1.5002.7443-.3102.064-1.1344.2339-1.1464.8115-.0025.1224.0329.2309.0919.3268.2269.4231.9216.6097 1.015.6331 1.3345.3335 2.5044.092 3.3714-.6787-.017 2.231.0775 4.4174.3454 5.0874.2212.5529.7618 1.9045 2.4692 1.9043.2505 0 .5263-.0291.8296-.0941 1.7819-.3821 2.5557-1.1696 2.855-2.9059.1503-.8707.4016-2.8753.5388-4.1012.0169-.0703.0357-.1207.057-.1362.0007-.0005.0697-.0471.4272.0307a.3673.3673 0 0 0 .0443.0068l.2539.0223.0149.001c.8468.0384 1.9114-.1426 2.5312-.4308.6438-.2988 1.8057-1.0323 1.5951-1.6698zM2.371 11.8765c-.7435-2.4358-1.1779-4.8851-1.2123-5.5719-.1086-2.1714.4171-3.6829 1.5623-4.4927 1.8367-1.2986 4.8398-.5408 6.108-.13-.0032.0032-.0066.0061-.0098.0094-2.0238 2.044-1.9758 5.536-1.9708 5.7495-.0002.0823.0066.1989.0162.3593.0348.5873.0996 1.6804-.0735 2.9184-.1609 1.1504.1937 2.2764.9728 3.0892.0806.0841.1648.1631.2518.2374-.3468.3714-1.1004 1.1926-1.9025 2.1576-.5677.6825-.9597.5517-1.0886.5087-.3919-.1307-.813-.5871-1.2381-1.3223-.4796-.839-.9635-2.0317-1.4155-3.5126zm6.0072 5.0871c-.1711-.0428-.3271-.1132-.4322-.1772.0889-.0394.2374-.0902.4833-.1409 1.2833-.2641 1.4815-.4506 1.9143-1.0002.0992-.126.2116-.2687.3673-.4426a.3549.3549 0 0 0 .0737-.1298c.1708-.1513.2724-.1099.4369-.0417.156.0646.3078.26.3695.4752.0291.1016.0619.2945-.0452.4444-.9043 1.2658-2.2216 1.2494-3.1676 1.0128zm2.094-3.988-.0525.141c-.133.3566-.2567.6881-.3334 1.003-.6674-.0021-1.3168-.2872-1.8105-.8024-.6279-.6551-.9131-1.5664-.7825-2.5004.1828-1.3079.1153-2.4468.079-3.0586-.005-.0857-.0095-.1607-.0122-.2199.2957-.2621 1.6659-.9962 2.6429-.7724.4459.1022.7176.4057.8305.928.5846 2.7038.0774 3.8307-.3302 4.7363-.084.1866-.1633.3629-.2311.5454zm7.3637 4.5725c-.0169.1768-.0358.376-.0618.5959l-.146.4383a.3547.3547 0 0 0-.0182.1077c-.0059.4747-.054.6489-.115.8693-.0634.2292-.1353.4891-.1794 1.0575-.11 1.4143-.8782 2.2267-2.4172 2.5565-1.5155.3251-1.7843-.4968-2.0212-1.2217a6.5824 6.5824 0 0 0-.0769-.2266c-.2154-.5858-.1911-1.4119-.1574-2.5551.0165-.5612-.0249-1.9013-.3302-2.6462.0044-.2932.0106-.5909.019-.8918a.3529.3529 0 0 0-.0153-.1126 1.4927 1.4927 0 0 0-.0439-.208c-.1226-.4283-.4213-.7866-.7797-.9351-.1424-.059-.4038-.1672-.7178-.0869.067-.276.1831-.5875.309-.9249l.0529-.142c.0595-.16.134-.3257.213-.5012.4265-.9476 1.0106-2.2453.3766-5.1772-.2374-1.0981-1.0304-1.6343-2.2324-1.5098-.7207.0746-1.3799.3654-1.7088.5321a5.6716 5.6716 0 0 0-.1958.1041c.0918-1.1064.4386-3.1741 1.7357-4.4823a4.0306 4.0306 0 0 1 .3033-.276.3532.3532 0 0 0 .1447-.0644c.7524-.5706 1.6945-.8506 2.802-.8325.4091.0067.8017.0339 1.1742.081 1.939.3544 3.2439 1.4468 4.0359 2.3827.8143.9623 1.2552 1.9315 1.4312 2.4543-1.3232-.1346-2.2234.1268-2.6797.779-.9926 1.4189.543 4.1729 1.2811 5.4964.1353.2426.2522.4522.2889.5413.2403.5825.5515.9713.7787 1.2552.0696.087.1372.1714.1885.245-.4008.1155-1.1208.3825-1.0552 1.717-.0123.1563-.0423.4469-.0834.8148-.0461.2077-.0702.4603-.0994.7662zm.8905-1.6211c-.0405-.8316.2691-.9185.5967-1.0105a2.8566 2.8566 0 0 0 .135-.0406 1.202 1.202 0 0 0 .1342.103c.5703.3765 1.5823.4213 3.0068.1344-.2016.1769-.5189.3994-.9533.6011-.4098.1903-1.0957.333-1.7473.3636-.7197.0336-1.0859-.0807-1.1721-.151zm.5695-9.2712c-.0059.3508-.0542.6692-.1054 1.0017-.055.3576-.112.7274-.1264 1.1762-.0142.4368.0404.8909.0932 1.3301.1066.887.216 1.8003-.2075 2.7014a3.5272 3.5272 0 0 1-.1876-.3856c-.0527-.1276-.1669-.3326-.3251-.6162-.6156-1.1041-2.0574-3.6896-1.3193-4.7446.3795-.5427 1.3408-.5661 2.1781-.463zm.2284 7.0137a12.3762 12.3762 0 0 0-.0853-.1074l-.0355-.0444c.7262-1.1995.5842-2.3862.4578-3.4385-.0519-.4318-.1009-.8396-.0885-1.2226.0129-.4061.0666-.7543.1185-1.0911.0639-.415.1288-.8443.1109-1.3505.0134-.0531.0188-.1158.0118-.1902-.0457-.4855-.5999-1.938-1.7294-3.253-.6076-.7073-1.4896-1.4972-2.6889-2.0395.5251-.1066 1.2328-.2035 2.0244-.1859 2.0515.0456 3.6746.8135 4.8242 2.2824a.908.908 0 0 1 .0667.1002c.7231 1.3556-.2762 6.2751-2.9867 10.5405zm-8.8166-6.1162c-.025.1794-.3089.4225-.6211.4225a.5821.5821 0 0 1-.0809-.0056c-.1873-.026-.3765-.144-.5059-.3156-.0458-.0605-.1203-.178-.1055-.2844.0055-.0401.0261-.0985.0925-.1488.1182-.0894.3518-.1226.6096-.0867.3163.0441.6426.1938.6113.4186zm7.9305-.4114c.0111.0792-.049.201-.1531.3102-.0683.0717-.212.1961-.4079.2232a.5456.5456 0 0 1-.075.0052c-.2935 0-.5414-.2344-.5607-.3717-.024-.1765.2641-.3106.5611-.352.297-.0414.6111.0088.6356.1851z","posthog":"M9.854 14.5 5 9.647.854 5.5A.5.5 0 0 0 0 5.854V8.44a.5.5 0 0 0 .146.353L5 13.647l.147.146L9.854 18.5l.146.147v-.049c.065.03.134.049.207.049h2.586a.5.5 0 0 0 .353-.854L9.854 14.5zm0-5-4-4a.487.487 0 0 0-.409-.144.515.515 0 0 0-.356.21.493.493 0 0 0-.089.288V8.44a.5.5 0 0 0 .147.353l9 9a.5.5 0 0 0 .853-.354v-2.585a.5.5 0 0 0-.146-.354l-5-5zm1-4a.5.5 0 0 0-.854.354V8.44a.5.5 0 0 0 .147.353l4 4a.5.5 0 0 0 .853-.354V9.854a.5.5 0 0 0-.146-.354l-4-4zm12.647 11.515a3.863 3.863 0 0 1-2.232-1.1l-4.708-4.707a.5.5 0 0 0-.854.354v6.585a.5.5 0 0 0 .5.5H23.5a.5.5 0 0 0 .5-.5v-.6c0-.276-.225-.497-.499-.532zm-5.394.032a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6zM.854 15.5a.5.5 0 0 0-.854.354v2.293a.5.5 0 0 0 .5.5h2.293c.222 0 .39-.135.462-.309a.493.493 0 0 0-.109-.545L.854 15.501zM5 14.647.854 10.5a.5.5 0 0 0-.854.353v2.586a.5.5 0 0 0 .146.353L4.854 18.5l.146.147h2.793a.5.5 0 0 0 .353-.854L5 14.647z","sentry":"M13.91 2.505c-.873-1.448-2.972-1.448-3.844 0L6.904 7.92a15.478 15.478 0 0 1 8.53 12.811h-2.221A13.301 13.301 0 0 0 5.784 9.814l-2.926 5.06a7.65 7.65 0 0 1 4.435 5.848H2.194a.365.365 0 0 1-.298-.534l1.413-2.402a5.16 5.16 0 0 0-1.614-.913L.296 19.275a2.182 2.182 0 0 0 .812 2.999 2.24 2.24 0 0 0 1.086.288h6.983a9.322 9.322 0 0 0-3.845-8.318l1.11-1.922a11.47 11.47 0 0 1 4.95 10.24h5.915a17.242 17.242 0 0 0-7.885-15.28l2.244-3.845a.37.37 0 0 1 .504-.13c.255.14 9.75 16.708 9.928 16.9a.365.365 0 0 1-.327.543h-2.287c.029.612.029 1.223 0 1.831h2.297a2.206 2.206 0 0 0 1.922-3.31z","shopify":"M15.337 23.979l7.216-1.561s-2.604-17.613-2.625-17.73c-.018-.116-.114-.192-.211-.192s-1.929-.136-1.929-.136-1.275-1.274-1.439-1.411c-.045-.037-.075-.057-.121-.074l-.914 21.104h.023zM11.71 11.305s-.81-.424-1.774-.424c-1.447 0-1.504.906-1.504 1.141 0 1.232 3.24 1.715 3.24 4.629 0 2.295-1.44 3.76-3.406 3.76-2.354 0-3.54-1.465-3.54-1.465l.646-2.086s1.245 1.066 2.28 1.066c.675 0 .975-.545.975-.932 0-1.619-2.654-1.694-2.654-4.359-.034-2.237 1.571-4.416 4.827-4.416 1.257 0 1.875.361 1.875.361l-.945 2.715-.02.01zM11.17.83c.136 0 .271.038.405.135-.984.465-2.064 1.639-2.508 3.992-.656.213-1.293.405-1.889.578C7.697 3.75 8.951.84 11.17.84V.83zm1.235 2.949v.135c-.754.232-1.583.484-2.394.736.466-1.777 1.333-2.645 2.085-2.971.193.501.309 1.176.309 2.1zm.539-2.234c.694.074 1.141.867 1.429 1.755-.349.114-.735.231-1.158.366v-.252c0-.752-.096-1.371-.271-1.871v.002zm2.992 1.289c-.02 0-.06.021-.078.021s-.289.075-.714.21c-.423-1.233-1.176-2.37-2.508-2.37h-.115C12.135.209 11.669 0 11.265 0 8.159 0 6.675 3.877 6.21 5.846c-1.194.365-2.063.636-2.16.674-.675.213-.694.232-.772.87-.075.462-1.83 14.063-1.83 14.063L15.009 24l.927-21.166z","slack":"M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z","square":"M4.01 0A4.01 4.01 0 000 4.01v15.98c0 2.21 1.8 4 4.01 4.01h15.98C22.2 24 24 22.2 24 19.99V4A4.01 4.01 0 0019.99 0H4zm1.62 4.36h12.74c.7 0 1.26.57 1.26 1.27v12.74c0 .7-.56 1.27-1.26 1.27H5.63c-.7 0-1.26-.57-1.26-1.27V5.63a1.27 1.27 0 011.26-1.27zm3.83 4.35a.73.73 0 00-.73.73v5.09c0 .4.32.72.72.72h5.1a.73.73 0 00.73-.72V9.44a.73.73 0 00-.73-.73h-5.1Z","stripe":"M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z","supabase":"M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z","todoist":"M21 0H3C1.35 0 0 1.35 0 3v3.858s3.854 2.24 4.098 2.38c.31.18.694.177 1.004 0 .26-.147 8.02-4.608 8.136-4.675.279-.161.58-.107.748-.01.164.097.606.348.84.48.232.134.221.502.013.622l-9.712 5.59c-.346.2-.69.204-1.048.002C3.478 10.907.998 9.463 0 8.882v2.02l4.098 2.38c.31.18.694.177 1.004 0 .26-.147 8.02-4.609 8.136-4.676.279-.16.58-.106.748-.008.164.096.606.347.84.48.232.133.221.5.013.62-.208.121-9.288 5.346-9.712 5.59-.346.2-.69.205-1.048.002C3.478 14.951.998 13.506 0 12.926v2.02l4.098 2.38c.31.18.694.177 1.004 0 .26-.147 8.02-4.609 8.136-4.676.279-.16.58-.106.748-.009.164.097.606.348.84.48.232.133.221.502.013.622l-9.712 5.59c-.346.199-.69.204-1.048.001C3.478 18.994.998 17.55 0 16.97V21c0 1.65 1.35 3 3 3h18c1.65 0 3-1.35 3-3V3c0-1.65-1.35-3-3-3z","twilio":"M12 0C5.381-.008.008 5.352 0 11.971V12c0 6.64 5.359 12 12 12 6.64 0 12-5.36 12-12 0-6.641-5.36-12-12-12zm0 20.801c-4.846.015-8.786-3.904-8.801-8.75V12c-.014-4.846 3.904-8.786 8.75-8.801H12c4.847-.014 8.786 3.904 8.801 8.75V12c.015 4.847-3.904 8.786-8.75 8.801H12zm5.44-11.76c0 1.359-1.12 2.479-2.481 2.479-1.366-.007-2.472-1.113-2.479-2.479 0-1.361 1.12-2.481 2.479-2.481 1.361 0 2.481 1.12 2.481 2.481zm0 5.919c0 1.36-1.12 2.48-2.481 2.48-1.367-.008-2.473-1.114-2.479-2.48 0-1.359 1.12-2.479 2.479-2.479 1.361-.001 2.481 1.12 2.481 2.479zm-5.919 0c0 1.36-1.12 2.48-2.479 2.48-1.368-.007-2.475-1.113-2.481-2.48 0-1.359 1.12-2.479 2.481-2.479 1.358-.001 2.479 1.12 2.479 2.479zm0-5.919c0 1.359-1.12 2.479-2.479 2.479-1.367-.007-2.475-1.112-2.481-2.479 0-1.361 1.12-2.481 2.481-2.481 1.358 0 2.479 1.12 2.479 2.481z","vercel":"M24 22.525H0l12-21.05 12 21.05z","webflow":"m24 4.515-7.658 14.97H9.149l3.205-6.204h-.144C9.566 16.713 5.621 18.973 0 19.485v-6.118s3.596-.213 5.71-2.435H0V4.515h6.417v5.278l.144-.001 2.622-5.277h4.854v5.244h.144l2.72-5.244H24Z","zapier":"M4.157 0A4.151 4.151 0 0 0 0 4.161v15.678A4.151 4.151 0 0 0 4.157 24h15.682A4.152 4.152 0 0 0 24 19.839V4.161A4.152 4.152 0 0 0 19.839 0H4.157Zm10.61 8.761h.03a.577.577 0 0 1 .23.038.585.585 0 0 1 .201.124.63.63 0 0 1 .162.431.612.612 0 0 1-.162.435.58.58 0 0 1-.201.128.58.58 0 0 1-.23.042.529.529 0 0 1-.235-.042.585.585 0 0 1-.332-.328.559.559 0 0 1-.038-.235.613.613 0 0 1 .17-.431.59.59 0 0 1 .405-.162Zm2.853 1.572c.03.004.061.004.095.004.325-.011.646.064.937.219.238.144.431.355.552.609.128.279.189.582.185.888v.193a2 2 0 0 1 0 .219h-2.498c.003.227.075.45.204.642a.78.78 0 0 0 .646.265.714.714 0 0 0 .484-.136.642.642 0 0 0 .23-.318l.915.257a1.398 1.398 0 0 1-.28.537c-.14.159-.321.284-.521.355a2.234 2.234 0 0 1-.836.136 1.923 1.923 0 0 1-1.001-.245 1.618 1.618 0 0 1-.665-.703 2.221 2.221 0 0 1-.227-1.036 1.95 1.95 0 0 1 .48-1.398 1.9 1.9 0 0 1 1.3-.488Zm-9.607.023c.162.004.325.026.48.079.207.065.4.174.563.314.26.302.393.692.366 1.088v2.276H8.53l-.109-.711h-.065c-.064.163-.155.31-.272.439a1.122 1.122 0 0 1-.374.264 1.023 1.023 0 0 1-.453.083 1.334 1.334 0 0 1-.866-.264.965.965 0 0 1-.329-.801.993.993 0 0 1 .076-.431 1.02 1.02 0 0 1 .242-.363 1.478 1.478 0 0 1 1.043-.303h.952v-.181a.696.696 0 0 0-.136-.454.553.553 0 0 0-.438-.154.695.695 0 0 0-.378.086.48.48 0 0 0-.193.254l-.99-.144a1.26 1.26 0 0 1 .257-.563c.14-.174.321-.302.533-.378.261-.091.54-.136.82-.129.053-.003.106-.007.163-.007Zm4.384.007c.174 0 .347.038.506.114.182.083.34.211.458.374.257.423.377.911.351 1.406a2.53 2.53 0 0 1-.355 1.448 1.148 1.148 0 0 1-1.009.517c-.204 0-.401-.045-.582-.136a1.052 1.052 0 0 1-.48-.457 1.298 1.298 0 0 1-.114-.234h-.045l.004 1.784h-1.059v-4.713h.904l.117.805h.057c.068-.208.177-.401.328-.56a1.129 1.129 0 0 1 .843-.344h.076v-.004Zm7.559.084h.903l.113.805h.053a1.37 1.37 0 0 1 .235-.484.813.813 0 0 1 .313-.242.82.82 0 0 1 .39-.076h.234v1.051h-.401a.662.662 0 0 0-.313.008.623.623 0 0 0-.272.155.663.663 0 0 0-.174.26.683.683 0 0 0-.027.314v1.875h-1.054v-3.666Zm-17.515.003h3.262v.896L3.73 13.104l.034.113h1.973l.042.9H2.4v-.9l1.931-1.754-.045-.117H2.441v-.896Zm11.815 0h1.055v3.659h-1.055V10.45Zm3.443.684.019.016a.69.69 0 0 0-.351.045.756.756 0 0 0-.287.204c-.11.155-.174.336-.189.522h1.545c-.034-.526-.257-.787-.74-.787h.003Zm-5.718.163c-.026 0-.057 0-.083.004a.78.78 0 0 0-.31.053.746.746 0 0 0-.257.189 1.016 1.016 0 0 0-.204.695v.064c-.015.257.057.507.204.711a.634.634 0 0 0 .253.196.638.638 0 0 0 .314.061.644.644 0 0 0 .578-.265c.14-.223.204-.48.189-.74a1.216 1.216 0 0 0-.181-.711.677.677 0 0 0-.503-.257Zm-4.509 1.266a.464.464 0 0 0-.268.102.373.373 0 0 0-.114.276c0 .053.008.106.027.155a.375.375 0 0 0 .087.132.576.576 0 0 0 .397.11v.004a.863.863 0 0 0 .563-.182.573.573 0 0 0 .211-.457v-.14h-.903Z"};
+/* ---------------- shader: XMB-style wave ribbon made of strands ---------------- */
+const HUES = {sessions:[.12,.26,.80],integrations:[.36,.14,.74],workspaces:[.04,.40,.42],scripts:[.66,.32,.08],tokens:[.62,.08,.22],doc:[.10,.16,.52]};
+let hueTarget = HUES.sessions.slice(), hueNow = hueTarget.slice();
+const cssHue = c => c.map(v=>Math.round(v*255)).join(",");
+(function shader(){
+  const cv = document.getElementById("gl"), gl = cv.getContext("webgl",{antialias:false,premultipliedAlpha:false});
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(!gl) return;
+  const vs = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
+  const fs = `precision highp float;uniform vec2 r;uniform float t;uniform vec3 h;
+  /* XMB-style ribbon drawn as a bundle of strands: centre wave c(x), signed width w(x) that pinches and twists */
+  float cen(float x,float k){return .30+k*.03+.105*sin(x*1.10+t*.20+k)+.040*sin(x*2.45-t*.16+1.2+k*2.)+.010*sin(x*5.2+t*.31);}
+  float wid(float x,float k){return .17*sin(x*.80-t*.12+.7+k*1.7)+.045*sin(x*1.9+t*.18+k);}
+  /* strand coordinate; the warp depends on v itself, so strands curl apart and together like a flow field */
+  float g(vec2 p,float k,float n){float v=(p.y-cen(p.x,k))/wid(p.x,k);
+    v+=.11*sin(p.x*2.3+v*4.2+t*.33+k)+.06*sin(p.x*5.1-v*7.0-t*.26)+.03*sin(p.x*9.0+v*11.-t*.41);
+    return v*n;}
+  /* sig: strand blur in pixels (depth of field) */
+  float strands(vec2 p,float px,float k,float n,float sig,out float a){
+    float v=g(p,k,n);
+    a=abs(v)/(n*.5);
+    if(a>1.15) return 0.;
+    vec2 gr=vec2(g(p+vec2(px,0.),k,n)-v,g(p+vec2(0.,px),k,n)-v);
+    float dw=max(length(gr),1e-4);              /* strands per pixel */
+    float d=abs(fract(v+.5)-.5)/dw;             /* pixels to nearest strand */
+    float s=exp(-d*d/(2.*sig*sig))*pow(1.1/sig,.6); /* gaussian; blurrier strands are dimmer, as out-of-focus light is */
+    float avg=min(dw*sig*2.5,1.)*.5;            /* what a dense bundle averages to */
+    return mix(s,avg,smoothstep(.10,.22,dw*sig));/* strands closer than ~5 sigma blend into a glow before moire can form */
+  }
+  vec3 ribbon(vec2 p,float px,float k,float n,float amp,float sig){
+    float a0,a1;
+    float l=.5*(strands(p,px,k,n,sig,a0)+strands(p+vec2(.5*px,.5*px),px,k,n,sig,a1));
+    float body=(1.-smoothstep(.7,1.,a0))*(.5+.5*(1.-a0));
+    float pulse=.75+.5*pow(.5+.5*sin(p.x*1.6-t*.55+k),4.);   /* light travelling along the ribbon */
+    return mix(vec3(.80,.86,1.),h*1.5+.12,.35)*l*body*pulse*amp;}
+  void main(){
+    vec2 uv=gl_FragCoord.xy/r; float a=r.x/r.y; vec2 p=vec2(uv.x*a,uv.y); float px=1./r.y;
+    vec3 col=mix(vec3(.006,.008,.018),h*.16,smoothstep(.0,1.,uv.y));
+    col+=h*.10*exp(-5.*length(vec2((uv.x-.78)*1.2,uv.y-1.)));
+    float c=cen(p.x,0.); col+=mix(h,vec3(1.),.3)*.11*exp(-pow((uv.y-c)*6.,2.));   /* bloom under the ribbon */
+    /* sharp only near a slowly wandering focal point, otherwise soft; keeps text over it readable */
+    float fx=a*(.15+.12*sin(t*.07)); float focus=exp(-pow((p.x-fx)*2.2,2.));
+    col+=ribbon(p,px,0.,15.,.55,mix(3.2,.9,focus)/px*px);
+    col+=ribbon(p,px,2.3,8.,.30,5.);
+    col*=1.-.28*length(vec2(uv.x-.55,uv.y-.5));
+    gl_FragColor=vec4(col,1.);}`;
+  const sh=(type,src)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s};
+  let pr; try{pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);}catch(e){console.warn(e);return}
+  gl.useProgram(pr);
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(pr,"p");gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  const uR=gl.getUniformLocation(pr,"r"),uT=gl.getUniformLocation(pr,"t"),uH=gl.getUniformLocation(pr,"h");
+  // full CSS-pixel resolution: the lines are 1px and blur badly when upscaled
+  const scale=Math.min(window.devicePixelRatio||1,2);
+  function size(){cv.width=Math.max(1,Math.round(innerWidth*scale));cv.height=Math.max(1,Math.round(innerHeight*scale));gl.viewport(0,0,cv.width,cv.height)}
+  size(); addEventListener("resize",size);
+  const t0=performance.now(); let raf=0;
+  function frame(now){
+    for(let i=0;i<3;i++) hueNow[i]+=(hueTarget[i]-hueNow[i])*.06;
+    document.documentElement.style.setProperty("--hue",cssHue(hueNow));
+    gl.uniform2f(uR,cv.width,cv.height);gl.uniform1f(uT,reduce?20.:(now-t0)/1000);gl.uniform3f(uH,hueNow[0],hueNow[1],hueNow[2]);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    raf=(reduce&&Math.abs(hueTarget[0]-hueNow[0])<.002)?0:requestAnimationFrame(frame);
+  }
+  window.kick=()=>{if(!raf&&!document.hidden)raf=requestAnimationFrame(frame)};
+  document.addEventListener("visibilitychange",()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0}else kick()});
+  kick();
+})();
+function setHue(k){hueTarget=HUES[k].slice(); if(window.kick)kick(); else document.documentElement.style.setProperty("--hue",cssHue(hueTarget))}
+
+/* ---------------- data (illustrative) ---------------- */
+const CAT={yours:"Your apps",code:"Code",work:"Work",docs:"Docs",comms:"Comms",obs:"Observability",infra:"Infra",data:"Data",pay:"Payments",design:"Design",ai:"AI & research"};
+const MODE={oauth:"One-click",app:"OAuth app",key:"API key",open:"Open",local:"Local"};
+const V=[
+ ["Nudge","Nu","yours","oauth","Tasks, issues and reminders.","fail",12],["Researcher","Re","yours","oauth","Deep research jobs."],["Artifacts","Ar","yours","oauth","Pages and documents.","linked",16],
+ ["GitHub","github","code","app","Repositories, issues, pull requests.","need"],["GitLab","gitlab","code","oauth","Projects, merge requests, pipelines."],
+ ["Linear","linear","work","oauth","Issues, projects and cycles.","linked",23],["Jira","jira","work","oauth","Issues and boards."],["Asana","asana","work","oauth","Tasks and projects."],["Todoist","todoist","work","key","Personal tasks."],["HubSpot","hubspot","work","oauth","CRM contacts and deals."],["Zapier","zapier","work","oauth","Actions across thousands of apps."],["Google Calendar","googlecalendar","work","app","Events and availability."],
+ ["Notion","notion","docs","oauth","Pages, docs and databases."],["Confluence","confluence","docs","oauth","Spaces and pages."],["Google Drive","googledrive","docs","app","Files and folders."],["Box","box","docs","oauth","Enterprise files."],
+ ["Slack","slack","comms","app","Channels and messages."],["Gmail","gmail","comms","app","Mail threads."],["Discord","discord","comms","key","Servers and channels."],["Intercom","intercom","comms","oauth","Conversations and contacts."],["Twilio","twilio","comms","key","SMS and voice."],
+ ["Sentry","sentry","obs","oauth","Errors and performance.","linked",14],["PostHog","posthog","obs","oauth","Product analytics and flags."],["Grafana","grafana","obs","key","Dashboards, Loki, Prometheus."],
+ ["Cloudflare","cloudflare","infra","oauth","Workers, DNS and logs."],["Vercel","vercel","infra","oauth","Deployments and logs."],["Netlify","netlify","infra","oauth","Sites and deploys."],
+ ["Supabase","supabase","data","oauth","Postgres, auth, storage."],["Airtable","airtable","data","key","Bases and records."],["Postgres","postgresql","data","local","Local stdio SQL server."],
+ ["Stripe","stripe","pay","oauth","Payments, customers, invoices."],["PayPal","paypal","pay","oauth","Orders and invoices."],["Square","square","pay","oauth","Commerce and payments."],["Shopify","shopify","pay","app","Store, products and orders."],
+ ["Figma","figma","design","oauth","Design files and frames."],["Canva","canva","design","oauth","Designs and assets."],["Webflow","webflow","design","oauth","Sites and CMS."],
+ ["Hugging Face","huggingface","ai","oauth","Models, datasets, spaces."],["DeepWiki","Dw","ai","open","Docs for public repositories."],["Context7","C7","ai","open","Current library documentation."],["Exa","Ex","ai","key","Web search for agents."]];
+const S=[
+ {day:"Today",t:"Triage Sentry errors into Linear",cl:"Claude Code",ago:"12 min ago",start:"14:02",dur:"18 min",left:"3 days 23 h",src:"sentry 11 · linear 9 · github 3",ex:[
+  ["Pull unresolved errors from the last 24h",[["sentry.list_issues",412],["sentry.get_event",188],["sentry.get_event",201],["sentry.get_event",176]],0,
+   "# pull unresolved errors from the last 24h\nissues = await tools.sentry.list_issues(query=\"is:unresolved age:-24h\")\nevents = await asyncio.gather(*[\n    tools.sentry.get_event(issue_id=i[\"id\"]) for i in issues[:3]])\nreturn [{\"id\": i[\"id\"], \"title\": i[\"title\"]} for i in issues]",
+   "[{\"id\": \"4512\", \"title\": \"TypeError: cannot read 'slug'\"},\n {\"id\": \"4498\", \"title\": \"Timeout in /api/sync\"}, … 9 more]","fetched 11 issues, 3 events"],
+  ["github.search_code",[["github.search_code",640],["github.search_code",590]],0,"hits = await tools.github.search_code(q='\"slug\" repo:acme/web')\nreturn [h[\"path\"] for h in hits[\"items\"]]","[\"src/sources/store.ts\", \"src/sources/list.tsx\"]",""],
+  ["File Linear issues for the top 3",[["linear.create_issue",820],["linear.create_issue",790],["linear.create_issue",801]],0,"# file Linear issues for the top 3\nout = await asyncio.gather(*[\n    tools.linear.create_issue(team=\"WEB\", title=t, description=d)\n    for t, d in drafts])\nreturn [o[\"identifier\"] for o in out]","[\"WEB-1182\", \"WEB-1183\", \"WEB-1184\"]","created 3 issues"],
+  ["linear.update_issue",[["linear.update_issue",310],["linear.update_issue",0,1]],1,"await tools.linear.update_issue(id=\"WEB-1184\", priority=1)\nawait tools.linear.update_issue(id=\"WEB-9999\", priority=1)","ToolError: linear.update_issue: issue \"WEB-9999\" not found (HTTP 404)",""],
+  ["linear.update_issue",[["linear.update_issue",298]],0,"await tools.linear.update_issue(id=\"WEB-1183\", priority=1)\nreturn \"ok\"","\"ok\"",""],
+  ["Summary for the user",[],0,"# summary for the user\nreturn {\"filed\": [\"WEB-1182\", \"WEB-1183\", \"WEB-1184\"], \"skipped\": 8}","{\"filed\": [\"WEB-1182\", \"WEB-1183\", \"WEB-1184\"], \"skipped\": 8}",""]]},
+ {day:"Today",t:"Weekly Nudge cleanup",cl:"Codex",ago:"2 h ago",start:"12:10",dur:"6 min",left:"3 days 22 h",src:"nudge 41",ex:[
+  ["nudge.list_issues",[["nudge.list_issues",230]],0,"return await tools.nudge.list_issues(limit=50)","[ … 50 items ]",""],
+  ["nudge.get_issue × 38",[["nudge.get_issue",120],["nudge.get_issue",0,1]],1,"await asyncio.gather(*[tools.nudge.get_issue(id=i) for i in ids])","ToolError: nudge.get_issue: account is not linked; link it in Integrations",""],
+  ["nudge.list_issues",[["nudge.list_issues",210]],0,"return len(await tools.nudge.list_issues(state=\"stale\"))","12",""]]},
+ {day:"Yesterday",t:"PR digest to Artifacts",cl:"Claude Code",ago:"1 day ago",start:"Thu 17:40",dur:"3 min",left:"2 days 21 h",src:"github 4 · artifacts 1",ex:[
+  ["github.list_pull_requests",[["github.list_pull_requests",510],["github.get_pull_request",300]],0,"prs = await tools.github.list_pull_requests(repo=\"acme/web\", state=\"open\")","[ … 7 pull requests ]",""],
+  ["Publish review digest",[["artifacts.publish",900]],0,"# publish review digest\nreturn await tools.artifacts.publish(title=\"PR digest\", html=page)","{\"url\": \"https://artifacts…/a/x1\"}",""]]},
+ {day:"Yesterday",t:"Notion meeting notes into Linear",cl:"Cursor",ago:"1 day ago",start:"Thu 10:05",dur:"9 min",left:"2 days 19 h",src:"notion 5 · linear 4",ex:[
+  ["notion.search",[["notion.search",450]],0,"return await tools.notion.search(query=\"weekly sync\")","[ … 4 pages ]",""]]},
+ {day:"Wednesday",t:"Release checklist",cl:"Claude Code",ago:"3 days ago",start:"Wed 16:20",dur:"22 min",left:"14 h",src:"github 9 · sentry 5",ex:[
+  ["github.list_releases",[["github.list_releases",420]],0,"return await tools.github.list_releases(repo=\"acme/web\")","[ … 3 releases ]",""]]}];
+const W={"All sources":[["linear",[["create_issue","team: str, title: str, description: str | None = None","Create an issue in a team.",1],["update_issue","id: str, priority: int | None = None, state: str | None = None","Update fields on an issue.",1],["delete_issue","id: str","Permanently delete an issue.",0],["list_issues","team: str | None = None, limit: int = 50","List issues, newest first.",1]]],["sentry",[["list_issues","query: str = \"is:unresolved\"","Search issues in the default project.",1],["get_event","issue_id: str","Latest event for an issue, with stack trace.",1],["resolve_issue","issue_id: str","Mark an issue resolved.",1]]],["artifacts",[["publish","title: str, html: str, visibility: str = \"private\"","Publish a page.",1],["delete","id: str","Delete an artifact.",0]]]],
+ "Ops":[["sentry",[["list_issues","query: str = \"is:unresolved\"","Search issues in the default project.",1],["get_event","issue_id: str","Latest event for an issue, with stack trace.",1]]]]};
+const SC=[["triage_sentry","Saved from “Triage Sentry errors into Linear”","2 days ago","issues = await tools.sentry.list_issues(query=\"is:unresolved age:-24h\")\nreturn issues[:10]"],["pr_digest","Saved from “PR digest to Artifacts”","3 days ago","prs = await tools.github.list_pull_requests(repo=args[\"repo\"], state=\"open\")\nreturn [p[\"title\"] for p in prs]"],["stale_nudge","Written by hand","5 days ago","return await tools.nudge.list_issues(state=\"stale\")"]];
+const TK=[["Claude Code","OAuth · All sources","12 min ago","Claude Code"],["Codex","OAuth · All sources","2 h ago","Codex"],["Cursor","OAuth · Ops","1 day ago","Cursor"],["ci-nightly","Personal token · Ops","never","—"]];
+
+/* ---------------- more illustrative sessions, with start offsets for the timeline ---------------- */
+[[.4,18],[2.2,6],[25.3,3],[33.8,9],[74.5,22]].forEach(([at,durm],i)=>{S[i].at=at;S[i].durm=durm});
+S.push(
+ {day:"Today",t:"Investigate flaky deploy",cl:"Codex",ago:"8 h ago",start:"06:12",dur:"14 min",left:"3 days 16 h",src:"github 6 · vercel 4",at:8.1,durm:14,ex:[
+  ["vercel.list_deployments",[["vercel.list_deployments",380]],0,"return await tools.vercel.list_deployments(limit=20)","[ … 20 deployments ]",""],
+  ["vercel.get_logs",[["vercel.get_logs",0,1]],1,"await tools.vercel.get_logs(id=d)","ToolError: vercel.get_logs: account is not linked; link it in Integrations",""]]},
+ {day:"Yesterday",t:"Sync Linear cycle to Notion",cl:"Cursor",ago:"1 day ago",start:"Thu 15:50",dur:"5 min",left:"2 days 2 h",src:"linear 3 · notion 2",at:46.5,durm:5,ex:[
+  ["linear.list_issues",[["linear.list_issues",290]],0,"return await tools.linear.list_issues(team=\"WEB\", cycle=\"current\")","[ … 31 issues ]",""],
+  ["notion.update_page",[["notion.update_page",610]],0,"await tools.notion.update_page(id=page, content=md)","{\"ok\": true}",""]]},
+ {day:"Wednesday",t:"Morning inbox triage",cl:"Claude Code",ago:"3 days ago",start:"Wed 08:20",dur:"11 min",left:"14 h",src:"gmail 7 · linear 2",at:82,durm:11,ex:[
+  ["gmail.search_threads",[["gmail.search_threads",520]],0,"return await tools.gmail.search_threads(q=\"is:unread newer_than:1d\")","[ … 14 threads ]",""]]});
+S.sort((a,b)=>a.at-b.at);
+
+/* ---------------- prototype ---------------- */
+const NAVI={sessions:'<path d="M3 8c3-3 6 3 9 0s6-3 9 0M3 13c3-3 6 3 9 0s6-3 9 0M3 18c3-3 6 3 9 0s6-3 9 0"/>',integrations:'<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>',workspaces:'<path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5"/>',scripts:'<path d="M8 6l-5 6 5 6M16 6l5 6-5 6M14 4l-4 16"/>',tokens:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/>'};
+const WS=Object.keys(W);
+const SEC={
+ sessions:{t:"Sessions",d:"What your agents ran, grouped automatically. Kept for 4 days after the last activity.",q:"Search sessions",
+   cols:"minmax(0,1fr) 112px 52px 52px 92px 104px",narrow:"minmax(0,1fr) 72px",head:[["Session"],["Agent","ex"],["Runs","r ex"],["Calls","r ex"],["Status"],["Last activity","r ex"]]},
+ executions:{cols:"28px minmax(0,1fr) 52px 76px 80px",narrow:"28px minmax(0,1fr) 64px",head:[["#"],["Execution"],["Calls","r ex"],["Time","r ex"],["Status"]]},
+ integrations:{t:"Integrations",d:"Connect a tool once. Every agent in the workspace can then search and call it.",act:"Add by URL",q:"Search vendors and tools",
+   cols:"minmax(0,1fr) 140px 180px",narrow:"minmax(0,1fr) 120px",head:[["Vendor"],["Connects with","ex"],["Status"]]},
+ workspaces:{t:"Workspaces",d:"Choose which tools agents may call. Everything is allowed until you block it.",act:"New workspace",q:"Search tools",
+   cols:"minmax(0,1fr) 120px 120px",narrow:"minmax(0,1fr) 100px",head:[["Tool"],["Source","ex"],["Policy"]]},
+ scripts:{t:"Scripts",d:"Python saved from sessions or written by hand. Agents can run them by name.",act:"New script",q:"Search scripts",
+   cols:"minmax(0,1fr) minmax(0,1.3fr) 110px",narrow:"minmax(0,1fr) 90px",head:[["Script"],["Origin","ex"],["Saved","r"]]},
+ tokens:{t:"Tokens",d:"Agents holding access. Revoking takes effect on their next request.",act:"New personal token",q:"Search agents",
+   cols:"minmax(0,1fr) 130px 120px 120px",narrow:"minmax(0,1fr) 100px",head:[["Agent"],["Type","ex"],["Workspace","ex"],["Last used","r"]]}};
+const ORDER=["sessions","integrations","workspaces","scripts","tokens"];
+// pane widths (%) by depth; sessions stacks three deep, the rest two
+const WID={s:[[100],[36,64],[20,32,48]],o:[[100],[46,54]]};
+const st={sec:"sessions",tab:0,view:"list",depth:0,sel:[0,0],q:"",ws:0,confirm:null};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+const glyph=k=>ICONS[k]?`<svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[k]}"/></svg>`:`<span class="gl t" aria-hidden="true">${k[0]}</span>`;
+const count=k=>({sessions:S.length,integrations:V.filter(v=>v[5]).length,workspaces:WS.length,scripts:SC.length,tokens:TK.length})[k];
+const maxDepth=()=>st.sec==="sessions"?2:1;
+const focusLevel=()=>st.sec==="sessions"&&st.depth>=1?1:0;
+let msgT;
+function say(m,bad){const e=$("status").querySelector(".msg");e.textContent=m;e.className="msg"+(bad?" bad":"");void e.offsetWidth;e.classList.add("a-msg");clearTimeout(msgT);msgT=setTimeout(()=>{e.textContent=""},4500)}
+
+function tabsFor(){
+  if(st.sec==="sessions") return [["All",S.length],["With errors",S.filter(s=>s.ex.some(e=>e[2])).length]];
+  if(st.sec==="integrations") return [["Catalogue",V.length],["Linked",V.filter(v=>v[5]==="linked").length],["Needs attention",V.filter(v=>v[5]==="fail"||v[5]==="need").length]];
+  if(st.sec==="workspaces") return WS.map(k=>[k,W[k].reduce((a,s)=>a+s[1].length,0)]);
+  return [["All",st.sec==="scripts"?SC.length:TK.length]];
+}
+function rootRows(){
+  const q=st.q.toLowerCase(), m=s=>!q||s.toLowerCase().includes(q);
+  if(st.sec==="sessions"){
+    let l=S.map((s,i)=>({s,i})); if(st.tab===1) l=l.filter(x=>x.s.ex.some(e=>e[2]));
+    return l.filter(x=>m(x.s.t+" "+x.s.cl)).map(({s,i})=>{const f=s.ex.filter(e=>e[2]).length,c=s.ex.reduce((a,e)=>a+e[1].length,0);
+      return {group:s.day,label:s.t,data:{i},cells:[`<span class="nm"><span>${esc(s.t)}</span></span>`,`<span class="ex">${esc(s.cl)}</span>`,`<span class="num r ex">${s.ex.length}</span>`,`<span class="num r ex">${c}</span>`,f?`<span class="bad">${f} failed</span>`:`<span class="dim">Done</span>`,`<span class="r ex dim">${esc(s.ago)}</span>`]}});
+  }
+  if(st.sec==="integrations"){
+    let l=V; if(st.tab===1) l=V.filter(v=>v[5]==="linked"); if(st.tab===2) l=V.filter(v=>v[5]==="fail"||v[5]==="need");
+    return l.filter(v=>m(v[0]+" "+CAT[v[2]]+" "+v[4])).map(v=>({group:CAT[v[2]],label:v[0],data:{v},cells:[`<span class="nm">${glyph(v[1])}<span>${esc(v[0])}</span></span>`,`<span class="ex">${MODE[v[3]]}</span>`,
+      v[5]==="linked"?`<span>Linked · ${v[6]} tools</span>`:v[5]==="fail"?`<span class="bad">Failed at step 6</span>`:v[5]==="need"?`<span class="warn">Needs link</span>`:`<span class="dim">Not added</span>`]}));
+  }
+  if(st.sec==="workspaces"){const out=[];
+    W[WS[st.tab]].forEach(([src,tools])=>tools.forEach(t=>{if(m(src+"."+t[0]))out.push({group:src,label:`${src}.${t[0]}`,data:{src,t},cells:[`<span class="nm"><span class="mono">${esc(src)}.${esc(t[0])}</span></span>`,`<span class="ex dim">${esc(src)}</span>`,`<button class="sw${t[3]?"":" off"}" data-toggle aria-label="${t[3]?"Allowed":"Blocked"}: ${esc(src)}.${esc(t[0])}"><i></i>${t[3]?"Allowed":"Blocked"}</button>`]})}));
+    return out;}
+  if(st.sec==="scripts") return SC.filter(s=>m(s[0])).map(s=>({group:"Saved scripts",label:s[0],data:{s},cells:[`<span class="nm"><span class="mono">${esc(s[0])}</span></span>`,`<span class="ex dim">${esc(s[1])}</span>`,`<span class="r dim">${esc(s[2])}</span>`]}));
+  return TK.filter(t=>m(t[0])).map(t=>({group:"Agents with access",label:t[0],data:{t},cells:[`<span class="nm"><span>${esc(t[0])}</span></span>`,`<span class="ex">${esc(t[1].split(" · ")[0])}</span>`,`<span class="ex">${esc(t[1].split(" · ")[1])}</span>`,`<span class="r dim">${esc(t[2])}</span>`]}));
+}
+function execRows(si){return S[si].ex.map((e,i)=>({group:null,label:e[0],data:{e,i},cells:[`<span class="num">${i+1}</span>`,`<span class="nm"><span>${esc(e[0])}</span></span>`,`<span class="num r ex">${e[1].length}</span>`,`<span class="num r ex">${e[1].reduce((a,c)=>a+c[1],0)} ms</span>`,e[2]?`<span class="bad">Failed</span>`:`<span class="dim">Done</span>`]}))}
+
+/* views */
+function listHTML(k,c,rows,narrow){
+  let last,h="",n=0;
+  if(!rows.length) h=`<div class="empty"><b>${st.q?"No matches":"Nothing here yet"}</b>${st.q?`Nothing matches “${esc(st.q)}”. Press Esc to clear.`:"Items appear here as soon as there is something to show."}</div>`;
+  rows.forEach((r,i)=>{if(r.group&&r.group!==last){h+=`<div class="grp" style="--i:${Math.min(n++,14)}">${esc(r.group)}</div>`;last=r.group}
+    h+=`<div class="row" role="option" id="r${k}-${i}" data-k="${k}" data-i="${i}" aria-selected="${i===st.sel[k]}" aria-label="${esc(r.label)}" style="--i:${Math.min(n++,14)}">${r.cells.join("")}</div>`});
+  return `<div class="thead" style="--cols:${narrow?c.narrow:c.cols};--cols-n:${c.narrow}">${c.head.map(([l,cl])=>`<span class="${cl||""}">${l}</span>`).join("")}</div>
+    <div class="list" id="L${k}" role="listbox" tabindex="-1" aria-label="${k?"Executions":esc(SEC[st.sec].t)}" style="--cols:${narrow?c.narrow:c.cols};--cols-n:${c.narrow}"><div class="cursor" aria-hidden="true"></div>${h}</div>`;
+}
+const SPAN=96, NOWH=14.33; // timeline: last 96 h; "now" is Friday 14:20
+function timelineHTML(rows){
+  const x=h=>((SPAN-h)/SPAN*100).toFixed(2);
+  const days=[["Fri",NOWH],["Thu",NOWH+24],["Wed",NOWH+48],["Tue",NOWH+72]], axis=days.slice(0,3);
+  const grid=days.map(([,h])=>`<i style="left:${x(h)}%"></i>`).join("");
+  let last,h="",n=0;
+  rows.forEach((r,i)=>{const s=S[r.data.i];
+    if(r.group!==last){h+=`<div class="grp" style="--i:${Math.min(n++,14)}">${esc(r.group)}</div>`;last=r.group}
+    const L=+x(s.at), Wd=Math.max(s.durm/60/SPAN*100,.9);
+    const ticks=s.ex.map((e,j)=>`<b class="${e[2]?"f":""}" style="left:${(j+.5)/s.ex.length*100}%"></b>`).join("");
+    h+=`<div class="row lane" role="option" id="r0-${i}" data-k="0" data-i="${i}" aria-selected="${i===st.sel[0]}" aria-label="${esc(r.label)}" style="--i:${Math.min(n++,14)}">
+      <span class="nm"><span>${esc(s.t)}</span></span><span class="trk">${grid}<span class="bar${s.ex.some(e=>e[2])?" has-f":""}" style="left:${L-Wd}%;width:${Wd}%">${ticks}</span>${L>80?`<em class="lft" style="right:${(100-L+Wd).toFixed(2)}%">${esc(s.ago)}</em>`:`<em style="left:${L}%">${esc(s.ago)}</em>`}</span></div>`});
+  return `<div class="thead tl-axis"><span>Session</span><span class="trk"><span class="edge" style="left:0">← expires</span>${axis.map(([d,hh])=>`<span style="left:${x(hh)}%">${d}</span>`).join("")}<span style="left:100%;transform:translateX(-100%)">now</span></span></div>
+    <div class="list tl" id="L0" role="listbox" tabindex="-1" aria-label="Sessions timeline"><div class="cursor" aria-hidden="true"></div>${h}</div>`;
+}
+function bigIcon(k){
+  const ring=`<circle class="s" cx="120" cy="84" r="72" stroke-width=".8" opacity=".5"/><circle class="s" cx="120" cy="84" r="58" stroke-width=".5" opacity=".25"/>`+
+    Array.from({length:40},(_,i)=>{const a=i/40*Math.PI*2,r2=i%5?75:80;return `<line class="s" stroke-width=".7" opacity=".45" x1="${120+72*Math.cos(a)}" y1="${84+72*Math.sin(a)}" x2="${120+r2*Math.cos(a)}" y2="${84+r2*Math.sin(a)}"/>`}).join("");
+  const inner=ICONS[k]?`<g transform="translate(90 54) scale(2.5)"><path class="s" d="${ICONS[k]}" stroke-width=".3"/></g>`:`<text x="120" y="98" text-anchor="middle" style="font:300 40px var(--f-ui);fill:var(--c-text)">${k}</text>`;
+  return `<svg class="art" viewBox="0 0 240 168" aria-hidden="true">${ring}${inner}</svg>`;
+}
+const facts=a=>`<div class="facts">${a.map(([k,v])=>`<div><span>${k}</span><span>${v}</span></div>`).join("")}</div>`;
+const stats=a=>`<div class="stats">${a.map(([k,v])=>`<div><b${k==="failed"&&v?' class="bad"':""}>${v}</b><span>${k}</span></div>`).join("")}</div>`;
+const acts=a=>`<div class="acts">${a.map(([k,l,cls])=>`<button class="btn ${cls||""}" data-act="${esc(l)}">${esc(l)}<span class="kbd">${k}</span></button>`).join("")}</div>`;
+const hl=c=>esc(c).replace(/^(#.*)$/gm,'<span class="c">$1</span>').replace(/\b(await|return|for|in|async|def)\b/g,'<span class="y">$1</span>');
+const paneHead=(k,label)=>`<div class="pane-h"><span class="label">${label}</span><span class="sp"></span><button class="btn ghost sm" data-pop="${k}" aria-label="Close panel">Close<span class="kbd">Esc</span></button></div>`;
+
+function detailHTML(r){
+  if(st.sec==="integrations"){const v=r.data.v;let b="";
+    if(v[0]==="GitHub") b=`<p>GitHub's sign-in server can't register apps automatically, so choose one of two ways in.</p>${acts([["↵","Paste a token","pri"],["A","Use my OAuth app"]])}<h3>Callback URL for your OAuth app</h3><div class="code">https://codemode.microapps.space/api/accounts/oauth/callback</div>`;
+    else if(v[5]==="fail") b=`<h3>Last attempt</h3><div class="stepline"><span class="ok">1</span><span class="ok">2</span><span class="ok">3</span><span class="ok">4</span><span class="ok">5</span><span class="x">6 token</span><span>7</span></div><div class="errl">Token exchange failed at step 6.
+The provider's error and description appear here verbatim, with the HTTP status.</div>${acts([["↵","Link again","pri"],["L","Copy diagnostics"],["D","Remove","danger"]])}`;
+    else if(v[5]==="linked") b=`${facts([["Account","Linked, refreshes automatically"],["Tools",v[6]],["Last sync","2 min ago"],["Workspaces","All sources, Ops"]])}${acts([["↵","Browse tools","pri"],["S","Sync now"],["D","Unlink","danger"]])}`;
+    else b=`<p>${esc(v[4])}</p>${facts([["Connects with",MODE[v[3]]],["Category",CAT[v[2]]],["Checked by probe","Yes"]])}${acts([["↵",{oauth:"Connect "+v[0],app:"Set up OAuth app",key:"Paste API key",open:"Add",local:"Add local server"}[v[3]],"pri"]])}`;
+    return `<h2>${esc(v[0])}</h2><div class="meta">${esc(CAT[v[2]])} · ${esc(MODE[v[3]])}</div>${bigIcon(v[1])}${b}`}
+  if(st.sec==="workspaces"){const {src,t}=r.data;
+    return `<h2 class="mono">${esc(src)}.${esc(t[0])}</h2><div class="meta${t[3]?"":" bad"}">${t[3]?"Allowed":"Blocked"} in ${esc(WS[st.tab])}</div>
+    <h3>Signature</h3><div class="code"><span class="y">async def</span> ${esc(t[0])}(${esc(t[1])}) -&gt; Any</div><p>${esc(t[2])}</p>
+    ${acts([["Space",t[3]?"Block":"Allow","pri"],["A","Allow all from "+src],["B","Block all from "+src]])}<p>A blocked call raises <code>PermissionError</code> in the agent's Python, naming the tool and the workspace.</p>`}
+  if(st.sec==="scripts"){const s=r.data.s;return `<h2 class="mono">${esc(s[0])}</h2><div class="meta">${esc(s[1])} · ${esc(s[2])}</div><h3>Code</h3><div class="code">${hl(s[3])}</div>${acts([["↵","Edit","pri"],["C","Copy"],["D","Delete","danger"]])}`}
+  const t=r.data.t;return `<h2>${esc(t[0])}</h2><div class="meta">${esc(t[1])}</div>${facts([["Last used",t[2]],["Client",t[3]],["Resource","/mcp"]])}${acts([["S","Show sessions"],["D","Revoke","danger"]])}`;
+}
+let R0=[],R1=[];
+function paneHTML(k){
+  const narrow=k<st.depth;
+  if(k===0){R0=rootRows(); if(st.sel[0]>=R0.length) st.sel[0]=Math.max(0,R0.length-1);
+    return st.sec==="sessions"&&st.view==="timeline"&&st.depth<2 ? timelineHTML(R0) : listHTML(0,SEC[st.sec],R0,narrow)}
+  const r=R0[st.sel[0]]; if(!r) return "";
+  if(st.sec!=="sessions") return paneHead(k,esc(CAT[r.data.v?.[2]]||"Details"))+`<div class="pane-b">${detailHTML(r)}</div>`;
+  const si=r.data.i,s=S[si];
+  if(k===1){R1=execRows(si); if(st.sel[1]>=R1.length) st.sel[1]=0; const f=s.ex.filter(e=>e[2]).length;
+    return paneHead(k,`Session · ${esc(s.cl)}`)+`<div class="pane-top"><h2>${esc(s.t)}</h2><div class="meta">Started ${esc(s.start)} · ran ${esc(s.dur)} · expires in ${esc(s.left)}</div>
+      ${stats([["executions",s.ex.length],["tool calls",s.ex.reduce((a,e)=>a+e[1].length,0)],["failed",f],["sources",esc(s.src.split(" · ").length)]])}</div>`+listHTML(1,SEC.executions,R1,narrow)}
+  const e=s.ex[st.sel[1]]; if(!e) return "";
+  return paneHead(k,`Execution ${st.sel[1]+1} of ${s.ex.length}`)+`<div class="pane-b"><h2>${esc(e[0])}</h2><div class="meta${e[2]?" bad":""}">${e[2]?"Failed":"Completed"} · ${e[1].reduce((a,c)=>a+c[1],0)} ms · ${e[1].length} calls</div>
+    <h3>Code</h3><div class="code">${hl(e[3])}</div><h3>${e[2]?"Exception":"Return value"}</h3><div class="${e[2]?"errl":"code"}">${esc(e[4])}</div>
+    ${e[5]?`<h3>Output</h3><div class="code">${esc(e[5])}</div>`:""}
+    ${e[1].length?`<h3>Tool calls</h3><div class="calls">${e[1].map(c=>`<div class="${c[2]?"f":""}"><span>${c[0]}</span><span>${c[2]?"failed":c[1]+" ms"}</span></div>`).join("")}</div>`:""}
+    ${acts([["C","Copy code"],["S","Save as script"]])}</div>`;
+}
+function anim(el,cls){if(!el)return;el.classList.remove("a-sec","a-tab","a-sel","p-in","p-out");if(!cls)return;void el.offsetWidth;el.classList.add(cls)}
+const PANES=[...document.querySelectorAll("#stack .pane")];
+const curY=[0,0],curH=[40,40];let indX=0,indW=0,prevDepth=0,leaveT=null;
+function placeCursor(k,glide){
+  const L=$("L"+k); if(!L) return; const cur=L.querySelector(".cursor"),el=$(`r${k}-${st.sel[k]}`);
+  if(!el){cur.style.display="none";return}
+  cur.style.transition="none";cur.style.transform=`translateY(${glide?curY[k]:el.offsetTop}px)`;cur.style.height=(glide?curH[k]:el.offsetHeight)+"px";
+  if(glide){void cur.offsetWidth;cur.style.transition="";cur.style.transform=`translateY(${el.offsetTop}px)`;cur.style.height=el.offsetHeight+"px"}
+  curY[k]=el.offsetTop;curH[k]=el.offsetHeight;
+  const top=el.offsetTop-34,bot=el.offsetTop+el.offsetHeight+8;
+  if(top<L.scrollTop)L.scrollTop=top;else if(bot>L.scrollTop+L.clientHeight)L.scrollTop=bot-L.clientHeight;
+  L.setAttribute("aria-activedescendant",el.id);
+}
+function render(how){
+  setHue(st.sec);
+  const s=SEC[st.sec];
+  $("side").innerHTML=ORDER.map((k,i)=>`<button class="nv" data-sec="${k}"${st.sec===k?' aria-current="page"':""}><svg viewBox="0 0 24 24" aria-hidden="true">${NAVI[k]}</svg><span>${SEC[k].t}</span><span class="c">${i+1}</span></button>`).join("")+
+    `<span class="label">Workspaces</span>`+WS.map((w,i)=>`<button class="wsl" data-ws="${i}" aria-current="${i===st.ws}">${esc(w)}</button>`).join("")+`<div class="foot">ursus95 · private tenant</div>`;
+  $("wsName").textContent=WS[st.ws];
+  $("q").placeholder=s.q;
+  // header + breadcrumb trail of the stack
+  const trail=[`<button data-popto="0">${esc(s.t)}</button>`];
+  if(st.depth>=1&&R0[st.sel[0]]) trail.push(`<button data-popto="1">${esc(R0[st.sel[0]].label)}</button>`);
+  if(st.depth>=2) trail.push(`<span>Execution ${st.sel[1]+1}</span>`);
+  $("ph").innerHTML=`<div class="tt"><div class="crumbs"><span>${esc(WS[st.ws])}</span><span>/</span>${trail.join("<span>/</span>")}</div><h1>${esc(s.t)}</h1><p>${esc(s.d)}</p></div>${s.act?`<button class="btn pri" data-act="${esc(s.act)}">${esc(s.act)}</button>`:""}`;
+  const tb=tabsFor();
+  $("tabbar").innerHTML=tb.map(([l,n],i)=>`<button class="tab" role="tab" data-tab="${i}" aria-selected="${i===st.tab}">${esc(l)}<sup>${n}</sup></button>`).join("")+`<span class="sp"></span>`+
+    (st.sec==="sessions"?`<div class="seg" role="group" aria-label="Layout"><button data-view="list" aria-pressed="${st.view==="list"}">List</button><button data-view="timeline" aria-pressed="${st.view==="timeline"}">Timeline</button><span class="kbd">V</span></div>`:"")+`<span class="tab-ind" id="ind"></span>`;
+  // panes
+  const wid=WID[st.sec==="sessions"?"s":"o"][st.depth];
+  clearTimeout(leaveT);
+  PANES.forEach((p,k)=>{
+    p.classList.remove("narrow","under","top");
+    if(k<=st.depth){
+      const fresh=p.hidden||p.classList.contains("p-out");
+      p.innerHTML=paneHTML(k); p.hidden=false;
+      if(fresh&&how==="push"){p.style.transition="none";p.style.flexBasis="0%";void p.offsetWidth;p.style.transition=""}
+      p.style.flexBasis=wid[k]+"%";
+      p.classList.toggle("narrow",k<st.depth); p.classList.toggle("under",k<st.depth); p.classList.toggle("top",k===st.depth);
+      if(fresh&&how==="push") anim(p,"p-in"); else if(how!=="sel") anim(p,null);
+    } else if(how==="pop"&&k<=prevDepth){ anim(p,"p-out"); p.style.flexBasis="0%"; leaveT=setTimeout(()=>{if(k>st.depth){p.hidden=true;p.classList.remove("p-out")}},220); }
+    else { p.hidden=true; p.style.flexBasis="0%"; }
+  });
+  // motion on content
+  const rootMotion={sec:"a-sec",tab:"a-tab",view:"a-sec",ws:"a-tab",q:null}[how];
+  if(rootMotion) anim($("L0"),rootMotion);
+  if(how==="sec") anim($("ph"),"a-sec");
+  if(how==="sel"&&focusLevel()<st.depth) anim(PANES[st.depth].querySelector(".pane-b")||PANES[st.depth],"a-sel");
+  [0,1].forEach(k=>placeCursor(k,how==="sel"&&k===focusLevel()));
+  // tab underline glide
+  const ind=$("ind"),tabEl=$("tabbar").querySelector('[aria-selected="true"]');
+  if(tabEl){const x=tabEl.offsetLeft,w=tabEl.offsetWidth,slide=how==="tab"||how==="ws";
+    ind.style.transition="none";ind.style.width=(slide?indW:w)+"px";ind.style.transform=`translateX(${slide?indX:x}px)`;
+    if(slide){void ind.offsetWidth;ind.style.transition="";ind.style.width=w+"px";ind.style.transform=`translateX(${x}px)`}indX=x;indW=w}
+  prevDepth=st.depth;
+  hints();
+}
+function hints(){
+  const h=[];
+  if(st.depth<maxDepth()) h.push(["↵","Open"]);
+  if(st.sec==="workspaces") h.push(["Space","Allow / block"]);
+  h.push(["↑↓","Select"],["[ ]","Tabs"]);
+  if(st.sec==="sessions") h.push(["V","Layout"]);
+  h.push(["/","Search"]);
+  if(st.depth>0||st.q) h.push(["Esc","Back"]);
+  const S_=$("status"); S_.querySelectorAll("button").forEach(b=>b.remove());
+  S_.insertAdjacentHTML("beforeend",h.map(([k,l])=>`<button data-key="${k}"><span class="kbd">${k}</span>${l}</button>`).join(""));
+}
+function move(d){const k=focusLevel(),n=(k?R1:R0).length;if(!n)return;const v=Math.max(0,Math.min(n-1,st.sel[k]+d));if(v===st.sel[k])return;st.sel[k]=v;if(k===0)st.sel[1]=0;render("sel")}
+function push(){if(st.depth>=maxDepth())return enterAction();if(!(st.depth===0?R0:R1).length)return;st.depth++;if(st.depth===1)st.sel[1]=0;render("push")}
+function pop(to){if(st.depth===0)return;st.depth=to===undefined?st.depth-1:to;render("pop")}
+function back(){if(st.q){clearQ();render("q");return}pop()}
+function enterAction(){say("Opening (prototype)")}
+function clearQ(){st.q="";$("q").value=""}
+function sec(k){if(k===st.sec&&st.depth===0)return;st.sec=k;st.tab=k==="workspaces"?st.ws:0;st.sel=[0,0];st.depth=0;clearQ();render("sec")}
+function tab(d){const n=tabsFor().length;if(n<2)return;st.tab=(st.tab+d+n)%n;if(st.sec==="workspaces")st.ws=st.tab;st.sel=[0,0];st.depth=0;render("tab")}
+function view(v){if(st.sec!=="sessions")return;st.view=v||(st.view==="list"?"timeline":"list");render("view");say(st.view==="timeline"?"Timeline: the last 4 days. A session falls off the left edge when it expires.":"List layout")}
+function toggle(i){const r=R0[i];if(!r||st.sec!=="workspaces")return;r.data.t[3]=r.data.t[3]?0:1;render("q");say(`${r.label} ${r.data.t[3]?"allowed":"blocked"} in ${WS[st.tab]}`,!r.data.t[3])}
+function action(l){
+  if(/Remove|Unlink|Revoke|Delete/.test(l)){if(st.confirm===l){st.confirm=null;say(l+": done (prototype)",true)}else{st.confirm=l;say(`Press ${l} again within 3 seconds to confirm.`,true);setTimeout(()=>{if(st.confirm===l)st.confirm=null},3000)}return}
+  if(l==="Allow"||l==="Block") return toggle(st.sel[0]);
+  say(l+" (prototype)");
+}
+function copyUrl(){navigator.clipboard?.writeText("https://codemode.microapps.space/mcp").catch(()=>{});say("Agent URL copied. Paste it into your agent's MCP settings; it will ask you to pick a workspace.")}
+const P=$("proto");
+P.addEventListener("click",e=>{
+  const n=e.target.closest("[data-sec]"); if(n) return sec(n.dataset.sec);
+  const w=e.target.closest("[data-ws]"); if(w){st.ws=+w.dataset.ws;if(st.sec==="workspaces"){st.tab=st.ws;st.sel=[0,0];st.depth=0}render("ws");return say("Workspace: "+WS[st.ws])}
+  const t=e.target.closest("[data-tab]"); if(t){const i=+t.dataset.tab;if(i===st.tab)return;st.tab=i;if(st.sec==="workspaces")st.ws=i;st.sel=[0,0];st.depth=0;return render("tab")}
+  const v=e.target.closest("[data-view]"); if(v) return view(v.dataset.view);
+  const tg=e.target.closest("[data-toggle]"); if(tg){const r=tg.closest(".row");st.sel[0]=+r.dataset.i;return toggle(+r.dataset.i)}
+  const pp=e.target.closest("[data-pop]"); if(pp) return pop(+pp.dataset.pop-1);
+  const pt=e.target.closest("[data-popto]"); if(pt) return pop(+pt.dataset.popto);
+  const r=e.target.closest(".row[data-k]"); if(r){const k=+r.dataset.k,i=+r.dataset.i;
+    // click opens: select at this level and show the next level (replacing anything deeper)
+    st.sel[k]=i; if(k===0) st.sel[1]=0;
+    const target=Math.min(k+1,maxDepth()); const how=st.depth<target?"push":st.depth>target?"pop":"sel";
+    st.depth=target; render(how); return}
+  const a=e.target.closest("[data-act]"); if(a) return action(a.dataset.act);
+  const k=e.target.closest("[data-key]"); if(k){({"↵":push,"↑↓":()=>move(1),"[ ]":()=>tab(1),"V":()=>view(),"/":()=>$("q").focus(),"Esc":back,"Space":()=>toggle(st.sel[0])})[k.dataset.key]?.();return}
+  if(e.target.closest("#copyUrl")) return copyUrl();
+  if(e.target.closest("#wsw")){st.ws=(st.ws+1)%WS.length;if(st.sec==="workspaces"){st.tab=st.ws;st.sel=[0,0];st.depth=0}render("ws");say("Workspace: "+WS[st.ws])}
+});
+$("q").addEventListener("input",e=>{st.q=e.target.value;st.sel=[0,0];st.depth=0;render("q")});
+$("q").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();back();P.focus()}if(e.key==="ArrowDown"||e.key==="Enter"){e.preventDefault();P.focus();if(e.key==="Enter")push()}});
+P.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT")return;
+  const k=e.key;
+  if(k==="ArrowDown"||k==="j"){e.preventDefault();move(1)}
+  else if(k==="ArrowUp"||k==="k"){e.preventDefault();move(-1)}
+  else if(k==="ArrowRight"||(k==="Enter"&&!e.target.closest("button"))){e.preventDefault();push()}
+  else if(k==="ArrowLeft"||k==="Escape"){e.preventDefault();back()}
+  else if(k==="]"){tab(1)}else if(k==="["){tab(-1)}
+  else if(k==="v"||k==="V"){view()}
+  else if(k===" "&&st.sec==="workspaces"&&!e.target.closest("button")){e.preventDefault();toggle(st.sel[0])}
+  else if(k==="/"){e.preventDefault();$("q").focus()}
+  else if(/^[1-5]$/.test(k)) sec(ORDER[+k-1]);
+});
+$("status").innerHTML=`<span class="msg" role="status"></span>`;
+render("sec");
+setTimeout(()=>{if(scrollY<50)P.focus({preventScroll:true})},300);
+new IntersectionObserver(es=>es.forEach(en=>setHue(en.isIntersecting?st.sec:"doc")),{threshold:.35}).observe(P);
+
+
+/* ---------------- kit ---------------- */
+const tokRow=(name,val,sample,note)=>`<div class="tok"><span>${sample}</span><code>${name}</code><span class="dim">${note||val}</span></div>`;
+const KIT=[
+ ["Color","text, lines, status, section hue",
+  [["--c-text","#F3F5FA","primary text"],["--c-text-2","76%","secondary text"],["--c-text-3","56%","labels, meta (≥ 4.5:1 on surface)"],["--c-line","9%","row and section rules"],["--c-line-2","18%","controls, emphasis rules"],["--c-bad","#FF8C98","failure, block"],["--c-warn","#F3CE80","needs attention"],["--c-ok","#93E6C4","diagram only"],["--c-accent-text","hue + 55% white","focus, cursor, active"]]
+   .map(([n,v,u])=>tokRow(n,v,`<div class="sw-c" style="background:var(${n})"></div>`,u)).join("")],
+ ["Section hue","one uniform drives the backdrop, cursor, active nav and focus",`<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">${ORDER.map(k=>`<div style="height:64px;padding:8px;display:flex;align-items:flex-end;font-size:12px;background:linear-gradient(180deg,rgba(${cssHue(HUES[k])},.65),rgba(${cssHue(HUES[k])},.08));border-bottom:2px solid rgb(${cssHue(HUES[k])})">${SEC[k].t}</div>`).join("")}</div>`],
+ ["Type","M PLUS 1p for UI, JetBrains Mono for code",
+  [["--fs-9","64 / 200","Display",'font:200 40px/1 var(--f-ui)',"document display only"],["--fs-8","40 / 300","Section",'font:300 32px/1 var(--f-ui)',"document sections"],["--fs-7","28 / 300","Page title",'font:300 28px/1 var(--f-ui)',"app page header"],["--fs-6","20 / 400","Detail title",'font:400 20px/1.2 var(--f-ui)',"detail panel"],["--fs-5","16 / 500","Subhead",'font:500 16px var(--f-ui)',"doc subheads"],["--fs-4","14 / 400","Body and rows",'font:400 14px var(--f-ui)',"default"],["--fs-3","13 / 400–500","Controls, meta",'font:500 13px var(--f-ui)',"buttons, tabs"],["--fs-2","12 mono","code, status",'font:12px var(--f-mono)',"code"],["--fs-1","11 / 500 caps","LABEL",'font:500 11px var(--f-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--c-text-3)',"labels, column heads"]]
+   .map(([n,v,s,css,u])=>`<div class="tok"><span style="${css};white-space:nowrap;overflow:hidden">${s}</span><code>${n} · ${v}</code><span class="dim">${u}</span></div>`).join("")+
+   `<p class="dim" style="font-size:12px;margin:10px 0 0">Light weights (200–300) only at 28px and up. Everything you read runs at 400 or 500.</p>`],
+ ["Space & layout","4px base; layout sizes are tokens too",
+  [["--s-1",4],["--s-2",8],["--s-3",12],["--s-4",16],["--s-5",24],["--s-6",32],["--s-7",48],["--s-8",72]].map(([n,v])=>`<div class="tok"><span><i style="display:block;height:8px;width:${v*2}px;background:var(--c-accent-text);opacity:.8"></i></span><code>${n}</code><span class="dim">${v}px</span></div>`).join("")+
+   [["--bar","48px","top bar"],["--side","228px","sidebar"],["--pane","100 · 36/64 · 20/32/48 %","pane widths by depth"],["--row","40px","table row"],["--status","30px","status bar"]].map(([n,v,u])=>`<div class="tok"><span>${u}</span><code>${n}</code><span class="dim">${v}</span></div>`).join("")],
+ ["Motion","press Replay; every transition uses these",`<div class="mo-wrap" id="mo">${[["--t-1 · 120ms","var(--t-1)","var(--e-out)","detail refresh"],["--t-2 · 200ms","var(--t-2)","var(--e-out)","cursor, tab underline"],["--t-3 · 320ms","var(--t-3)","var(--e-out)","list enter, pane push, width"],["--t-4 · 600ms","var(--t-4)","var(--e-io)","section hue crossfade"]].map(([n,d,e,u])=>`<div class="mo"><span>${n}<br><span class="dim">${u}</span></span><div class="tr"><i style="transition-duration:${d};transition-timing-function:${e}"></i></div></div>`).join("")}</div>
+   <div style="display:flex;gap:8px;margin-top:12px;align-items:center"><button class="btn" id="moGo">Replay</button><code class="dim">--e-out cubic-bezier(.2,.8,.2,1) · --e-io (.65,0,.35,1) · --stagger 16ms</code></div>`],
+ ["Transitions","what moves and why",`<table class="t" style="margin:0"><tr><th>Change</th><th>Motion</th><th>Tells you</th></tr>
+   <tr><td>Section</td><td>hue crossfade, rows rise with stagger, header fades</td><td>you moved somewhere else</td></tr>
+   <tr><td>Tab</td><td>underline glides, rows rise (half stagger)</td><td>same place, different filter</td></tr>
+   <tr><td>Selection</td><td>cursor glides between rows, detail refreshes</td><td>where focus is</td></tr>
+   <tr><td>Open</td><td>a pane slides in from the right; panes behind narrow and dim</td><td>you went deeper and can still see where from</td></tr><tr><td>Back</td><td>the top pane slides out; the rest widen</td><td>you came back up</td></tr><tr><td>Layout</td><td>List ↔ Timeline: rows re-enter with stagger</td><td>same data, different shape</td></tr>
+   <tr><td>Result</td><td>status message rises in the status bar</td><td>what just happened</td></tr></table>`],
+ ["Pane stack","widths animate between depths; Esc pops one level",(()=>{const f=(x,y,ws,lbl)=>{let o=0,g=`<text x="${x}" y="${y-8}">${lbl}</text><rect class="s" x="${x}" y="${y}" width="200" height="70"/>`;ws.forEach((w,i)=>{const W_=200*w/100;if(i)g+=`<line class="s" x1="${x+o}" y1="${y}" x2="${x+o}" y2="${y+70}" ${i===ws.length-1?'style="stroke:var(--c-accent-text)"':""}/>`;for(let j=0;j<5;j++)g+=`<line class="s" opacity="${i<ws.length-1?.35:.8}" x1="${x+o+6}" y1="${y+12+j*11}" x2="${x+o+W_-6}" y2="${y+12+j*11}"/>`;o+=W_});return g};
+   return `<svg class="art" viewBox="0 0 680 110" style="max-height:none">${f(0,24,[100],"0 · list")}${f(240,24,[36,64],"1 · + session")}${f(480,24,[20,32,48],"2 · + execution")}</svg>`})()],
+ ["Navigation item","default · hover · current",`<div class="specimen" style="padding:8px;background:rgba(0,0,0,.3)">${["sessions","integrations","workspaces"].map((k,i)=>`<button class="nv"${i===1?' aria-current="page"':""}><svg viewBox="0 0 24 24" aria-hidden="true">${NAVI[k]}</svg><span>${SEC[k].t}</span><span class="c">${count(k)}</span></button>`).join("")}</div>`],
+ ["Tabs","the underline is one element that glides",`<div class="specimen"><div class="tabbar" id="kitTabs" style="padding:0 16px">${["Catalogue","Linked","Needs attention"].map((l,i)=>`<button class="tab" data-kt="${i}" aria-selected="${i===0}">${l}<sup>${[41,3,2][i]}</sup></button>`).join("")}<span class="tab-ind" id="kitInd"></span></div></div>`],
+ ["Table","column heads, group header, cursor, statuses",`<div class="specimen" style="--cols:minmax(0,1fr) 110px 140px;--cols-sm:minmax(0,1fr) 120px"><div class="thead" style="padding:0 16px"><span>Vendor</span><span class="hide-sm">Connects with</span><span>Status</span></div><div class="list" id="kitList" style="overflow:visible;padding:0"><div class="cursor" id="kitCur"></div><div class="grp" style="padding:0 16px;position:relative">Work</div>
+   ${[["linear","Linear","One-click","<span>Linked · 23 tools</span>"],["github","GitHub","OAuth app",'<span class="warn">Needs link</span>'],["Nu","Nudge","One-click",'<span class="bad">Failed at step 6</span>'],["stripe","Stripe","One-click",'<span class="dim">Not added</span>']].map((r,i)=>`<div class="row" data-ki="${i}" aria-selected="${i===1}" style="padding:0 16px"><span class="nm">${glyph(r[0])}<span>${r[1]}</span></span><span class="hide-sm">${r[2]}</span>${r[3]}</div>`).join("")}</div></div>`],
+ ["Buttons","primary · secondary · ghost · danger; key hint inside",`<div class="acts" style="margin:0"><button class="btn pri">Connect Linear<span class="kbd">↵</span></button><button class="btn">Sync now<span class="kbd">S</span></button><button class="btn ghost">← Back<span class="kbd">Esc</span></button><button class="btn danger">Unlink<span class="kbd">D</span></button></div>
+   <p class="dim" style="font-size:12px;margin:10px 0 0">Danger actions confirm with a second press within 3 s, shown in the status bar. No dialogs.</p>`],
+ ["Search & fields","search lives in the top bar; fields are quiet",`<label class="gsearch" style="max-width:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="Search vendors and tools" aria-label="Search example"><span class="kbd">/</span></label>
+   <label style="display:block;margin-top:14px"><span class="label" style="display:block;margin-bottom:6px">Grafana API key</span><span class="gsearch" style="max-width:none"><input type="password" value="glsa_xxxxxxxxxxxxxxxx" aria-label="Grafana API key" style="font-family:var(--f-mono)"></span><span class="dim" style="display:block;font-size:12px;margin-top:6px">Stored sealed. It is never shown again and never reaches the sandbox.</span></label>`],
+ ["Policy switch","Enter or click toggles; block is the only red state",`<div style="display:flex;gap:24px"><button class="sw" onclick="this.classList.toggle('off');this.lastChild.textContent=this.classList.contains('off')?'Blocked':'Allowed'"><i></i>Allowed</button><button class="sw off" onclick="this.classList.toggle('off');this.lastChild.textContent=this.classList.contains('off')?'Blocked':'Allowed'"><i></i>Blocked</button></div>`],
+ ["Detail blocks","facts, code, exception, step line",facts([["Executions","6"],["Failed",'<span class="bad">1</span>'],["Expires in","3 days 23 h"]])+`<div class="code"><span class="y">await</span> tools.linear.update_issue(id="WEB-9999")</div><div class="errl">ToolError: linear.update_issue: issue "WEB-9999" not found (HTTP 404)</div><div class="stepline"><span class="ok">1</span><span class="ok">2</span><span class="ok">3</span><span class="ok">4</span><span class="ok">5</span><span class="x">6 token</span><span>7</span></div>`],
+ ["Illustration","vendor glyph as line art; session timeline",`<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center">${bigIcon("linear")}${timeline(S[0])}</div>`],
+ ["Status bar","result message plus the keys that work right now",`<div class="status" style="position:relative;height:30px;border-left:0"><span class="msg">Linear linked · 23 tools added to All sources</span><button><span class="kbd">↵</span>Open</button><button><span class="kbd">↑↓</span>Select</button><button><span class="kbd">Esc</span>Back</button></div>`],
+ ["Empty & loading","one instruction; rows keep their shape while loading",`<div class="specimen"><div class="empty" style="padding:24px 16px"><b>No sessions yet</b>Copy the agent URL from the top bar into your agent. Its first execution appears here within 5 seconds.</div>${[62,48,55].map(w=>`<div class="row" style="padding:0 16px;--cols:1fr"><span><i style="display:block;width:${w}%;height:8px;background:linear-gradient(90deg,var(--c-line),var(--c-line-2),var(--c-line));background-size:200% 100%;animation:sh 1.4s linear infinite"></i></span></div>`).join("")}</div><style>@keyframes sh{to{background-position:-200% 0}}</style>`],
+];
+$("kitroot").innerHTML=KIT.map(([n,c,h])=>`<div class="spec"><div class="cap"><b>${n}</b><code>${c}</code></div>${h}</div>`).join("");
+$("moGo").addEventListener("click",()=>{const m=$("mo");m.classList.toggle("go")});
+(()=>{const tb=$("kitTabs"),ind=$("kitInd");const place=b=>{ind.style.width=b.offsetWidth+"px";ind.style.transform=`translateX(${b.offsetLeft}px)`};
+  requestAnimationFrame(()=>place(tb.querySelector('[aria-selected="true"]')));
+  tb.addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return;tb.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected",x===b));place(b)})})();
+(()=>{const L=$("kitList"),cur=$("kitCur");const place=r=>{cur.style.transform=`translateY(${r.offsetTop}px)`;cur.style.height=r.offsetHeight+"px"};
+  requestAnimationFrame(()=>place(L.querySelector('[aria-selected="true"]')));
+  L.addEventListener("click",e=>{const r=e.target.closest(".row");if(!r)return;L.querySelectorAll(".row").forEach(x=>x.setAttribute("aria-selected",x===r));place(r)})})();
+
+</script>
+</body>
+</html>

@@ -1,5 +1,10 @@
 # Acceptance ledger
 
+## Active replacement proposal — in progress
+
+The owner requested https://artifacts.microapps.space/a/hkwwwp90n0dt, which supersedes the historical approval/resume, snapshot persistence, custom-host and daytime UI requirements in the older ledgers below. Current local scope and evidence are tracked in [the proposal implementation ledger](proposal/implementation.md). The deployed baseline remains schema 16; none of these replacement changes is deployed yet. Live-provider consent/client acceptance and hardware performance remain unperformed. Historical qualification below does not prove the replacement proposal complete.
+
+
 Checked 2026-11-14 against [revision 5 of the implementation plan](https://artifacts.microapps.space/a/saqdh2xm7jcd), the current sources, recorded qualification and the running Oracle process. Implementation is deployed; the owner-dependent gates below remain open. Continuing past a manual gate was authorized; that authorization is not evidence the gate passed.
 
 ## Running release

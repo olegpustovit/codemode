@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH reused AS (\n            UPDATE agent_sessions SET last_seen_at=GREATEST(last_seen_at,clock_timestamp())\n            WHERE id=(SELECT id FROM agent_sessions WHERE workspace_id=$2\n             AND (($3::uuid IS NULL AND token_id=$1) OR ($3::uuid IS NOT NULL AND oauth_grant=$3))\n             AND last_seen_at>=clock_timestamp()-interval '30 minutes' ORDER BY last_seen_at DESC,id DESC LIMIT 1)\n            RETURNING id\n        ), created AS (\n            INSERT INTO agent_sessions(token_id,workspace_id,oauth_grant,client,started_at,last_seen_at)\n            SELECT $1,$2,$3,$4,clock_timestamp(),clock_timestamp() WHERE NOT EXISTS(SELECT 1 FROM reused) RETURNING id\n        ) SELECT id AS \"id!\" FROM reused UNION ALL SELECT id FROM created",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0bf92e896ca945688e1b00b6540053dadf61d2ff628eb33fa4eaaab282fb0395"
+}

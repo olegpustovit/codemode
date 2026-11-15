@@ -29,6 +29,7 @@ const CLIENT_METADATA: &str = "https://test.example/oauth/client-metadata.json";
 pub struct Provider {
     pub origin: String,
     pub cimd: bool,
+    pub static_app: Arc<AtomicBool>,
     pub registrations: Arc<AtomicUsize>,
     pub exchanges: Arc<AtomicUsize>,
     pub refreshes: Arc<AtomicUsize>,
@@ -36,6 +37,8 @@ pub struct Provider {
     pub calls: Arc<AtomicUsize>,
     pub leaked_agents: Arc<AtomicUsize>,
     pub transient: Arc<AtomicBool>,
+    pub fail_registration: Arc<AtomicBool>,
+    pub fail_exchange: Arc<AtomicBool>,
     pub rejected: Arc<AtomicBool>,
     pub replacement: Arc<AtomicBool>,
     pub blocked: Arc<AtomicBool>,
@@ -48,6 +51,7 @@ impl Provider {
         Self {
             origin,
             cimd,
+            static_app: Arc::new(AtomicBool::new(false)),
             registrations: Arc::new(AtomicUsize::new(0)),
             exchanges: Arc::new(AtomicUsize::new(0)),
             refreshes: Arc::new(AtomicUsize::new(0)),
@@ -55,6 +59,8 @@ impl Provider {
             calls: Arc::new(AtomicUsize::new(0)),
             leaked_agents: Arc::new(AtomicUsize::new(0)),
             transient: Arc::new(AtomicBool::new(false)),
+            fail_registration: Arc::new(AtomicBool::new(false)),
+            fail_exchange: Arc::new(AtomicBool::new(false)),
             rejected: Arc::new(AtomicBool::new(false)),
             replacement: Arc::new(AtomicBool::new(false)),
             blocked: Arc::new(AtomicBool::new(false)),
@@ -112,20 +118,33 @@ async fn metadata(State(provider): State<Provider>) -> Json<serde_json::Value> {
 async fn register(
     State(provider): State<Provider>,
     Json(body): Json<serde_json::Value>,
-) -> Json<serde_json::Value> {
+) -> Response {
+    if provider.fail_registration.load(Ordering::SeqCst) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_client_metadata", "error_description":"redirect URI is not accepted", "client_secret":"registration-secret"}))).into_response();
+    }
     provider.registrations.fetch_add(1, Ordering::SeqCst);
     assert_eq!(body["application_type"], "web");
     assert_eq!(body["redirect_uris"], serde_json::json!([CALLBACK]));
     Json(
         serde_json::json!({"client_id":"fixture-client","client_secret":CLIENT_SECRET,"redirect_uris":[CALLBACK],"token_endpoint_auth_method":"client_secret_basic"}),
-    )
+    ).into_response()
 }
 async fn token(
     State(provider): State<Provider>,
     headers: HeaderMap,
     Form(body): Form<HashMap<String, String>>,
 ) -> Response {
-    if provider.cimd {
+    if provider.static_app.load(Ordering::SeqCst) {
+        assert_eq!(
+            body.get("client_id").map(String::as_str),
+            Some("fixture-client")
+        );
+        assert_eq!(
+            body.get("client_secret").map(String::as_str),
+            Some(CLIENT_SECRET)
+        );
+        assert!(!headers.contains_key("authorization"));
+    } else if provider.cimd {
         assert_eq!(
             body.get("client_id").map(String::as_str),
             Some(CLIENT_METADATA)
@@ -147,6 +166,9 @@ async fn token(
             URL_SAFE_NO_PAD.encode(Sha256::digest(body["code_verifier"].as_bytes())),
             *provider.challenge.lock().unwrap()
         );
+        if provider.fail_exchange.load(Ordering::SeqCst) {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_grant", "error_description":format!("denied code {} for secret {CLIENT_SECRET}", body["code"])}))).into_response();
+        }
         provider.exchanges.fetch_add(1, Ordering::SeqCst);
     } else {
         assert_eq!(body["grant_type"], "refresh_token");

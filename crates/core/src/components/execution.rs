@@ -1,9 +1,9 @@
-pub mod approvals;
 pub mod log;
+pub(crate) mod title;
 use super::{auth::Principal, sources::Sources};
 use crate::infrastructure::{
     postgres::{Database, Error as DbError},
-    sandbox::{OUTPUT, Sandbox, Step},
+    sandbox::{Capture, OUTPUT, Sandbox, Step},
 };
 use futures_util::{StreamExt, stream};
 use serde::Serialize;
@@ -22,9 +22,9 @@ pub enum Error {
     #[error("execution stopped")]
     Stopped,
     #[error(transparent)]
-    Script(#[from] super::scripts::Error),
+    Session(#[from] super::agent_sessions::Error),
     #[error(transparent)]
-    Approval(#[from] approvals::Error),
+    Script(#[from] super::scripts::Error),
     #[error(transparent)]
     Database(#[from] DbError),
 }
@@ -42,8 +42,6 @@ pub struct ResultValue {
     pub output_dropped_bytes: usize,
     pub tool_calls: usize,
     pub error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub approval_url: Option<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -52,7 +50,6 @@ pub struct Limits {
     pub concurrent_executions: usize,
     pub concurrent_calls: usize,
     pub upstream_timeout: Duration,
-    pub approval_lifetime: Duration,
 }
 impl Default for Limits {
     fn default() -> Self {
@@ -61,7 +58,6 @@ impl Default for Limits {
             concurrent_executions: 8,
             concurrent_calls: 16,
             upstream_timeout: Duration::from_secs(30),
-            approval_lifetime: Duration::from_secs(600),
         }
     }
 }
@@ -74,20 +70,6 @@ pub struct Execution<S: Sandbox> {
     tasks: TaskTracker,
     stop: CancellationToken,
     limits: Limits,
-    approvals: approvals::Approvals,
-}
-
-enum Job {
-    Start(Principal, String),
-    Resume(Principal, Uuid),
-}
-enum Initial {
-    Start(String),
-    Resume(approvals::Continuation),
-}
-enum Outcome {
-    Done(Step),
-    Paused,
 }
 
 impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
@@ -98,10 +80,8 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         tasks: TaskTracker,
         stop: CancellationToken,
         limits: Limits,
-        snapshot_key: [u8; 32],
     ) -> Self {
         Self {
-            approvals: approvals::Approvals::new(db.clone(), snapshot_key),
             db,
             sources,
             sandbox,
@@ -113,7 +93,6 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
     }
     pub fn with_database(&self, db: Database, sources: Sources, stop: CancellationToken) -> Self {
         Self {
-            approvals: self.approvals.with_database(db.clone()),
             db,
             sources,
             sandbox: self.sandbox.clone(),
@@ -130,15 +109,11 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
             sources.run(stop).await;
         });
     }
-    pub fn approvals(&self) -> approvals::Approvals {
-        self.approvals.clone()
-    }
     pub async fn recover(&self) -> Result<(), Error> {
         let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
         sqlx::query!("UPDATE executions SET status='failed',error='Gateway restarted during execution',finished_at=now() WHERE status='running'").execute(&mut *tx).await.map_err(DbError::from)?;
-        sqlx::query!("UPDATE tool_calls c SET outcome='cancelled',error='Gateway restarted; upstream may have completed' WHERE c.outcome='running' OR (c.outcome='awaiting_approval' AND EXISTS(SELECT 1 FROM executions e WHERE e.id=c.execution_id AND e.status<>'paused'))").execute(&mut *tx).await.map_err(DbError::from)?;
+        sqlx::query!("UPDATE tool_calls SET outcome='cancelled',error='Gateway restarted; upstream may have completed' WHERE outcome='running'").execute(&mut *tx).await.map_err(DbError::from)?;
         tx.commit().await.map_err(DbError::from)?;
-        self.approvals.sweep().await?;
         Ok(())
     }
     pub async fn execute(
@@ -149,7 +124,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         if code.len() > 64 * 1024 {
             return Err(Error::Source);
         }
-        self.submit(Job::Start(principal, code)).await
+        self.submit(principal, code).await
     }
     pub fn execute_script(
         self: &Arc<Self>,
@@ -164,14 +139,11 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
             self.execute(principal, code).await
         })
     }
-    pub async fn resume(
+    async fn submit(
         self: &Arc<Self>,
         principal: Principal,
-        id: Uuid,
+        code: String,
     ) -> Result<ResultValue, Error> {
-        self.submit(Job::Resume(principal, id)).await
-    }
-    async fn submit(self: &Arc<Self>, job: Job) -> Result<ResultValue, Error> {
         let permit = self
             .slots
             .clone()
@@ -181,150 +153,45 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         let guard = cancel.clone().drop_guard();
         let this = self.clone();
         let (tx, rx) = oneshot::channel();
-        self.tasks.spawn(async move{
-            let _permit=permit;
-            let result=match job {
-                Job::Start(principal,code)=>{
-                    match sqlx::query_scalar!("INSERT INTO executions(token_id,code,status) VALUES($1,$2,'running') RETURNING id",principal.token_id,code).fetch_one(&this.db.0).await.map_err(DbError::from) {
-                        Ok(id)=>Box::pin(this.segment(principal,id,Initial::Start(code),cancel)).await,
-                        Err(error)=>Err(Error::Database(error)),
-                    }
-                }
-                Job::Resume(principal,id)=>match this.approvals.claim(id,&principal).await {
-                    Ok(approvals::Claim::Pending(count))=>Ok(this.paused(id,count)),
-                    Ok(approvals::Claim::Ready(continuation))=>Box::pin(this.segment(principal,id,Initial::Resume(continuation),cancel)).await,
-                    Err(error)=>Err(Error::Approval(error)),
-                },
+        self.tasks.spawn(async move {
+            let _permit = permit;
+            let result = match super::agent_sessions::AgentSessions::new(this.db.clone())
+                .start(&principal, &code)
+                .await
+            {
+                Ok(id) => Box::pin(this.segment(principal, id, code, cancel)).await,
+                Err(error) => Err(Error::Session(error)),
             };
-            let _=tx.send(result);
+            let _ = tx.send(result);
         });
         let result = rx.await.map_err(|_| Error::Stopped)?;
         guard.disarm();
         result
     }
-    fn paused(&self, id: Uuid, count: usize) -> ResultValue {
-        ResultValue {
-            execution_id: id,
-            status: "paused",
-            result: RawValue::NULL.to_owned(),
-            output: String::new(),
-            result_truncated: false,
-            result_dropped_bytes: 0,
-            output_truncated: false,
-            output_dropped_bytes: 0,
-            tool_calls: count,
-            error: None,
-            approval_url: Some(format!(
-                "https://{}/approvals/{id}",
-                self.sources.main_hostname()
-            )),
-        }
-    }
-    async fn dispatch_batch(
-        &self,
-        id: Uuid,
-        first: usize,
-        principal: &Principal,
-        pending: Vec<super::broker::Prepared>,
-        decisions: Option<&[(u32, bool)]>,
-    ) -> Vec<(u32, crate::infrastructure::sandbox::CallResult)> {
-        use super::broker::Authority;
-        stream::iter(pending.into_iter().enumerate())
-            .map(|(index, pending)| {
-                let authority = match decisions {
-                    None => Authority::Unapproved,
-                    Some(decisions) => match (
-                        pending.error,
-                        pending.binding,
-                        decisions
-                            .iter()
-                            .find(|(call, _)| *call == pending.call.id)
-                            .map(|(_, allow)| *allow),
-                    ) {
-                        (Some(error), _, _) => Authority::Rejected(error),
-                        (None, Some(binding), Some(true)) => Authority::Approved(binding),
-                        _ => Authority::Rejected("denied by owner".into()),
-                    },
-                };
-                self.sources.dispatch_authorized(
-                    id,
-                    first + index,
-                    pending.call,
-                    self.limits.upstream_timeout,
-                    principal.workspace_id,
-                    authority,
-                )
-            })
-            .buffer_unordered(self.limits.concurrent_calls)
-            .collect()
-            .await
-    }
     async fn segment(
         &self,
         principal: Principal,
         id: Uuid,
-        initial: Initial,
+        code: String,
         cancel: CancellationToken,
     ) -> Result<ResultValue, Error> {
         use crate::infrastructure::sandbox::Error as SandboxError;
-        use sha2::Digest;
-        let mut count = match &initial {
-            Initial::Start(_) => 0,
-            Initial::Resume(saved) => saved.frozen.count,
-        };
-        let code_hash = match &initial {
-            Initial::Start(code) => sha2::Sha256::digest(code.as_bytes()).into(),
-            Initial::Resume(saved) => saved.frozen.code_hash,
-        };
+        let mut count = 0;
+        let capture = self.sandbox.capture();
         let future = async {
-            let (mut run, mut step) = match initial {
-                Initial::Start(code) => {
-                    let allowed = self
-                        .sources
-                        .allowed_sources(principal.workspace_id)
-                        .await
-                        .map_err(|_| SandboxError::Invalid("endpoint scope unavailable".into()))?;
-                    let prelude = self
-                        .sources
-                        .prelude_scoped(allowed.as_deref(), principal.workspace_id)
-                        .await
-                        .map_err(|_| SandboxError::Invalid("endpoint policy unavailable".into()))?;
-                    self.sandbox
-                        .start_for(principal.token_id, &code, &prelude)
-                        .await?
-                }
-                Initial::Resume(saved) => {
-                    let (run, ids) = self
-                        .sandbox
-                        .restore_for(principal.token_id, &saved.snapshot)
-                        .await?;
-                    if ids.len() != saved.frozen.pending.len()
-                        || saved
-                            .frozen
-                            .pending
-                            .iter()
-                            .any(|p| !ids.contains(&p.call.id))
-                    {
-                        return Err(SandboxError::Snapshot);
-                    }
-                    let first = count
-                        .checked_sub(saved.frozen.pending.len())
-                        .ok_or(SandboxError::Snapshot)?;
-                    let results = self
-                        .dispatch_batch(
-                            id,
-                            first,
-                            &principal,
-                            saved.frozen.pending,
-                            Some(&saved.decisions),
-                        )
-                        .await;
-                    self.sandbox.resume(run, results).await?
-                }
-            };
+            let allowed = self
+                .sources
+                .allowed_sources(principal.workspace_id)
+                .await
+                .map_err(|_| SandboxError::Invalid("workspace scope unavailable".into()))?;
+            let prelude = self.sources.prelude(allowed.as_deref()).await;
+            let (mut run, mut step) = self
+                .sandbox
+                .start_captured_for(principal.token_id, &code, &prelude, capture.clone())
+                .await?;
             loop {
                 match step {
-                    Step::Done { .. } => return Ok::<_, SandboxError>(Outcome::Done(step)),
+                    Step::Done { .. } => return Ok::<_, SandboxError>(step),
                     Step::Calls(calls) => {
                         if calls.len() > 100usize.saturating_sub(count) {
                             return Err(SandboxError::Invalid(
@@ -343,45 +210,18 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                         }
                         let first = count;
                         count += calls.len();
-                        let pending = self
-                            .sources
-                            .prepare(calls, principal.workspace_id)
-                            .await
-                            .map_err(|_| {
-                                SandboxError::Invalid(
-                                    "policy unavailable; no calls in this batch were sent".into(),
+                        let results = stream::iter(calls.into_iter().enumerate())
+                            .map(|(index, call)| {
+                                self.sources.dispatch(
+                                    id,
+                                    first + index,
+                                    call,
+                                    self.limits.upstream_timeout,
+                                    principal.workspace_id,
                                 )
-                            })?;
-                        if pending.iter().any(|call| call.needs_approval) {
-                            let snapshot = self.sandbox.snapshot(run).await?;
-                            let expires = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .ok()
-                                .and_then(|v| i64::try_from(v.as_secs()).ok())
-                                .and_then(|v| {
-                                    i64::try_from(self.limits.approval_lifetime.as_secs())
-                                        .ok()
-                                        .and_then(|lifetime| v.checked_add(lifetime))
-                                })
-                                .ok_or(SandboxError::Snapshot)?;
-                            let frozen = approvals::Frozen {
-                                execution_id: id,
-                                pause_id: Uuid::new_v4(),
-                                token_id: principal.token_id,
-                                audience: principal.audience.clone(),
-                                expires,
-                                code_hash,
-                                count,
-                                pending,
-                            };
-                            self.approvals
-                                .save(frozen, snapshot)
-                                .await
-                                .map_err(|error| SandboxError::Invalid(error.to_string()))?;
-                            return Ok(Outcome::Paused);
-                        }
-                        let results = self
-                            .dispatch_batch(id, first, &principal, pending, None)
+                            })
+                            .buffer_unordered(self.limits.concurrent_calls)
+                            .collect()
                             .await;
                         (run, step) = self.sandbox.resume(run, results).await?;
                     }
@@ -393,22 +233,35 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
             outcome=tokio::time::timeout(Duration::from_secs(60),future)=>match outcome {
                 Err(_)=>("timed_out",Some("execution exceeded its 60 second wall deadline; worker terminated".into()),None),
                 Ok(Err(error))=>("failed",Some(error.agent_message()),None),
-                Ok(Ok(Outcome::Paused))=>return Ok(self.paused(id,count)),
-                Ok(Ok(Outcome::Done(step)))=>("completed",None,Some(step)),
+                Ok(Ok(step))=>("completed",None,Some(step)),
             }
         };
-        let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
-        sqlx::query!("UPDATE tool_calls SET outcome='cancelled',error='Execution ended while call was in flight; upstream may have completed' WHERE execution_id=$1 AND outcome IN ('running','awaiting_approval') AND NOT EXISTS(SELECT 1 FROM paused_runs p WHERE p.execution_id=$1)",id).execute(&mut *tx).await.map_err(DbError::from)?;
-        sqlx::query!("UPDATE executions SET status=$2,error=$3,tool_calls=$4,finished_at=now() WHERE id=$1 AND status='running'",id,status,error,count as i32).execute(&mut *tx).await.map_err(DbError::from)?;
-        tx.commit().await.map_err(DbError::from)?;
         let (result, output, output_dropped_bytes) = match done {
             Some(Step::Done {
                 result,
                 output,
                 output_dropped_bytes,
             }) => (result, output, output_dropped_bytes),
-            _ => (RawValue::NULL.to_owned(), String::new(), 0),
+            _ => {
+                let (output, dropped) = Capture::snapshot(&capture);
+                (RawValue::NULL.to_owned(), output, dropped)
+            }
         };
+        let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
+        let paths = sqlx::query_scalar!(
+            "SELECT path FROM tool_calls WHERE execution_id=$1 ORDER BY seq",
+            id
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(DbError::from)?;
+        let title = title::title(&code, &paths);
+        let stored_result = log::preview(result.get(), 16384);
+        let stored_output = log::preview(&output, 16384);
+        sqlx::query!("UPDATE tool_calls SET outcome='cancelled',error='Execution ended while call was in flight; upstream may have completed' WHERE execution_id=$1 AND outcome='running'",id).execute(&mut *tx).await.map_err(DbError::from)?;
+        sqlx::query!("UPDATE executions SET status=$2,error=$3,tool_calls=$4,title=$5,result=$6,output=$7,finished_at=clock_timestamp() WHERE id=$1 AND status='running'",id,status,error,count as i32,title,stored_result,stored_output).execute(&mut *tx).await.map_err(DbError::from)?;
+        sqlx::query!("UPDATE agent_sessions s SET last_seen_at=GREATEST(s.last_seen_at,clock_timestamp()),title=COALESCE(s.title,CASE WHEN NOT EXISTS(SELECT 1 FROM executions earlier JOIN executions current ON current.id=$1 WHERE earlier.session_id=s.id AND (earlier.started_at,earlier.id)<(current.started_at,current.id)) THEN $2 ELSE NULL END) WHERE s.id=(SELECT session_id FROM executions WHERE id=$1)",id,title).execute(&mut *tx).await.map_err(DbError::from)?;
+        tx.commit().await.map_err(DbError::from)?;
         let (result, result_dropped_bytes) = truncate_result(result, self.limits.result_bytes);
         Ok(ResultValue {
             execution_id: id,
@@ -421,7 +274,6 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
             output_dropped_bytes,
             tool_calls: count,
             error,
-            approval_url: None,
         })
     }
 }

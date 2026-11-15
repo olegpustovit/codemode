@@ -7,9 +7,9 @@ import {
 } from "@tanstack/react-query"
 import { z } from "zod"
 import { ArrowLeft, ExternalLink, Plus, X } from "lucide-react"
-import { sourcesQuery, sourceQuery, accountsQuery } from "./queries"
+import { sourceQuery, accountsQuery } from "./queries"
 import { write, nothing, httpUrl } from "@/lib/api"
-import { PageHeader, Blank, ErrorNotice, date } from "@/components/common"
+import { PageHeader, ErrorNotice, date } from "@/components/common"
 import { ConfirmAction } from "@/components/confirm-action"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,94 +21,17 @@ import {
   FieldSet,
   FieldLegend,
 } from "@/components/ui/field"
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
+
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { toast } from "@/components/ui/toast"
+import { useStatus } from "@/components/status-bar"
 const accountRoute = getRouteApi("/_authenticated/sources/$sourceId_/accounts")
-export function AccountsPage() {
-  const sources = useSuspenseQuery(sourcesQuery).data
-  const accounts = useSuspenseQuery(accountsQuery).data
-  return (
-    <>
-      <PageHeader
-        title="Linked accounts"
-        description="Credentials stay in the gateway. Agents receive tool results."
-      />
-      {!sources.length ? (
-        <Blank
-          title="Add a source first"
-          description="Each source has its own linked credential."
-        >
-          <Button render={<Link to="/sources/new" />}>Add source</Button>
-        </Blank>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Source</TableHead>
-              <TableHead>Account</TableHead>
-              <TableHead>Access token expiry</TableHead>
-              <TableHead>
-                <span className="sr-only">Manage</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sources.map((source) => {
-              const account = accounts.find((a) => a.sourceId === source.id)
-              return (
-                <TableRow key={source.id}>
-                  <TableCell>{source.slug}</TableCell>
-                  <TableCell>
-                    {account
-                      ? account.kind === "environment"
-                        ? "Environment variables"
-                        : account.kind === "oauth"
-                          ? "OAuth"
-                          : account.kind === "rest"
-                            ? "HTTP credential"
-                            : "Bearer token"
-                      : source.requiresAccount
-                        ? "Not linked"
-                        : "Optional"}
-                  </TableCell>
-                  <TableCell>{date(account?.expiresAt ?? null)}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      render={
-                        <Link
-                          to="/sources/$sourceId/accounts"
-                          params={{ sourceId: source.id }}
-                        />
-                      }
-                    >
-                      {account ? "Manage" : "Link account"}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      )}
-    </>
-  )
-}
 export function AccountPage() {
   const { sourceId } = accountRoute.useParams()
   return <AccountEditor key={sourceId} sourceId={sourceId} />
 }
 function AccountEditor({ sourceId }: { sourceId: string }) {
+  const { report } = useStatus()
   const { oauth } = accountRoute.useSearch()
   const source = useSuspenseQuery(sourceQuery(sourceId)).data
   const httpApi = source.kind === "openapi" || source.kind === "graphql"
@@ -183,7 +106,7 @@ function AccountEditor({ sourceId }: { sourceId: string }) {
       setCredentialName("")
       setVariables([{ id: "initial", name: "", value: "" }])
       await refresh()
-      toast.add({ title: "Account linked", type: "success" })
+      report("Account linked")
     },
   })
   const connect = useMutation({

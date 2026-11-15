@@ -74,11 +74,6 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         args.is_empty(),
         "usage: codemode [token create NAME | token list | token revoke UUID | password hash]"
     );
-    let key = config
-        .snapshot_key
-        .as_ref()
-        .context("CODEMODE_SNAPSHOT_KEY is required (64 hex characters)")?;
-    let key = decode_key(key.expose_secret())?;
     let encryption_key = config
         .encryption_key
         .as_ref()
@@ -113,6 +108,17 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
             }
         }
     });
+    let history = codemode_core::components::agent_sessions::AgentSessions::new(db.clone());
+    let history_stop = stop.clone();
+    tasks.spawn(async move {
+        let mut timer = tokio::time::interval(Duration::from_secs(3600));
+        loop {
+            tokio::select! {biased; _=history_stop.cancelled()=>break,_=timer.tick()=>{}}
+            if let Err(error) = history.sweep().await {
+                tracing::error!(error=?error,"agent history retention cleanup failed");
+            }
+        }
+    });
     let catalogue = Catalogue::new(db.clone());
     let sources = Sources::new(
         db.clone(),
@@ -128,7 +134,6 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         MontySandbox::new(
             &config.monty_bin,
             Duration::from_secs(60),
-            key,
             config.output_bytes,
         )
         .await
@@ -141,24 +146,11 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         tasks.clone(),
         stop.clone(),
         config.execution_limits,
-        key,
     ));
     execution
         .recover()
         .await
         .context("recover interrupted executions")?;
-    let approval_sweeper = execution.approvals();
-    let approval_stop = stop.clone();
-    tasks.spawn(async move {
-        let mut timer = tokio::time::interval(Duration::from_secs(60));
-        loop {
-            tokio::select! {biased; _=approval_stop.cancelled()=>break, _=timer.tick()=>{}}
-            if let Err(error) = approval_sweeper.sweep().await {
-                tracing::error!(error=?error,"approval expiry cleanup failed");
-            }
-        }
-    });
-
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .context("bind HTTP listener")?;

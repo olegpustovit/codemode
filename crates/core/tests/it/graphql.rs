@@ -9,7 +9,6 @@ use axum::{
 use codemode_core::{
     components::{
         accounts::{Accounts, HttpCredential},
-        execution::approvals::Decision,
         sources::{Source, Transport},
     },
     infrastructure::sandbox::MontySandbox,
@@ -114,7 +113,7 @@ async fn wait(sources: &Sources, id: Uuid) {
     );
 }
 #[sqlx::test(migrations = "./migrations")]
-async fn graphql_source_validates_operation_kind_links_credentials_and_approves_mutations(
+async fn graphql_source_validates_operation_kind_links_credentials_and_dispatches_mutations(
     pool: sqlx::PgPool,
 ) {
     let stop = CancellationToken::new();
@@ -175,16 +174,8 @@ async fn graphql_source_validates_operation_kind_links_credentials_and_approves_
     tasks.spawn(async move {
         sync.run(sync_stop).await;
     });
-    wait(&sources, id).await;
-    assert_eq!(
-        catalogue
-            .search("GraphQL", true, None, None)
-            .await
-            .unwrap()
-            .tools
-            .len(),
-        2
-    );
+    sources.ready().await;
+    assert_eq!(sources.get(id).await.unwrap().unwrap().status, "needs_link");
     let auth = Auth::new(db.clone());
     let (_, token) = auth.create("test", "test.example").await.unwrap();
     let principal = auth
@@ -193,14 +184,9 @@ async fn graphql_source_validates_operation_kind_links_credentials_and_approves_
         .unwrap()
         .unwrap();
     let sandbox = Arc::new(
-        MontySandbox::new(
-            &super::approvals::binary(),
-            Duration::from_secs(1),
-            [73; 32],
-            32768,
-        )
-        .await
-        .unwrap(),
+        MontySandbox::new(&super::policies::binary(), Duration::from_secs(1), 32768)
+            .await
+            .unwrap(),
     );
     let execution = Arc::new(Execution::new(
         db.clone(),
@@ -209,10 +195,13 @@ async fn graphql_source_validates_operation_kind_links_credentials_and_approves_
         tasks.clone(),
         stop.clone(),
         Default::default(),
-        [73; 32],
     ));
-    let run=execution.execute(principal.clone(),"try:\n    return await tools.graph.query(query='{ viewer { id } }')\nexcept ToolError as e:\n    return str(e)".into()).await.unwrap();
-    assert!(run.result.get().contains("account is not linked"));
+    let run=execution.execute(principal.clone(),"try:\n    return await _call('graph.query', '{}')\nexcept ToolError as e:\n    return str(e)".into()).await.unwrap();
+    assert!(
+        run.result
+            .get()
+            .contains(&format!("/sources/{id}/accounts"))
+    );
     assert!(state.calls.lock().unwrap().is_empty());
     let accounts = Accounts::new(db.clone(), Some([73; 32]), "test".into()).unwrap();
     accounts
@@ -225,7 +214,17 @@ async fn graphql_source_validates_operation_kind_links_credentials_and_approves_
         )
         .await
         .unwrap();
+    sources.wake();
     wait(&sources, id).await;
+    assert_eq!(
+        catalogue
+            .search("GraphQL", true, None, None)
+            .await
+            .unwrap()
+            .tools
+            .len(),
+        2
+    );
     let run=execution.execute(principal.clone(),"return await tools.graph.query(query='query Read($id:ID!) { item(id:$id) { ...Item } } mutation Other { deleteItem } fragment Item on Thing { id }', operationName='Read', variables={'id':'one'})".into()).await.unwrap();
     assert_eq!(run.status, "completed");
     assert_eq!(
@@ -257,31 +256,8 @@ async fn graphql_source_validates_operation_kind_links_credentials_and_approves_
         assert!(!run.result.get().contains("items"));
     }
     assert_eq!(state.calls.lock().unwrap().len(), before);
-    let paused=execution.execute(principal.clone(),"return await tools.graph.mutation(query='mutation Delete($id:ID!) { deleteItem(id:$id) }',variables={'id':'one'})".into()).await.unwrap();
-    assert_eq!(paused.status, "paused");
-    assert_eq!(state.calls.lock().unwrap().len(), before);
-    let approvals = execution.approvals();
-    let detail = approvals.detail(paused.execution_id).await.unwrap();
-    approvals
-        .decide(
-            paused.execution_id,
-            detail.pause_id,
-            detail
-                .calls
-                .into_iter()
-                .map(|c| Decision {
-                    call_id: c.call_id,
-                    allow: true,
-                })
-                .collect(),
-        )
-        .await
-        .unwrap();
-    let resumed = execution
-        .resume(principal.clone(), paused.execution_id)
-        .await
-        .unwrap();
-    assert_eq!(resumed.status, "completed");
+    let mutation=execution.execute(principal.clone(),"return await tools.graph.mutation(query='mutation Delete($id:ID!) { deleteItem(id:$id) }',variables={'id':'one'})".into()).await.unwrap();
+    assert_eq!(mutation.status, "completed");
     assert_eq!(state.calls.lock().unwrap().len(), before + 1);
     for mode in [
         "error",

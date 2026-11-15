@@ -18,7 +18,9 @@ import { ErrorNotice } from "@/components/common"
 import { safeReturnPath, write } from "@/lib/api"
 import { configQuery, sessionQuery, sessionSchema } from "@/lib/runtime"
 export const Route = createFileRoute("/login")({
-  validateSearch: z.object({ redirect: z.unknown().transform(safeReturnPath) }),
+  validateSearch: z.object({
+    redirect: z.unknown().optional().transform(safeReturnPath),
+  }),
   head: () => ({ meta: [{ title: "Sign in · Codemode" }] }),
   component: Login,
 })

@@ -459,18 +459,6 @@ fn json_content(value: &Value) -> Result<Option<(&str, &Value)>, Error> {
 }
 
 impl Operation {
-    pub(crate) fn binding(&self) -> Result<[u8; 32], Error> {
-        use sha2::Digest;
-        let encoded = serde_json::to_vec(&(
-            self.method.as_str(),
-            self.server.as_str(),
-            &self.path,
-            &self.parameters,
-            &self.body,
-        ))
-        .map_err(|_| Error::Invalid("operation identity could not be encoded"))?;
-        Ok(sha2::Sha256::digest(encoded).into())
-    }
     pub(crate) fn request(
         &self,
         client: &reqwest::Client,

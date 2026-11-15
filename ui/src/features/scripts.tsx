@@ -13,7 +13,8 @@ import {
   scriptSchema,
 } from "./queries"
 import type { Script } from "./queries"
-import { write, nothing } from "@/lib/api"
+import { useStatus } from "@/components/status-bar"
+import { write, nothing, message } from "@/lib/api"
 import { Blank, PageHeader, ErrorNotice, date } from "@/components/common"
 import { ConfirmAction } from "@/components/confirm-action"
 import { Button } from "@/components/ui/button"
@@ -98,7 +99,13 @@ function Back({ workspaceId }: { workspaceId: string }) {
     </Link>
   )
 }
-export function NewScriptPage({ workspaceId }: { workspaceId: string }) {
+export function NewScriptPage({
+  workspaceId,
+  initialCode,
+}: {
+  workspaceId: string
+  initialCode?: string
+}) {
   const workspace = useSuspenseQuery(workspaceQuery(workspaceId)).data
   return (
     <>
@@ -107,7 +114,7 @@ export function NewScriptPage({ workspaceId }: { workspaceId: string }) {
         title="Create script"
         description={`Save reusable Python for ${workspace.name}.`}
       />
-      <ScriptEditor workspaceId={workspaceId} />
+      <ScriptEditor workspaceId={workspaceId} initialCode={initialCode} />
     </>
   )
 }
@@ -124,7 +131,7 @@ export function ScriptPage({
       <Back workspaceId={workspaceId} />
       <PageHeader
         title="Edit script"
-        description="Saving changes affects future runs. Executions already awaiting approval keep their original code."
+        description="Saving changes affects future runs. Running executions keep their original code."
       />
       <ScriptEditor key={script.id} workspaceId={workspaceId} script={script} />
     </>
@@ -133,16 +140,18 @@ export function ScriptPage({
 function ScriptEditor({
   workspaceId,
   script,
+  initialCode,
 }: {
   workspaceId: string
   script?: Script
+  initialCode?: string
 }) {
   const [name, setName] = useState(script?.name ?? "")
   const [description, setDescription] = useState(script?.description ?? "")
-  const [code, setCode] = useState(script?.code ?? "")
+  const [code, setCode] = useState(script?.code ?? initialCode ?? "")
   // Keep the revision belonging to this draft; a background refetch must not authorize overwriting another edit.
   const [revision, setRevision] = useState(script?.revision)
-  const [saved, setSaved] = useState(false)
+  const { report } = useStatus()
   const cache = useQueryClient()
   const router = useRouter()
   const bytes = new TextEncoder().encode(code).length
@@ -164,28 +173,28 @@ function ScriptEditor({
     onSuccess: async (result) => {
       setRevision(result.revision)
       setName(result.name)
-      setSaved(true)
       cache.setQueryData(scriptQuery(workspaceId, result.id).queryKey, result)
       await cache.invalidateQueries({
         queryKey: ["scripts", workspaceId],
         exact: true,
       })
+      report(script ? "Changes saved." : "Script created.")
       if (!script)
         await router.navigate({
           to: "/workspaces/$workspaceId/scripts/$scriptId",
           params: { workspaceId, scriptId: result.id },
         })
     },
+    onError: (error) => report(message(error), "error"),
   })
   return (
     <div className="record-grid">
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          setSaved(false)
+          report("Saving script…")
           save.mutate()
         }}
-        onChange={() => setSaved(false)}
       >
         <FieldGroup>
           <fieldset
@@ -240,9 +249,6 @@ function ScriptEditor({
                   ? "Save changes"
                   : "Create script"}
             </Button>
-            <output className="text-sm text-muted-foreground">
-              {saved ? "Changes saved." : ""}
-            </output>
           </div>
         </FieldGroup>
       </form>
@@ -251,7 +257,8 @@ function ScriptEditor({
           <h2>Run from an agent</h2>
           <p className="text-sm text-muted-foreground">
             Agents can find this script through search on the same workspace.
-            Each tool call still follows its current scope and approval rules.
+            Each tool call still follows its current scope and allow/block
+            policies.
           </p>
           {script && (
             <code className="code-panel block overflow-x-auto text-sm">{`execute(scriptId="${script.id}")`}</code>

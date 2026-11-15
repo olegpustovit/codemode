@@ -6,10 +6,9 @@ import {
 } from "@tanstack/react-query"
 import { z } from "zod"
 import { Copy } from "lucide-react"
-import { tokensQuery, workspacesQuery } from "./queries"
-import { write, nothing } from "@/lib/api"
-import { PageHeader, Blank, ErrorNotice } from "@/components/common"
-import { ConfirmAction } from "@/components/confirm-action"
+import { workspacesQuery } from "./queries"
+import { write } from "@/lib/api"
+import { ErrorNotice } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -19,19 +18,11 @@ import {
   FieldDescription,
 } from "@/components/ui/field"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { toast } from "@/components/ui/toast"
-export function TokensPage() {
+import { useStatus } from "@/components/status-bar"
+export function TokenForm({ onDone }: { onDone: () => void }) {
+  const { report } = useStatus()
   const [administration, setAdministration] = useState(false)
-  const tokens = useSuspenseQuery(tokensQuery).data
   const workspaces = useSuspenseQuery(workspacesQuery).data
   const cache = useQueryClient()
   const create = useMutation({
@@ -52,10 +43,6 @@ export function TokensPage() {
   })
   return (
     <>
-      <PageHeader
-        title="Access tokens"
-        description="Use a personal token for a headless agent, or connect through OAuth."
-      />
       {create.data ? (
         <Alert>
           <AlertTitle>Save this token now</AlertTitle>
@@ -80,21 +67,16 @@ export function TokensPage() {
                 onClick={() => {
                   void navigator.clipboard
                     .writeText(create.data.token)
-                    .then(() =>
-                      toast.add({ title: "Token copied", type: "success" })
-                    )
+                    .then(() => report("Token copied"))
                     .catch(() =>
-                      toast.add({
-                        title: "Copy failed. Select and copy the token.",
-                        type: "error",
-                      })
+                      report("Copy failed. Select and copy the token.", "error")
                     )
                 }}
               >
                 <Copy data-icon="inline-start" />
                 Copy token
               </Button>
-              <Button variant="outline" onClick={() => create.reset()}>
+              <Button variant="outline" onClick={onDone}>
                 I saved it
               </Button>
             </div>
@@ -172,66 +154,6 @@ export function TokensPage() {
           </FieldGroup>
         </form>
       )}
-      <section className="flex flex-col gap-4">
-        <h2>Issued tokens</h2>
-        {tokens.length === 0 ? (
-          <Blank
-            title="No tokens issued"
-            description="Create a token above, or authorize an OAuth client."
-          />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Access</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>
-                  <span className="sr-only">Revoke</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tokens.map((token) => (
-                <TableRow key={token.id}>
-                  <TableCell className="max-w-xs break-all">
-                    {token.name}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs break-all">
-                    {token.resource === "/mcp-admin"
-                      ? "Administration"
-                      : (workspaces.find((w) => w.id === token.workspaceId)
-                          ?.name ?? "Deleted workspace")}
-                    <p className="mt-1 text-muted-foreground">
-                      {token.resource}
-                    </p>
-                  </TableCell>
-                  <TableCell>{token.revoked ? "Revoked" : "Issued"}</TableCell>
-                  <TableCell>
-                    {!token.revoked && (
-                      <ConfirmAction
-                        label="Revoke token"
-                        description="The agent will lose access. OAuth token revocation also revokes its refresh grant."
-                        onConfirm={async () => {
-                          await write(
-                            `/api/tokens/${token.id}`,
-                            "DELETE",
-                            undefined,
-                            nothing
-                          )
-                          await cache.invalidateQueries({
-                            queryKey: ["tokens"],
-                          })
-                        }}
-                      />
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </section>
     </>
   )
 }

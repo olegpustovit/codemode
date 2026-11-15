@@ -1,17 +1,8 @@
-import { useState } from "react"
+import { useEffect, useId, useRef } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { ErrorNotice } from "./common"
+import { message } from "@/lib/api"
+import { useStatus } from "./status-bar"
 export function ConfirmAction({
   label,
   description,
@@ -21,43 +12,59 @@ export function ConfirmAction({
   description: string
   onConfirm: () => Promise<unknown>
 }) {
-  const [open, setOpen] = useState(false)
+  const { notice, report, clear } = useStatus()
+  const hint = useId()
+  const button = useRef<HTMLButtonElement>(null)
+  const armed = useRef<{ id: number; until: number } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current)
+      if (armed.current) clear(armed.current.id)
+    },
+    [clear]
+  )
   const action = useMutation({
     mutationFn: onConfirm,
-    onSuccess: () => setOpen(false),
+    onSuccess: () => report(`Completed: ${label}`),
+    onError: (error) => report(`${label} failed: ${message(error)}`, "error"),
   })
   return (
-    <AlertDialog
-      open={open}
-      onOpenChange={(value) => {
-        if (!action.isPending) {
-          setOpen(value)
-          action.reset()
-        }
-      }}
-    >
-      <AlertDialogTrigger render={<Button variant="destructive" />}>
-        {label}
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{label}?</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <ErrorNotice error={action.error} />
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={action.isPending}>
-            Cancel
-          </AlertDialogCancel>
-          <Button
-            variant="destructive"
-            disabled={action.isPending}
-            onClick={() => action.mutate()}
-          >
-            {action.isPending ? "Working…" : label}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <>
+      <Button
+        ref={button}
+        variant="destructive"
+        disabled={action.isPending}
+        aria-describedby={hint}
+        onClick={() => {
+          clearTimeout(timer.current)
+          if (
+            armed.current &&
+            notice?.id === armed.current.id &&
+            Date.now() < armed.current.until
+          ) {
+            armed.current = null
+            report(`Working: ${label}`)
+            action.mutate()
+            return
+          }
+          const id = report(
+            `Press ${label} again within 3 seconds to confirm. ${description}`,
+            "attention",
+            () => button.current?.click()
+          )
+          armed.current = { id, until: Date.now() + 3_000 }
+          timer.current = setTimeout(() => {
+            armed.current = null
+            clear(id)
+          }, 3_000)
+        }}
+      >
+        {action.isPending ? "Working…" : label}
+      </Button>
+      <span id={hint} className="sr-only">
+        {description} Press twice within 3 seconds to confirm.
+      </span>
+    </>
   )
 }

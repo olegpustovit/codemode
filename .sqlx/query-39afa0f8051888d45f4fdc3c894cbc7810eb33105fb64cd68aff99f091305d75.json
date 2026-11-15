@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tool_calls SET outcome='cancelled',error='Gateway restarted; upstream may have completed' WHERE outcome='running'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "39afa0f8051888d45f4fdc3c894cbc7810eb33105fb64cd68aff99f091305d75"
+}

@@ -7,7 +7,7 @@ use super::{
 };
 use crate::infrastructure::{
     postgres::Database,
-    sandbox::{CallResult, PendingCall},
+    sandbox::{CallFailure, CallResult, PendingCall},
 };
 use rmcp::{
     model::CallToolRequestParams,
@@ -43,7 +43,6 @@ pub(crate) enum Credentials {
 pub struct Tool {
     pub(crate) source_id: Uuid,
     pub revision: i64,
-    pub(crate) binding: [u8; 32],
     pub definition: Definition,
     pub(crate) validator: Arc<jsonschema::Validator>,
     pub(crate) target: Target,
@@ -67,20 +66,6 @@ pub(crate) enum Target {
         server: String,
         required: bool,
     },
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub(crate) struct Prepared {
-    pub call: PendingCall,
-    pub binding: Option<[u8; 32]>,
-    pub error: Option<String>,
-    pub needs_approval: bool,
-}
-
-pub(crate) enum Authority {
-    Unapproved,
-    Approved([u8; 32]),
-    Rejected(String),
 }
 
 #[derive(Clone)]
@@ -135,60 +120,71 @@ impl Broker {
         tool: Result<Tool, String>,
         timeout: Duration,
         workspace: Uuid,
-        authority: Authority,
     ) -> (u32, CallResult) {
         let started = Instant::now();
         let args: Result<Value, _> = serde_json::from_str(call.args.get());
         let redacted = args.as_ref().map(redact).unwrap_or(Value::Null);
-        let audit=sqlx::query_scalar!("INSERT INTO tool_calls(execution_id,seq,path,args_redacted,outcome) VALUES($1,$2,$3,$4,'running') ON CONFLICT(execution_id,seq) DO UPDATE SET outcome='running',error=NULL WHERE tool_calls.outcome='awaiting_approval' RETURNING id",execution,seq as i32,call.path,redacted).fetch_one(&self.db.0).await;
+        let audit=sqlx::query_scalar!("INSERT INTO tool_calls(execution_id,seq,path,args_redacted,outcome) VALUES($1,$2,$3,$4,'running') RETURNING id",execution,seq as i32,call.path,redacted).fetch_one(&self.db.0).await;
         let Ok(id) = audit else {
             return (
                 call.id,
                 Err("audit unavailable; tool was not called".into()),
             );
         };
-        let result = if let Authority::Rejected(message) = authority {
-            Err(CallError::Blocked(message))
-        } else {
-            match args {
-                Ok(args) => match tool {
-                    Ok(tool) => {
-                        let revision = sqlx::query_scalar!(
+        let result = match args {
+            Ok(args) => match tool {
+                Ok(tool) => {
+                    let revision = sqlx::query_scalar!(
                         "SELECT s.revision FROM sources s JOIN endpoints e ON e.id=$2 WHERE s.id=$1 AND (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.source_id=s.id AND es.endpoint_id=e.id))",
                         tool.source_id,workspace
                     )
                     .fetch_optional(&self.db.0)
                     .await;
-                        match revision {
-                            Ok(Some(revision)) if revision == tool.revision => {
-                                if let Err(error) = tool.validate(&args) {
-                                    Err(CallError::Invalid(error))
-                                } else {
-                                    match self.policies.effective(workspace,tool.source_id,&tool.definition.upstream_name,tool.definition.read_only,tool.definition.destructive).await {
-                                Ok(Action::Block)=>Err(CallError::Blocked(unavailable(&call.path))),
-                                Ok(action)=>match authority {
-                                    Authority::Approved(binding) if binding!=tool.binding=>Err(CallError::Blocked("tool changed since approval; call was not dispatched".into())),
-                                    Authority::Unapproved if action==Action::Approve=>Err(CallError::Blocked("browser approval required; call was not dispatched".into())),
-                                    _=>tool.call(args,timeout,&self.account_link(tool.source_id),&self.accounts).await,
-                                },
-                                Err(_)=>Err(CallError::Blocked("policy unavailable; tool was not called".into())),
-                            }
+                    match revision {
+                        Ok(Some(revision)) if revision == tool.revision => {
+                            if let Err(error) = tool.validate(&args) {
+                                Err(CallError::Invalid(error))
+                            } else {
+                                match self
+                                    .policies
+                                    .effective(
+                                        workspace,
+                                        tool.source_id,
+                                        &tool.definition.upstream_name,
+                                    )
+                                    .await
+                                {
+                                    Ok(Action::Block) => {
+                                        Err(CallError::Blocked(unavailable(&call.path, workspace)))
+                                    }
+                                    Ok(Action::Allow) => {
+                                        tool.call(
+                                            args,
+                                            timeout,
+                                            &self.account_link(tool.source_id),
+                                            &self.accounts,
+                                        )
+                                        .await
+                                    }
+                                    Err(_) => Err(CallError::Blocked(
+                                        "policy unavailable; tool was not called".into(),
+                                    )),
                                 }
                             }
-                            Ok(Some(_)) => Err(CallError::Upstream(format!(
-                                "source changed; search again after synchronization; account: {}",
-                                self.account_link(tool.source_id)
-                            ))),
-                            Ok(None) => Err(CallError::Blocked(unavailable(&call.path))),
-                            Err(_) => Err(CallError::Upstream(
-                                "source state unavailable; tool was not called".into(),
-                            )),
                         }
+                        Ok(Some(_)) => Err(CallError::Upstream(format!(
+                            "source changed; search again after synchronization; account: {}",
+                            self.account_link(tool.source_id)
+                        ))),
+                        Ok(None) => Err(CallError::Blocked(unavailable(&call.path, workspace))),
+                        Err(_) => Err(CallError::Upstream(
+                            "source state unavailable; tool was not called".into(),
+                        )),
                     }
-                    Err(error) => Err(CallError::Upstream(error)),
-                },
-                Err(_) => Err(CallError::Invalid("tool arguments are invalid JSON".into())),
-            }
+                }
+                Err(error) => Err(CallError::Upstream(error)),
+            },
+            Err(_) => Err(CallError::Invalid("tool arguments are invalid JSON".into())),
         };
         let outcome = match &result {
             Ok(_) => "ok",
@@ -198,13 +194,18 @@ impl Broker {
             Err(CallError::Upstream(_)) => "tool_error",
         };
         let error = result.as_ref().err().map(ToString::to_string);
+        let preview = result
+            .as_ref()
+            .ok()
+            .map(|value| super::execution::log::preview(value.get(), 2048));
         let elapsed = started.elapsed().as_millis().min(i64::MAX as u128) as i64;
         if sqlx::query!(
-            "UPDATE tool_calls SET outcome=$2,error=$3,duration_ms=$4 WHERE id=$1",
+            "UPDATE tool_calls SET outcome=$2,error=$3,duration_ms=$4,preview=$5 WHERE id=$1",
             id,
             outcome,
             error,
-            elapsed
+            elapsed,
+            preview
         )
         .execute(&self.db.0)
         .await
@@ -212,7 +213,13 @@ impl Broker {
         {
             return (call.id,Err("tool returned but its audit could not be finalized; do not automatically retry".into()));
         }
-        (call.id, result.map_err(|error| error.to_string()))
+        (
+            call.id,
+            result.map_err(|error| match error {
+                CallError::Blocked(message) => CallFailure::Permission(message),
+                other => CallFailure::from(other.to_string()),
+            }),
+        )
     }
 }
 
@@ -241,8 +248,8 @@ pub fn redact(value: &Value) -> Value {
     }
 }
 
-pub(crate) fn unavailable(path: &str) -> String {
-    format!("tool {path} is unavailable for this endpoint; use search to find allowed tools")
+pub(crate) fn unavailable(path: &str, workspace: Uuid) -> String {
+    format!("tool {path} is blocked in workspace {workspace}; use search to find allowed tools")
 }
 
 fn secret_key(key: &str) -> bool {

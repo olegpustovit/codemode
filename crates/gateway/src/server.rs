@@ -79,12 +79,6 @@ struct ExecuteArgs {
     script_id: Option<String>,
 }
 
-#[derive(serde::Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ResumeArgs {
-    execution_id: String,
-}
-
 fn failure(message: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(message)])
 }
@@ -159,7 +153,7 @@ impl Gateway {
     }
 
     #[tool(
-        description = "Search first, then provide exactly one of code (Python source) or scriptId (a saved script from this endpoint). Run Python with await tools.source.tool(keyword=value). Use asyncio.gather for parallel calls, print for diagnostics, and return only what is needed. Catch ToolError for upstream failures. No inheritance, generators, third-party imports, files, network or secrets. Limits: 60 seconds, 64 MB, 100 calls, 64 KB source."
+        description = "Search first, then provide exactly one of code (Python source) or scriptId (a saved script from this endpoint). Run Python with await tools.source.tool(keyword=value). Use asyncio.gather for parallel calls, print for diagnostics, and return only what is needed. Catch ToolError for upstream failures and PermissionError for workspace blocks. No inheritance, generators, third-party imports, files, network or secrets. Limits: 60 seconds, 64 MB, 100 calls, 64 KB source."
     )]
     async fn execute(
         &self,
@@ -194,35 +188,6 @@ impl Gateway {
             }
         }
     }
-
-    #[tool(
-        description = "Continue an execution paused for browser approval. The agent cannot approve calls."
-    )]
-    async fn resume(
-        &self,
-        Parameters(args): Parameters<ResumeArgs>,
-        ctx: RequestContext<RoleServer>,
-    ) -> CallToolResult {
-        let Ok(id) = uuid::Uuid::parse_str(&args.execution_id) else {
-            return failure("executionId must be a UUID");
-        };
-        let principal = ctx
-            .extensions
-            .get::<Parts>()
-            .and_then(|p| p.extensions.get::<Principal>())
-            .cloned();
-        let Some(principal) = principal else {
-            return failure("authentication required");
-        };
-        tokio::select! {
-            _=ctx.ct.cancelled()=>failure("execution cancelled"),
-            result=self.state.execution.resume(principal,id)=>match result {
-                Ok(result) if result.error.is_none()=>success(&result),
-                Ok(result)=> {let mut response=success(&result);response.is_error=Some(true);response},
-                Err(error)=>failure(error.to_string()),
-            }
-        }
-    }
 }
 
 #[tool_handler]
@@ -243,7 +208,7 @@ impl ServerHandler for Gateway {
             && context
                 .client_capabilities()
                 .is_some_and(|caps| caps.supports_tasks());
-        if capable && matches!(request.name.as_ref(), "execute" | "resume") {
+        if capable && request.name.as_ref() == "execute" {
             let principal = principal(&context)?;
             // A task outlives its originating HTTP request; its SDK cancellation still drops the execution future.
             context.ct = self.state.stop.child_token();
@@ -300,7 +265,7 @@ impl ServerHandler for Gateway {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_tasks().build())
             .with_server_info(Implementation::from_build_env())
-            .with_instructions("Search tools, then write Python using await tools.source.tool(...). Use return for the result and print for diagnostics. Errors from tools are catchable as ToolError. Authentication is bound to the selected workspace and this /mcp resource.")
+            .with_instructions("Search tools, then write Python using await tools.source.tool(...). Use return for the result and print for diagnostics. Upstream failures are catchable as ToolError; workspace blocks raise PermissionError naming the tool and workspace. Authentication is bound to the selected workspace and this /mcp resource.")
     }
 }
 
@@ -372,8 +337,10 @@ fn routes(state: State) -> Router {
         }))
         .merge(crate::admin::router(crate::admin::State {
             scripts: codemode_core::components::scripts::Scripts::new(state.db.clone()),
-            approvals: state.execution.approvals(),
             log: codemode_core::components::execution::log::Log::new(state.db.clone()),
+            agent_sessions: codemode_core::components::agent_sessions::AgentSessions::new(
+                state.db.clone(),
+            ),
             auth: state.auth.clone(),
             sessions: state.sessions.clone(),
             accounts: state.accounts.clone(),

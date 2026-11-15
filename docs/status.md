@@ -1,10 +1,16 @@
 # Implementation status
 
-## Schema-20 control-plane fixes — release qualification
+## Current release — control-plane fixes, schema 20
 
-All twelve steps of the [control-plane fixes](https://artifacts.microapps.space/a/jqm3ze7az66e) are implemented. Native **111/111**, hardened Oracle **111/111**, exhaustive core **98/98** and UI **32/32** checks pass. Final optimized-browser qualification, visual correction review, restored-backup preservation and deployment remain in progress. See [the implementation ledger](control-plane-fixes/implementation.md). The schema-19 release below remains the current production release.
+All twelve steps of the [control-plane fixes](https://artifacts.microapps.space/a/jqm3ze7az66e) are implemented, committed, pushed and deployed at https://codemode.microapps.space. Source build **d45e6106a3a6**, schema **20**, UI **e16dc707d79d**, running ARM SHA-256 **f03d44a766ad41da3f0f1128a61eb7a26be44c14814f040a9958af4e8e7093f2**.
 
-## Current release — final-v5 proposal, schema 19
+Qualification: **111 native**, **111 hardened Oracle**, **98 exhaustive core**, **32 UI tests** and **12 optimized-native browser workflows** in two accepted batches. Final pane p95 **46.4 ms** versus 407.9 ms before; 300-row key-script p95 **3.244 ms**, or **3.208 ms** with inclusion checkboxes. The same optimized binary's earlier 66.1 ms timing outlier under simultaneous compilation is retained in the evidence; the accepted repeat ran with compilation idle and unchanged limits. Three axe scans have zero violations. The reviewer scored both material fixes resolved and returned **ship for that fix list**.
+
+The restored-backup migration preserved **22 existing protected tables**, including session/execution/tool-call history. One registered user, seven sources, five linked accounts and the workspace survive; encrypted account rows are unchanged. The running checksum matches; service and backup timer are active with NoNewPrivileges/PrivateTmp. All **84 public staged files** are byte-identical. Unauthenticated public desktop/mobile checks pass without creating accounts, fixtures or provider consent. See [the implementation ledger](control-plane-fixes/implementation.md) and `docs/measurements/control-plane-fixes-qualification.json`.
+
+Provider consent, external-client acceptance and M-series shader checks remain unperformed. Incremental build-time budget limitations remain. All sections below are historical checkpoints.
+
+## Previous release — final-v5 proposal, schema 19
 
 The [replacement proposal](https://artifacts.microapps.space/a/hkwwwp90n0dt) phases A–E are implemented, merged in [PR #1](https://github.com/olegpustovit/codemode/pull/1) and deployed at https://codemode.microapps.space. Code build **d89531faf9a8**, schema **19**, UI **76b8f0e8e2e9**, running SHA-256 **0df472af2cef4962c7d4a954ec04882c6b7366ef9af1f61817ba066e85f972c3**. The restored-backup preflight preserved 18 existing protected metadata tables. Public HTTPS serves byte-identical copies of all 77 staged files; desktop/mobile sign-in checks and service/backup/security-property checks pass. Deployment created no accounts or provider consent.
 

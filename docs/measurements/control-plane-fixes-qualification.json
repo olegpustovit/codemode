@@ -2,7 +2,7 @@
   "date": "2026-11-15",
   "candidateSchema": 20,
   "deployedSchemaBeforeRollout": 19,
-  "status": "release qualification in progress",
+  "status": "deployed and verified",
   "native": {
     "cases": 111,
     "failures": 0,
@@ -31,7 +31,10 @@
   "ui": {
     "unitCases": 32,
     "failures": 0,
-    "incumbentLintWarnings": 3
+    "incumbentLintWarnings": 3,
+    "fingerprint": "e16dc707d79d",
+    "initialJsGzipBytes": 160410,
+    "cssGzipBytes": 15757
   },
   "detector": {
     "runs": 1,
@@ -42,5 +45,197 @@
     "externalClient": "unperformed",
     "MSeriesShader": "unperformed",
     "incrementalBuildBudgets": "historically exceeded; not claimed passing"
-  }
+  },
+  "sourceCommit": "d45e6106a3a67a1456975f8421f814cfdb316d70",
+  "release": {
+    "build": "d45e6106a3a6",
+    "schema": 20,
+    "nativeSha256": "2d25feba7e04d272d73fcb5b73b9b139abff43f3a8adb01a6b5be59769d2f614",
+    "oracleSha256": "f03d44a766ad41da3f0f1128a61eb7a26be44c14814f040a9958af4e8e7093f2",
+    "nativeBuildSeconds": 188,
+    "oracleBuildSeconds": 225,
+    "uiFingerprint": "e16dc707d79d"
+  },
+  "optimizedNativeBrowser": {
+    "flows": 12,
+    "failuresInAcceptedBatches": 0,
+    "batches": [
+      {
+        "flows": 7,
+        "result": "7 passed (1.4m)",
+        "log": "target/fixes-release-qualification.log"
+      },
+      {
+        "flows": 5,
+        "result": "5 passed (1.7m)",
+        "log": "target/fixes-release-browser-final.log"
+      }
+    ],
+    "failedTimingRun": {
+      "p95Ms": 66.1,
+      "condition": "concurrent ARM compilation; one outlier among 15 samples",
+      "action": "reran unchanged optimized binary with compilation idle; limits unchanged"
+    }
+  },
+  "paneLatency": {
+    "binary": "/home/snowbear/projects/codemode/target/release/codemode",
+    "samples": 15,
+    "clickToPaintMs": {
+      "p95": 46.400000005960464,
+      "values": [
+        42.5,
+        36.29999999701977,
+        37,
+        39.1000000089407,
+        39.5,
+        43,
+        38.6000000089407,
+        38.900000005960464,
+        40.599999994039536,
+        39.70000000298023,
+        39,
+        39.900000005960464,
+        46.400000005960464,
+        38.30000001192093,
+        42.20000000298023
+      ]
+    },
+    "keyScriptMs": {
+      "p95": 3.5589999999999997,
+      "values": [
+        3.5589999999999997,
+        3.2060000000000004,
+        2.9539999999999984,
+        2.724000000000004,
+        2.7319999999999984,
+        2.737000000000003,
+        2.688999999999997,
+        2.777000000000002,
+        3.5349999999999966,
+        2.72,
+        2.7380000000000044,
+        2.7490000000000014,
+        2.9669999999999974,
+        2.5210000000000026,
+        2.686999999999995
+      ]
+    }
+  },
+  "largeListKeyScriptMs": {
+    "rows": 300,
+    "samples": 20,
+    "p95": 3.2440000000000038,
+    "values": [
+      3.145,
+      2.9360000000000004,
+      2.8610000000000007,
+      3.004999999999999,
+      4.224000000000002,
+      2.9920000000000018,
+      2.9299999999999984,
+      2.763999999999999,
+      2.8740000000000014,
+      2.681999999999997,
+      3.009999999999999,
+      2.737000000000003,
+      2.686000000000001,
+      2.596000000000001,
+      2.809000000000006,
+      2.780999999999999,
+      3.238999999999999,
+      3.2440000000000038,
+      3.2139999999999946,
+      2.814000000000004
+    ]
+  },
+  "largeScopedListKeyScriptMs": {
+    "rows": 300,
+    "samples": 20,
+    "p95": 3.2079999999999957,
+    "values": [
+      2.9580000000000006,
+      2.8090000000000006,
+      2.5530000000000013,
+      2.787999999999999,
+      2.9299999999999984,
+      2.4649999999999985,
+      2.631999999999999,
+      2.589000000000001,
+      2.394999999999998,
+      2.617999999999999,
+      2.997999999999997,
+      2.6450000000000014,
+      3.1180000000000025,
+      2.910000000000003,
+      2.9600000000000044,
+      3.2079999999999957,
+      3.361999999999997,
+      2.8850000000000056,
+      2.815999999999999,
+      2.842999999999998
+    ]
+  },
+  "visualReview": {
+    "disposition": "ship",
+    "scope": "two listed material fixes",
+    "resolved": [
+      "mirrored rectangle behind account menu",
+      "Escape preserves selection from both confirmation buttons"
+    ],
+    "designSystemFiles": "preserved",
+    "detectorRuns": 1,
+    "detectorFindings": 0
+  },
+  "axeViolations": {
+    "fixes-policies-axe.json": 0,
+    "fixes-empty-mobile-axe.json": 0,
+    "fixes-script-confirm-axe.json": 0
+  },
+  "deployment": {
+    "protectedTablesPreserved": 22,
+    "schemaBefore": 19,
+    "schemaAfter": 20,
+    "existingUsers": 1,
+    "existingSources": 7,
+    "existingLinkedAccounts": 5,
+    "encryptedAccountRowsUnchanged": true,
+    "productionFixturesCreated": false,
+    "providerConsentCreated": false,
+    "serviceActive": true,
+    "backupTimerActive": true,
+    "NoNewPrivileges": true,
+    "PrivateTmp": true,
+    "preflightDatabasesRemaining": 0
+  },
+  "public": {
+    "health": {
+      "build": "d45e6106a3a6",
+      "schemaVersion": 20,
+      "status": "ok"
+    },
+    "stagedAssetsByteIdentical": 84,
+    "uiFingerprint": "e16dc707d79d"
+  },
+  "publicBrowser": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "noOverflow": true,
+      "font": true,
+      "buttonRadius": "0px",
+      "canvas": true,
+      "errors": []
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "noOverflow": true,
+      "font": true,
+      "buttonRadius": "0px",
+      "canvas": true,
+      "errors": []
+    }
+  ]
 }

@@ -46,6 +46,7 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
         log: log::Log::new(db.clone()),
         auth,
         sessions: Arc::new(sessions.clone()),
+        identity_enabled: false,
         accounts: Arc::new(accounts),
         sources: Arc::new(sources),
         hostname: "test.example".into(),
@@ -566,4 +567,208 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     stop.cancel();
     server.await.unwrap();
+}
+
+async fn identity_request(
+    app: axum::Router,
+    method: &str,
+    path: &str,
+    cookie: &str,
+    origin: Option<&str>,
+) -> axum::response::Response {
+    use tower::ServiceExt;
+    let mut request = axum::http::Request::builder()
+        .method(method)
+        .uri(path)
+        .header("host", "test.example")
+        .header("cookie", cookie);
+    if let Some(origin) = origin {
+        request = request.header("origin", origin);
+    }
+    if method == "POST" {
+        request = request.header("content-type", "application/json");
+    }
+    app.oneshot(
+        request
+            .body(axum::body::Body::from(if method == "POST" {
+                r#"{"email":"new@olegpustovit.com","password":"fixture-browser-password"}"#
+            } else {
+                ""
+            }))
+            .unwrap(),
+    )
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../core/migrations")]
+async fn identity_browser_mode_closes_password_routes_and_isolates_cookies_and_logout(
+    pool: sqlx::PgPool,
+) {
+    let db = Database::connect(pool.connect_options().to_url_lossy().as_str())
+        .await
+        .unwrap();
+    let auth = Auth::new(db.clone());
+    let (agent_id, agent_token) = auth.create("agent", "test.example").await.unwrap();
+    let accounts = Accounts::new(db.clone(), Some([73; 32]), "test".into()).unwrap();
+    let endpoints =
+        codemode_core::components::workspaces::Workspaces::new(db.clone(), "test.example".into())
+            .unwrap();
+    endpoints.initialize().await.unwrap();
+    let sources = Sources::new(
+        db.clone(),
+        codemode_core::components::catalogue::Catalogue::new(db.clone()),
+        accounts.clone(),
+        endpoints.clone(),
+    );
+    let sessions = Sessions::new(db.clone());
+    let legacy = sessions
+        .register("ursus95@gmail.com", "fixture-browser-password".into())
+        .await
+        .unwrap();
+    let state = State {
+        agent_sessions: codemode_core::components::agent_sessions::AgentSessions::new(db.clone()),
+        scripts: codemode_core::components::scripts::Scripts::new(db.clone()),
+        oauth: Arc::new(codemode_core::components::auth::oauth::OAuth::new(
+            db.clone(),
+            "test.example".into(),
+        )),
+        log: log::Log::new(db.clone()),
+        auth,
+        sessions: Arc::new(sessions.clone()),
+        identity_enabled: true,
+        accounts: Arc::new(accounts),
+        sources: Arc::new(sources),
+        hostname: "test.example".into(),
+        workspaces: Arc::new(endpoints),
+    };
+
+    sessions
+        .link_identity("browser-subject", "ursus95@gmail.com")
+        .await
+        .unwrap();
+    let id = sessions
+        .create_identity_session("browser-subject")
+        .await
+        .unwrap()
+        .unwrap();
+    use secrecy::ExposeSecret;
+    let legacy_cookie = format!("__Host-codemode_session={}", legacy.expose_secret());
+    let id_cookie = format!("__Host-codemode_id_session={}", id.expose_secret());
+    let app = router(state.clone());
+    let response = identity_request(app.clone(), "GET", "/api/session", &id_cookie, None).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), 8192)
+        .await
+        .unwrap();
+    let metadata: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(metadata["authenticated"], true);
+    assert_eq!(metadata["firstUser"], false);
+    assert_eq!(metadata["user"].as_object().unwrap().len(), 4);
+    assert_eq!(
+        identity_request(app.clone(), "GET", "/api/sources", &id_cookie, None)
+            .await
+            .status(),
+        StatusCode::OK
+    );
+    for invalid in [
+        legacy_cookie.clone(),
+        format!("__Host-codemode_id_session={}", legacy.expose_secret()),
+        format!("{id_cookie}; {id_cookie}"),
+    ] {
+        assert_eq!(
+            identity_request(app.clone(), "GET", "/api/sources", &invalid, None)
+                .await
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    let rollback = router(State {
+        identity_enabled: false,
+        ..state
+    });
+    for invalid in [
+        id_cookie.clone(),
+        format!("__Host-codemode_session={}", id.expose_secret()),
+    ] {
+        assert_eq!(
+            identity_request(rollback.clone(), "GET", "/api/sources", &invalid, None)
+                .await
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    let users: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    for path in ["/api/session", "/api/register"] {
+        assert_eq!(
+            identity_request(app.clone(), "POST", path, "", Some("https://test.example"))
+                .await
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        users
+    );
+    assert_eq!(
+        identity_request(
+            app.clone(),
+            "DELETE",
+            "/api/session",
+            &id_cookie,
+            Some("https://evil.example")
+        )
+        .await
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert!(
+        sessions
+            .identity_user(id.expose_secret())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    let response = identity_request(
+        app,
+        "DELETE",
+        "/api/session",
+        &id_cookie,
+        Some("https://test.example"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert!(
+        response.headers()["set-cookie"]
+            .to_str()
+            .unwrap()
+            .starts_with("__Host-codemode_id_session=;")
+    );
+    assert!(
+        sessions
+            .identity_user(id.expose_secret())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        sessions
+            .user(legacy.expose_secret())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        identity_request(rollback, "GET", "/api/sources", &legacy_cookie, None)
+            .await
+            .status(),
+        StatusCode::OK
+    );
 }

@@ -170,6 +170,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         execution,
         hostname: config.hostname,
         sessions: Arc::new(sessions),
+        identity_enabled: false,
         accounts: Arc::new(accounts),
         sources: Arc::new(sources),
         workspaces: Arc::new(endpoints),

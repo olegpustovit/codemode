@@ -33,6 +33,7 @@ pub struct State {
     pub agent_sessions: AgentSessions,
     pub auth: Auth,
     pub sessions: Arc<Sessions>,
+    pub identity_enabled: bool,
     pub accounts: Arc<Accounts>,
     pub sources: Arc<Sources>,
     pub hostname: String,
@@ -161,7 +162,7 @@ impl IntoResponse for ApiError {
         }
     }
 }
-fn unavailable(error: impl std::error::Error) -> ApiError {
+fn unavailable(error: impl std::fmt::Debug) -> ApiError {
     tracing::error!(error=?error,"control-plane operation failed");
     ApiError::Message(StatusCode::SERVICE_UNAVAILABLE, "operation unavailable")
 }
@@ -473,12 +474,17 @@ async fn sync_source(
     Ok(StatusCode::ACCEPTED)
 }
 
-pub(crate) fn cookie(headers: &HeaderMap) -> Option<&str> {
+const ID_COOKIE: &str = "__Host-codemode_id_session";
+const CLEAR_ID_COOKIE: &str =
+    "__Host-codemode_id_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
+
+pub(crate) fn cookie(headers: &HeaderMap, identity_enabled: bool) -> Option<&str> {
+    let expected = if identity_enabled { ID_COOKIE } else { COOKIE };
     let mut found = None;
     for line in headers.get_all(header::COOKIE) {
         for part in line.to_str().ok()?.split(';') {
             if let Some((name, value)) = part.trim().split_once('=')
-                && name == COOKIE
+                && name == expected
             {
                 if found.is_some() {
                     return None;
@@ -539,31 +545,33 @@ async fn require_session(
     request: Request,
     next: Next,
 ) -> Response {
-    let Some(token) = cookie(request.headers()) else {
+    let Some(token) = cookie(request.headers(), state.identity_enabled) else {
         return ApiError::Message(StatusCode::UNAUTHORIZED, "sign in required").into_response();
     };
-    match state.sessions.authenticate(token).await {
-        Ok(true) => next.run(request).await,
-        Ok(false) => {
-            ApiError::Message(StatusCode::UNAUTHORIZED, "sign in required").into_response()
-        }
-        Err(error) => ApiError::from(error).into_response(),
+    match browser_user(&state.sessions, state.identity_enabled, token).await {
+        Ok(Some(_)) => next.run(request).await,
+        Ok(None) => ApiError::Message(StatusCode::UNAUTHORIZED, "sign in required").into_response(),
+        Err(error) => unavailable(error).into_response(),
     }
 }
 
 async fn public_config(AxumState(state): AxumState<State>) -> Json<serde_json::Value> {
-    Json(serde_json::json!({"name":"Codemode","hostname":state.hostname,"loginEnabled":true}))
+    Json(
+        serde_json::json!({"name":"Codemode","hostname":state.hostname,"loginEnabled":true,"idEnabled":state.identity_enabled}),
+    )
 }
 async fn session(
     AxumState(state): AxumState<State>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let user = match cookie(&headers) {
-        Some(token) => state.sessions.user(token).await?,
+    let user = match cookie(&headers, state.identity_enabled) {
+        Some(token) => browser_user(&state.sessions, state.identity_enabled, token)
+            .await
+            .map_err(unavailable)?,
         None => None,
     };
     Ok(Json(
-        serde_json::json!({"authenticated":user.is_some(),"user":user,"firstUser":state.sessions.first_user().await?}),
+        serde_json::json!({"authenticated":user.is_some(),"user":user,"firstUser":!state.identity_enabled && state.sessions.first_user().await?}),
     ))
 }
 #[derive(serde::Deserialize)]
@@ -577,6 +585,12 @@ async fn login(
     headers: HeaderMap,
     ApiJson(input): ApiJson<Login>,
 ) -> Result<Response, ApiError> {
+    if state.identity_enabled {
+        return Err(ApiError::Message(
+            StatusCode::FORBIDDEN,
+            "sign in with ID required",
+        ));
+    }
     let token = state
         .sessions
         .login(&input.email, input.password)
@@ -592,6 +606,12 @@ async fn register(
     headers: HeaderMap,
     ApiJson(input): ApiJson<Login>,
 ) -> Result<Response, ApiError> {
+    if state.identity_enabled {
+        return Err(ApiError::Message(
+            StatusCode::FORBIDDEN,
+            "sign in with ID required",
+        ));
+    }
     let token = state
         .sessions
         .register(&input.email, input.password)
@@ -603,7 +623,7 @@ async fn signed_in(
     headers: &HeaderMap,
     token: SecretString,
 ) -> Result<Response, ApiError> {
-    if let Some(previous) = cookie(headers) {
+    if let Some(previous) = cookie(headers, state.identity_enabled) {
         state.sessions.logout(previous).await?;
     }
     let user = state.sessions.user(token.expose_secret()).await?;
@@ -621,10 +641,23 @@ async fn logout(
     AxumState(state): AxumState<State>,
     headers: HeaderMap,
 ) -> Result<Response, ApiError> {
-    if let Some(token) = cookie(&headers) {
-        state.sessions.logout(token).await?;
+    if let Some(token) = cookie(&headers, state.identity_enabled) {
+        if state.identity_enabled {
+            state
+                .sessions
+                .logout_identity(token)
+                .await
+                .map_err(unavailable)?;
+        } else {
+            state.sessions.logout(token).await?;
+        }
     }
-    Ok(([(header::SET_COOKIE, CLEAR_COOKIE)], StatusCode::NO_CONTENT).into_response())
+    let clear = if state.identity_enabled {
+        CLEAR_ID_COOKIE
+    } else {
+        CLEAR_COOKIE
+    };
+    Ok(([(header::SET_COOKIE, clear)], StatusCode::NO_CONTENT).into_response())
 }
 
 async fn tokens(
@@ -764,7 +797,7 @@ async fn start_upstream_oauth(
     Path(id): Path<Uuid>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let session = cookie(&headers).ok_or(ApiError::Message(
+    let session = cookie(&headers, state.identity_enabled).ok_or(ApiError::Message(
         StatusCode::UNAUTHORIZED,
         "sign in required",
     ))?;
@@ -787,7 +820,7 @@ async fn upstream_oauth_callback(
     headers: HeaderMap,
     Query(callback): Query<UpstreamCallback>,
 ) -> Result<axum::response::Redirect, ApiError> {
-    let session = cookie(&headers).ok_or(ApiError::Message(
+    let session = cookie(&headers, state.identity_enabled).ok_or(ApiError::Message(
         StatusCode::UNAUTHORIZED,
         "sign in required",
     ))?;
@@ -1299,4 +1332,16 @@ async fn bulk_scripts(
         .remove_many(id, input.selection, input.expected_count, &input.revisions)
         .await?;
     Ok(Json(serde_json::json!({"changed":changed})))
+}
+
+pub(crate) async fn browser_user(
+    sessions: &Sessions,
+    identity_enabled: bool,
+    token: &str,
+) -> anyhow::Result<Option<sessions::User>> {
+    if identity_enabled {
+        Ok(sessions.identity_user(token).await?)
+    } else {
+        Ok(sessions.user(token).await?)
+    }
 }

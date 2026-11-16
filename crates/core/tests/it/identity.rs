@@ -538,3 +538,124 @@ async fn identity_sessions_are_private_revocable_and_separate_from_password_sess
         0
     );
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn identity_onboarding_is_allowlisted_private_atomic_and_never_bootstraps_admin(
+    pool: sqlx::PgPool,
+) {
+    let sessions = Sessions::new(database(&pool).await);
+    assert!(matches!(
+        sessions
+            .resolve_identity("outsider", "outsider@example.com")
+            .await,
+        Err(IdentityError::NotAllowed)
+    ));
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM tenants")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        1
+    );
+    let mut requests = tokio::task::JoinSet::new();
+    for _ in 0..8 {
+        let sessions = sessions.clone();
+        requests.spawn(async move {
+            sessions
+                .resolve_identity("new-subject", "  New@olegpustovit.com  ")
+                .await
+                .unwrap()
+        });
+    }
+    let user = requests.join_next().await.unwrap().unwrap();
+    while let Some(result) = requests.join_next().await {
+        assert_eq!(result.unwrap().id, user.id);
+    }
+    assert_eq!(user.email, "new@olegpustovit.com");
+    assert_ne!(user.tenant_id, Uuid::nil());
+    assert!(!user.admin);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM tenants")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        2
+    );
+    assert!(
+        sessions
+            .login(&user.email, "identity-only".into())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let token = sessions
+        .create_identity_session("new-subject")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        sessions
+            .identity_user(token.expose_secret())
+            .await
+            .unwrap()
+            .unwrap()
+            .id,
+        user.id
+    );
+    assert_eq!(
+        sessions
+            .resolve_identity("new-subject", "changed@example.com")
+            .await
+            .unwrap()
+            .id,
+        user.id
+    );
+    assert!(matches!(
+        sessions
+            .resolve_identity("different-subject", &user.email)
+            .await,
+        Err(IdentityError::Conflict)
+    ));
+    let second = sessions
+        .resolve_identity("owner-address", "ursus95@gmail.com")
+        .await
+        .unwrap();
+    assert!(!second.admin);
+    assert_ne!(second.tenant_id, Uuid::nil());
+    assert_ne!(second.tenant_id, user.tenant_id);
+    let before = snapshot(&pool).await;
+    sqlx::query("CREATE FUNCTION reject_onboarding_link() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected onboarding mapping failure'; END $$").execute(&pool).await.unwrap();
+    sqlx::query("CREATE TRIGGER reject_onboarding_link BEFORE INSERT ON user_identities FOR EACH ROW EXECUTE FUNCTION reject_onboarding_link()").execute(&pool).await.unwrap();
+    assert!(matches!(
+        sessions
+            .resolve_identity("failed-new", "failed@olegpustovit.com")
+            .await,
+        Err(IdentityError::Database(_))
+    ));
+    assert_eq!(snapshot(&pool).await, before);
+    sqlx::query("DROP TRIGGER reject_onboarding_link ON user_identities")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let retry = sessions
+        .resolve_identity("failed-new", "failed@olegpustovit.com")
+        .await
+        .unwrap();
+    assert!(!retry.admin);
+    assert_ne!(retry.tenant_id, Uuid::nil());
+    assert_eq!(sqlx::query_scalar::<_,i64>("SELECT count(*) FROM users WHERE admin OR tenant_id='00000000-0000-0000-0000-000000000000'").fetch_one(&pool).await.unwrap(),0);
+}

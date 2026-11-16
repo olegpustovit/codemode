@@ -1,4 +1,4 @@
-use super::{Sessions, User, normalize_email};
+use super::{Sessions, User, allowed_email, normalize_email};
 use crate::infrastructure::postgres::Error as DbError;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use secrecy::SecretString;
@@ -10,6 +10,8 @@ pub enum IdentityError {
     InvalidClaims,
     #[error("identity requires an existing local account")]
     AccountRequired,
+    #[error("registration is limited to invited email addresses")]
+    NotAllowed,
     #[error("local account is bound to another identity")]
     Conflict,
     #[error(transparent)]
@@ -19,11 +21,36 @@ pub enum IdentityError {
 impl Sessions {
     /// Accept only SDK-verified claims. Roles and tenant membership remain local.
     pub async fn link_identity(&self, subject: &str, email: &str) -> Result<User, IdentityError> {
+        self.resolve_identity_account(subject, email, false).await
+    }
+
+    /// Accept only SDK-verified claims; new accounts retain the local signup allowlist.
+    pub async fn resolve_identity(
+        &self,
+        subject: &str,
+        email: &str,
+    ) -> Result<User, IdentityError> {
+        self.resolve_identity_account(subject, email, true).await
+    }
+
+    async fn resolve_identity_account(
+        &self,
+        subject: &str,
+        email: &str,
+        provision: bool,
+    ) -> Result<User, IdentityError> {
         if subject.is_empty() || subject.len() > 255 || subject.contains('\0') {
             return Err(IdentityError::InvalidClaims);
         }
         let email = normalize_email(email).ok_or(IdentityError::InvalidClaims)?;
         let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
+        if provision {
+            // Serialize signup with legacy registration without adopting its first-user tenant.
+            sqlx::query!("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE")
+                .execute(&mut *tx)
+                .await
+                .map_err(DbError::from)?;
+        }
         if let Some(user) = sqlx::query_as!(User,
             "SELECT u.id,u.email,u.tenant_id,u.admin FROM user_identities i JOIN users u ON u.id=i.user_id WHERE i.subject=$1 FOR UPDATE OF u",subject)
             .fetch_optional(&mut *tx).await.map_err(DbError::from)? {
@@ -37,8 +64,24 @@ impl Sessions {
         )
         .fetch_optional(&mut *tx)
         .await
-        .map_err(DbError::from)?
-        .ok_or(IdentityError::AccountRequired)?;
+        .map_err(DbError::from)?;
+        let created = user.is_none();
+        let user = match user {
+            Some(user) => user,
+            None => {
+                if !provision {
+                    return Err(IdentityError::AccountRequired);
+                }
+                allowed_email(&email).ok_or(IdentityError::NotAllowed)?;
+                let tenant = sqlx::query_scalar!("INSERT INTO tenants DEFAULT VALUES RETURNING id")
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(DbError::from)?;
+                // An invalid PHC marker cannot authenticate as a local password, including on rollback.
+                sqlx::query_as!(User, "INSERT INTO users(email,password_hash,tenant_id,admin) VALUES($1,'identity-only',$2,false) RETURNING id,email,tenant_id,admin", email, tenant)
+                    .fetch_one(&mut *tx).await.map_err(DbError::from)?
+            }
+        };
         sqlx::query!(
             "INSERT INTO user_identities(subject,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING",
             subject,
@@ -52,6 +95,9 @@ impl Sessions {
             "SELECT u.id,u.email,u.tenant_id,u.admin FROM user_identities i JOIN users u ON u.id=i.user_id WHERE i.subject=$1",subject)
             .fetch_optional(&mut *tx).await.map_err(DbError::from)?
             .ok_or(IdentityError::Conflict)?;
+        if created && linked.id != user.id {
+            return Err(IdentityError::Conflict);
+        }
         tx.commit().await.map_err(DbError::from)?;
         Ok(linked)
     }

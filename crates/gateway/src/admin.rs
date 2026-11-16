@@ -557,7 +557,7 @@ async fn require_session(
 
 async fn public_config(AxumState(state): AxumState<State>) -> Json<serde_json::Value> {
     Json(
-        serde_json::json!({"name":"Codemode","hostname":state.hostname,"loginEnabled":true,"idEnabled":state.identity_enabled,"idEnabled":state.identity_enabled}),
+        serde_json::json!({"name":"Codemode","hostname":state.hostname,"loginEnabled":true,"idEnabled":state.identity_enabled}),
     )
 }
 async fn session(

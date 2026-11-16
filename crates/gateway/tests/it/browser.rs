@@ -702,12 +702,26 @@ async fn identity_browser_mode_closes_password_routes_and_isolates_cookies_and_l
         .await
         .unwrap();
     for path in ["/api/session", "/api/register"] {
-        assert_eq!(
-            identity_request(app.clone(), "POST", path, "", Some("https://test.example"))
-                .await
-                .status(),
-            StatusCode::FORBIDDEN
+        let response =
+            identity_request(app.clone(), "POST", path, "", Some("https://test.example")).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(response.into_body(), 8192)
+            .await
+            .unwrap();
+        assert!(
+            String::from_utf8_lossy(&body).contains("sign in with Microapps ID required"),
+            "{path}"
         );
+    }
+    for (router, id_enabled) in [(app.clone(), true), (rollback.clone(), false)] {
+        let response = identity_request(router, "GET", "/api/config", "", None).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 8192)
+            .await
+            .unwrap();
+        let config: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(config["idEnabled"], id_enabled);
+        assert_eq!(config["loginEnabled"], !id_enabled);
     }
     assert_eq!(
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users")

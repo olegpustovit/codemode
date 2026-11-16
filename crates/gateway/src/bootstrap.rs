@@ -87,7 +87,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         Some(identity) => Some(
             crate::identity::router(identity, sessions.clone(), config.hostname.clone())
                 .await
-                .context("configure Identity login and discover issuer")?,
+                .context("configure Microapps ID login and discover issuer")?,
         ),
         None => None,
     };

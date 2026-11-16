@@ -155,7 +155,7 @@ impl Application for App {
 fn resolve_error(error: IdentityError) -> AppError {
     match error {
         IdentityError::Database(error) => {
-            tracing::error!(error=?error, "Identity application session operation failed");
+            tracing::error!(error=?error, "Microapps ID application session operation failed");
             AppError::Unavailable
         }
         _ => AppError::Denied,

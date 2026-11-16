@@ -322,7 +322,7 @@ async fn identity_discovery_failure_exits_before_workers_and_source_import(pool:
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(
-        combined.contains("configure Identity login and discover issuer"),
+        combined.contains("configure Microapps ID login and discover issuer"),
         "{combined}"
     );
     assert!(!combined.contains("startup-secret-must-not-appear"));

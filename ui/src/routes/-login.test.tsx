@@ -20,7 +20,7 @@ async function show(idEnabled: boolean) {
   client.setQueryData(configQuery.queryKey, {
     name: "Codemode",
     hostname: "codemode.test",
-    loginEnabled: true,
+    loginEnabled: !idEnabled,
     idEnabled,
   })
   client.setQueryData(sessionQuery.queryKey, {
@@ -47,7 +47,7 @@ test("legacy mode keeps the password form", async () => {
   expect(screen.queryByRole("link", { name: /Microapps ID/ })).toBeNull()
 })
 
-test("Identity mode offers only the ID sign-in link with an encoded return path", async () => {
+test("Microapps ID mode offers only the Microapps ID sign-in link with an encoded return path", async () => {
   await show(true)
   const link = await screen.findByRole("link", {
     name: "Sign in with Microapps ID",

@@ -210,6 +210,10 @@ impl Sessions {
         Ok(())
     }
     pub async fn sweep(&self) -> Result<(), Error> {
+        sqlx::query!("DELETE FROM identity_sessions WHERE expires_at<=now()")
+            .execute(&self.db.0)
+            .await
+            .map_err(DbError::from)?;
         sqlx::query!("DELETE FROM sessions WHERE expires_at<=now()")
             .execute(&self.db.0)
             .await

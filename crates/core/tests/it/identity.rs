@@ -389,3 +389,152 @@ async fn identity_initial_races_and_database_constraints_keep_one_binding_per_us
     );
     global.close().await;
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn identity_sessions_are_private_revocable_and_separate_from_password_sessions(
+    pool: sqlx::PgPool,
+) {
+    let sessions = Sessions::new(database(&pool).await);
+    let legacy = sessions
+        .register("ursus95@gmail.com", "fixture-browser-password".into())
+        .await
+        .unwrap();
+    let user = sessions
+        .link_identity("session-subject", "ursus95@gmail.com")
+        .await
+        .unwrap();
+    assert!(
+        sessions
+            .create_identity_session("missing")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let first = sessions
+        .create_identity_session("session-subject")
+        .await
+        .unwrap()
+        .unwrap();
+    let second = sessions
+        .create_identity_session("session-subject")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_ne!(first.expose_secret(), second.expose_secret());
+    assert!(
+        sessions
+            .user(first.expose_secret())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        sessions
+            .identity_user(legacy.expose_secret())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    for invalid in ["", "bad", &"!".repeat(43)] {
+        assert!(sessions.identity_user(invalid).await.unwrap().is_none());
+    }
+    sqlx::query("UPDATE users SET admin=false WHERE id=$1")
+        .bind(user.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let current = sessions
+        .identity_user(first.expose_secret())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(current.id, user.id);
+    assert_eq!(current.tenant_id, user.tenant_id);
+    assert!(!current.admin);
+    sessions.logout(first.expose_secret()).await.unwrap();
+    assert!(
+        sessions
+            .identity_user(first.expose_secret())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    sessions
+        .logout_identity(legacy.expose_secret())
+        .await
+        .unwrap();
+    assert!(
+        sessions
+            .user(legacy.expose_secret())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    sessions
+        .logout_identity(first.expose_secret())
+        .await
+        .unwrap();
+    assert!(
+        sessions
+            .identity_user(first.expose_secret())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        sessions
+            .identity_user(second.expose_secret())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    sqlx::query("UPDATE identity_sessions SET expires_at=now()-interval '1 second'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        sessions
+            .identity_user(second.expose_secret())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    sessions.sweep().await.unwrap();
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM identity_sessions")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+    let third = sessions
+        .create_identity_session("session-subject")
+        .await
+        .unwrap()
+        .unwrap();
+    sqlx::query("DELETE FROM user_identities WHERE subject='session-subject'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        sessions
+            .identity_user(third.expose_secret())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        sessions
+            .user(legacy.expose_secret())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM identity_sessions")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+}

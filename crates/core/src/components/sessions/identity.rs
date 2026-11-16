@@ -1,5 +1,8 @@
 use super::{Sessions, User, normalize_email};
 use crate::infrastructure::postgres::Error as DbError;
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use secrecy::SecretString;
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, thiserror::Error)]
 pub enum IdentityError {
@@ -52,4 +55,48 @@ impl Sessions {
         tx.commit().await.map_err(DbError::from)?;
         Ok(linked)
     }
+}
+
+impl Sessions {
+    /// Call only after resolving SDK-verified claims to the local subject binding.
+    pub async fn create_identity_session(
+        &self,
+        subject: &str,
+    ) -> Result<Option<SecretString>, IdentityError> {
+        let token = URL_SAFE_NO_PAD.encode(rand::random::<[u8; 32]>());
+        let hash = identity_session_hash(&token);
+        let inserted = sqlx::query!("INSERT INTO identity_sessions(token_hash,subject) SELECT $1,subject FROM user_identities WHERE subject=$2", hash, subject)
+            .execute(&self.db.0).await.map_err(DbError::from)?.rows_affected();
+        Ok((inserted == 1).then(|| token.into()))
+    }
+
+    pub async fn identity_user(&self, token: &str) -> Result<Option<User>, IdentityError> {
+        if token.len() != 43
+            || !token
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
+        {
+            return Ok(None);
+        }
+        let hash = identity_session_hash(token);
+        sqlx::query_as!(User, "SELECT u.id,u.email,u.tenant_id,u.admin FROM identity_sessions s JOIN user_identities i ON i.subject=s.subject JOIN users u ON u.id=i.user_id WHERE s.token_hash=$1 AND s.expires_at>now()", hash)
+            .fetch_optional(&self.db.0).await.map_err(|e| IdentityError::Database(DbError::from(e)))
+    }
+
+    pub async fn logout_identity(&self, token: &str) -> Result<(), IdentityError> {
+        let hash = identity_session_hash(token);
+        sqlx::query!("DELETE FROM identity_sessions WHERE token_hash=$1", hash)
+            .execute(&self.db.0)
+            .await
+            .map_err(DbError::from)?;
+        Ok(())
+    }
+}
+
+fn identity_session_hash(token: &str) -> Vec<u8> {
+    Sha256::new()
+        .chain_update(b"codemode:identity-session:v1\0")
+        .chain_update(token.as_bytes())
+        .finalize()
+        .to_vec()
 }

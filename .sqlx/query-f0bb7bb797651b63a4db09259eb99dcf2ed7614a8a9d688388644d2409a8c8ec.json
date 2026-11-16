@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO identity_sessions(token_hash,subject) SELECT $1,subject FROM user_identities WHERE subject=$2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f0bb7bb797651b63a4db09259eb99dcf2ed7614a8a9d688388644d2409a8c8ec"
+}

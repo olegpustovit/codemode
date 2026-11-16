@@ -2,7 +2,7 @@
 
 ## Identity preparation — not deployed
 
-The `identity-oidc` worktree adds private existing-user subject linking with preserved local tenants/roles/data; see [Identity rollout preparation](identity-rollout.md). Schema 21 and component checks are local only. No ID route/config flag is active yet, and production remains at the schema-20 release below.
+The `identity-oidc` worktree adds private existing-user subject linking with preserved local tenants/roles/data; see [Identity rollout preparation](identity-rollout.md). Schema 22 adds separate private ID browser sessions; these component checks are local only. No ID route/config flag is active yet, and production remains at the schema-20 release below.
 
 ## Current release — control-plane fixes, schema 20
 

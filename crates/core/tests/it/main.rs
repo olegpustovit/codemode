@@ -53,7 +53,7 @@ async fn database(pool: &sqlx::PgPool) -> Database {
     let db = Database::connect(pool.connect_options().to_url_lossy().as_str())
         .await
         .unwrap();
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     db
 }
 

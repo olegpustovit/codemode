@@ -82,6 +82,7 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
         hostname: "test.example".into(),
         sessions: Arc::new(sessions),
         identity_enabled: false,
+        identity_routes: None,
         accounts: Arc::new(accounts),
         sources: Arc::new(sources),
         workspaces: Arc::new(endpoints),

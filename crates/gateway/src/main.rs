@@ -1,6 +1,7 @@
 mod admin;
 mod bootstrap;
 mod config;
+mod identity;
 mod mcp_admin;
 mod oauth;
 mod server;

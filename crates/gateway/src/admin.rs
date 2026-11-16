@@ -474,8 +474,8 @@ async fn sync_source(
     Ok(StatusCode::ACCEPTED)
 }
 
-const ID_COOKIE: &str = "__Host-codemode_id_session";
-const CLEAR_ID_COOKIE: &str =
+pub(crate) const ID_COOKIE: &str = "__Host-codemode_id_session";
+pub(crate) const CLEAR_ID_COOKIE: &str =
     "__Host-codemode_id_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
 
 pub(crate) fn cookie(headers: &HeaderMap, identity_enabled: bool) -> Option<&str> {
@@ -557,7 +557,7 @@ async fn require_session(
 
 async fn public_config(AxumState(state): AxumState<State>) -> Json<serde_json::Value> {
     Json(
-        serde_json::json!({"name":"Codemode","hostname":state.hostname,"loginEnabled":true,"idEnabled":state.identity_enabled}),
+        serde_json::json!({"name":"Codemode","hostname":state.hostname,"loginEnabled":true,"idEnabled":state.identity_enabled,"idEnabled":state.identity_enabled}),
     )
 }
 async fn session(

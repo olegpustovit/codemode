@@ -8,7 +8,7 @@ See [measured results](docs/spike.md) and [current status](docs/status.md). Phas
 
 ## Development
 
-Requires Rust 1.96.0, uv and `mold`/clang on aarch64 Linux.
+Requires Rust 1.100.0, uv and `mold`/clang on aarch64 Linux.
 
 ```sh
 uv venv .tools/monty
@@ -19,7 +19,7 @@ cargo t --workspace
 T_SLOW=1 cargo t --workspace
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets
-cargo deny check
+bash tools/check-dependencies.sh
 ```
 
 The database test user needs permission to create disposable test databases. `DATABASE_URL` is for the test runner; the service uses `CODEMODE_DATABASE_URL`.
@@ -155,3 +155,10 @@ The gateway uses the official rmcp TaskManager for the [SEP-2663 Tasks extension
 Handles are bound to the exact access token and hostname, capped at 64 retained tasks, with a five-minute advertised TTL and a two-second suggested poll interval. The SDK retains terminal results for five minutes after completion. The ordinary 60-second execution limit and audit still apply. Task updates do not grant tool access; policies are rechecked on each dispatch.
 
 Task handles/results are held in memory and disappear when the gateway restarts; execution audits remain in Postgres. Running executions are marked interrupted on recovery and are never replayed. Cancellation stops local execution, but an upstream call already sent may have completed; inspect the execution log before repeating a side effect.
+
+
+### Identity login (default off)
+
+`CODEMODE_ID_ENABLED=false` retains existing password login and ignores unused ID settings. Enabling it requires `CODEMODE_ID_CLIENT_ID`, `CODEMODE_ID_CLIENT_SECRET` and `CODEMODE_ID_COOKIE_KEY` (64 hex characters of independent random key material, never the upstream credential encryption key). `CODEMODE_ID_ISSUER` defaults to `https://id.microapps.space`; the callback is exactly `https://CODEMODE_HOSTNAME/auth/callback`. Issuer discovery must succeed before background jobs or listening. The SDK exposes `/auth/login?return_to=/local/path`, `/auth/callback` and exact-origin POST `/auth/logout`. ID mode uses a separate host-only browser cookie and closes local password registration/login. The UI, actual-provider and deployment qualification are still pending; do not enable production yet. See [rollout preparation](docs/identity-rollout.md).
+
+The shared internal Rust SDK requires Rust 1.100.0; it currently resolves from the sibling `../identity` checkout until a published immutable pin is available. Dependency checks retain the SDK's public-verification-only RSA advisory assessment and reject new direct dependents of the affected RSA version. No RSA 0.9 private signing or decryption is permitted.

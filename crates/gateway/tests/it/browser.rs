@@ -609,7 +609,6 @@ async fn identity_browser_mode_closes_password_routes_and_isolates_cookies_and_l
         .await
         .unwrap();
     let auth = Auth::new(db.clone());
-    let (agent_id, agent_token) = auth.create("agent", "test.example").await.unwrap();
     let accounts = Accounts::new(db.clone(), Some([73; 32]), "test".into()).unwrap();
     let endpoints =
         codemode_core::components::workspaces::Workspaces::new(db.clone(), "test.example".into())

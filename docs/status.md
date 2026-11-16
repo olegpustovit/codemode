@@ -2,7 +2,7 @@
 
 ## Identity preparation — not deployed
 
-The `identity-oidc` worktree adds private existing-user subject linking with preserved local tenants/roles/data; see [Identity rollout preparation](identity-rollout.md). Schema 22 adds separate private ID browser sessions and verified allowlisted onboarding without administrator adoption; gateway cookie/session mode boundaries are also prepared locally. Production composition still selects legacy mode. No ID route/config flag is active yet, and production remains at the schema-20 release below.
+The `identity-oidc` worktree adds private existing-user subject linking with preserved local tenants/roles/data; see [Identity rollout preparation](identity-rollout.md). Schema 22 adds separate private ID browser sessions and verified allowlisted onboarding without administrator adoption; gateway cookie/session mode boundaries are also prepared locally. SDK login/callback/logout routes and validated default-off configuration are wired. UI, actual-provider and deployment qualification remain pending; production remains on the unchanged schema-20 release below.
 
 ## Current release — control-plane fixes, schema 20
 

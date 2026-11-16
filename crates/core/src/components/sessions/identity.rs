@@ -109,11 +109,31 @@ impl Sessions {
         &self,
         subject: &str,
     ) -> Result<Option<SecretString>, IdentityError> {
+        self.replace_identity_session(subject, None).await
+    }
+
+    pub async fn replace_identity_session(
+        &self,
+        subject: &str,
+        previous: Option<&str>,
+    ) -> Result<Option<SecretString>, IdentityError> {
         let token = URL_SAFE_NO_PAD.encode(rand::random::<[u8; 32]>());
         let hash = identity_session_hash(&token);
+        let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
         let inserted = sqlx::query!("INSERT INTO identity_sessions(token_hash,subject) SELECT $1,subject FROM user_identities WHERE subject=$2", hash, subject)
-            .execute(&self.db.0).await.map_err(DbError::from)?.rows_affected();
-        Ok((inserted == 1).then(|| token.into()))
+            .execute(&mut *tx).await.map_err(DbError::from)?.rows_affected();
+        if inserted == 0 {
+            return Ok(None);
+        }
+        if let Some(previous) = previous {
+            let hash = identity_session_hash(previous);
+            sqlx::query!("DELETE FROM identity_sessions WHERE token_hash=$1", hash)
+                .execute(&mut *tx)
+                .await
+                .map_err(DbError::from)?;
+        }
+        tx.commit().await.map_err(DbError::from)?;
+        Ok(Some(token.into()))
     }
 
     pub async fn identity_user(&self, token: &str) -> Result<Option<User>, IdentityError> {

@@ -83,6 +83,14 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
     let accounts = Accounts::new(db.clone(), encryption_key, config.encryption_key_id)
         .context("configure linked-account encryption")?;
     let sessions = Sessions::new(db.clone());
+    let identity_routes = match config.identity {
+        Some(identity) => Some(
+            crate::identity::router(identity, sessions.clone(), config.hostname.clone())
+                .await
+                .context("configure Identity login and discover issuer")?,
+        ),
+        None => None,
+    };
     let stop = CancellationToken::new();
     let tasks = TaskTracker::new();
     let oauth = Arc::new(codemode_core::components::auth::oauth::OAuth::new(
@@ -170,7 +178,8 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         execution,
         hostname: config.hostname,
         sessions: Arc::new(sessions),
-        identity_enabled: false,
+        identity_enabled: identity_routes.is_some(),
+        identity_routes,
         accounts: Arc::new(accounts),
         sources: Arc::new(sources),
         workspaces: Arc::new(endpoints),

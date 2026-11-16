@@ -27,6 +27,7 @@ export const configQuery = queryOptions({
         name: z.string(),
         hostname: z.string(),
         loginEnabled: z.boolean(),
+        idEnabled: z.boolean().default(false),
       })
     ),
   staleTime: Infinity,

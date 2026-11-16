@@ -3,6 +3,7 @@ use codemode_core::components::execution::Limits;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 pub struct Config {
+    pub identity: Option<idclient::Config>,
     pub bind: SocketAddr,
     pub hostname: String,
     pub database_url: secrecy::SecretString,
@@ -34,6 +35,7 @@ impl Config {
             bail!("CODEMODE_HOSTNAME must be a DNS hostname without a scheme or port");
         }
         let config = Self {
+            identity: crate::identity::configuration(&hostname)?,
             bind: std::env::var("CODEMODE_BIND")
                 .unwrap_or_else(|_| "127.0.0.1:2093".into())
                 .parse()

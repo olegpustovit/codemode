@@ -3,6 +3,9 @@ mod admin;
 mod authorization;
 mod browser;
 mod endpoints;
+#[path = "../../src/identity.rs"]
+mod identity;
+mod identity_login;
 #[path = "../../src/mcp_admin.rs"]
 mod mcp_admin;
 #[path = "../../src/oauth.rs"]

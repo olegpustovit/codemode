@@ -6,7 +6,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query"
 import { z } from "zod"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Field,
   FieldGroup,
@@ -48,6 +48,31 @@ function Login() {
       await router.navigate({ href: redirect })
     },
   })
+  if (config.idEnabled) {
+    return (
+      <main className="auth-page">
+        <section className="auth-panel">
+          <div className="flex flex-col gap-2">
+            <p className="font-semibold">Codemode</p>
+            <h1>Sign in to your control plane</h1>
+            <p className="text-muted-foreground">
+              Use your Microapps ID. Your MCPs, connected accounts and agent
+              access stay in one private workspace.
+            </p>
+          </div>
+          <a
+            className={buttonVariants()}
+            href={`/auth/login?return_to=${encodeURIComponent(redirect)}`}
+          >
+            Sign in with Microapps ID
+          </a>
+          <p className="text-sm break-all text-muted-foreground">
+            {config.hostname}
+          </p>
+        </section>
+      </main>
+    )
+  }
   return (
     <main className="auth-page">
       <section className="auth-panel">

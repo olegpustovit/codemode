@@ -47,6 +47,7 @@ async fn browser_upstream_linking_requires_its_session_and_exposes_only_account_
         log: Log::new(db.clone()),
         auth,
         sessions: Arc::new(sessions.clone()),
+        identity_enabled: false,
         accounts: Arc::new(accounts),
         sources: Arc::new(sources),
         hostname: "test.example".into(),

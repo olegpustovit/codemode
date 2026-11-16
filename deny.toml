@@ -1,5 +1,8 @@
 [advisories]
 version = 2
+ignore = [
+  { id = "RUSTSEC-2023-0071", reason = "Only openidconnect 4.1.0 depends on RSA 0.9.10; ID client verifies public signatures, never RSA private operations. tools/check-dependencies.sh enforces the dependency boundary. Reassess before private operations or library changes; remove when upstream upgrades. See docs/identity-rollout.md." },
+]
 
 [licenses]
 version = 2

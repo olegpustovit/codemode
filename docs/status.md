@@ -1,5 +1,9 @@
 # Implementation status
 
+## Identity preparation — not deployed
+
+The `identity-oidc` worktree adds private existing-user subject linking with preserved local tenants/roles/data; see [Identity rollout preparation](identity-rollout.md). Schema 22 adds separate private ID browser sessions and verified allowlisted onboarding without administrator adoption; gateway cookie/session mode boundaries are also prepared locally. SDK login/callback/logout routes and validated default-off configuration are wired. UI, actual-provider and deployment qualification remain pending; production remains on the unchanged schema-20 release below.
+
 ## Current release — control-plane fixes, schema 20
 
 All twelve steps of the [control-plane fixes](https://artifacts.microapps.space/a/jqm3ze7az66e) are implemented, committed, pushed and deployed at https://codemode.microapps.space. Source build **d45e6106a3a6**, schema **20**, UI **e16dc707d79d**, running ARM SHA-256 **f03d44a766ad41da3f0f1128a61eb7a26be44c14814f040a9958af4e8e7093f2**.

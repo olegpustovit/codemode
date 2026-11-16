@@ -296,6 +296,8 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         execution,
         hostname: "test.example".into(),
         sessions: Arc::new(Sessions::new(db)),
+        identity_enabled: false,
+        identity_routes: None,
         accounts: Arc::new(accounts),
         sources: Arc::new(sources),
         workspaces: Arc::new(endpoints.clone()),

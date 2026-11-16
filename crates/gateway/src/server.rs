@@ -41,6 +41,8 @@ pub struct State {
     pub execution: Arc<Execution<MontySandbox>>,
     pub hostname: String,
     pub sessions: Arc<codemode_core::components::sessions::Sessions>,
+    pub identity_enabled: bool,
+    pub identity_routes: Option<Router>,
     pub accounts: Arc<codemode_core::components::accounts::Accounts>,
     pub sources: Arc<codemode_core::components::sources::Sources>,
     pub workspaces: Arc<codemode_core::components::workspaces::Workspaces>,
@@ -331,6 +333,7 @@ fn routes(state: State) -> Router {
         .merge(mcp)
         .merge(crate::mcp_admin::routes(state.clone()))
         .with_state(state.clone())
+        .merge(state.identity_routes.clone().unwrap_or_default())
         .merge(crate::oauth::router(crate::oauth::State {
             oauth: state.oauth.clone(),
             hostname: state.hostname.clone(),
@@ -343,6 +346,7 @@ fn routes(state: State) -> Router {
             ),
             auth: state.auth.clone(),
             sessions: state.sessions.clone(),
+            identity_enabled: state.identity_enabled,
             accounts: state.accounts.clone(),
             sources: state.sources.clone(),
             hostname: state.hostname.clone(),

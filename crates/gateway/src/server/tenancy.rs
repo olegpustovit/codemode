@@ -74,13 +74,10 @@ async fn select(
     let tenant = if path.starts_with("/api/")
         && !matches!(path, "/api/config" | "/api/session" | "/api/register")
     {
-        match crate::admin::cookie(request.headers()) {
-            Some(token) => base
-                .sessions
-                .user(token)
+        match crate::admin::cookie(request.headers(), base.identity_enabled) {
+            Some(token) => crate::admin::browser_user(&base.sessions, base.identity_enabled, token)
                 .await
-                .map(|u| u.map(|u| u.tenant_id))
-                .map_err(anyhow::Error::from),
+                .map(|u| u.map(|u| u.tenant_id)),
             None => Ok(None),
         }
     } else if matches!(path, "/mcp" | "/mcp/" | "/mcp-admin" | "/mcp-admin/") {

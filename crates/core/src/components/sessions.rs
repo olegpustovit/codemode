@@ -1,3 +1,6 @@
+mod identity;
+pub use identity::IdentityError;
+
 use crate::infrastructure::postgres::{Database, Error as DbError};
 use argon2::{
     Argon2,
@@ -207,6 +210,10 @@ impl Sessions {
         Ok(())
     }
     pub async fn sweep(&self) -> Result<(), Error> {
+        sqlx::query!("DELETE FROM identity_sessions WHERE expires_at<=now()")
+            .execute(&self.db.0)
+            .await
+            .map_err(DbError::from)?;
         sqlx::query!("DELETE FROM sessions WHERE expires_at<=now()")
             .execute(&self.db.0)
             .await
@@ -215,7 +222,7 @@ impl Sessions {
     }
 }
 
-fn allowed_email(email: &str) -> Option<String> {
+fn normalize_email(email: &str) -> Option<String> {
     let email = email.trim().to_ascii_lowercase();
     let (local, domain) = email.split_once('@')?;
     if email.len() > 254
@@ -230,7 +237,25 @@ fn allowed_email(email: &str) -> Option<String> {
     {
         return None;
     }
-    (email == "ursus95@gmail.com" || domain == "olegpustovit.com").then_some(email)
+    if domain.is_empty()
+        || domain.split('.').any(|label| {
+            label.is_empty()
+                || label.len() > 63
+                || label.starts_with('-')
+                || label.ends_with('-')
+                || !label
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        })
+    {
+        return None;
+    }
+    Some(email)
+}
+
+fn allowed_email(email: &str) -> Option<String> {
+    let email = normalize_email(email)?;
+    (email == "ursus95@gmail.com" || email.ends_with("@olegpustovit.com")).then_some(email)
 }
 
 fn validate_hash(hash: &str) -> Result<(), Error> {

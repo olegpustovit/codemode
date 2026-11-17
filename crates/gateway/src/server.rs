@@ -54,7 +54,6 @@ pub struct State {
 #[derive(Clone)]
 struct Gateway {
     state: State,
-    manifest: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
@@ -98,7 +97,7 @@ fn success(value: &impl serde::Serialize) -> CallToolResult {
 #[tool_router]
 impl Gateway {
     #[tool(
-        description = "Prefer execute for tool lookup and work in one step, using await tools.search('tool_name') inside Python. This search browses tools and saved scripts in the selected workspace. Query one tool name, or join alternatives with OR; other words must all match. Run a saved script with execute(scriptId=its id, args={...}). Each page has ten tool hits; brief gives compact input signatures, full adds complete stubs for the top three. Use the cursor for more tools or refine the query for more than 20 script matches. Blocked tools are marked and cannot be dispatched.",
+        description = "Prefer execute for tool lookup and work in one step, using await tools.search('tool_name') inside Python. This search browses tools and saved scripts in the selected workspace. Query one tool name, or join alternatives with OR; other words must all match. Run a saved script with execute(scriptId=its id, args={...}). Each page has ten tool hits; brief gives compact signatures and output keys, full adds complete stubs for the top three. Use the cursor for more tools or refine the query for more than 20 script matches. Blocked tools are marked and cannot be dispatched.",
         annotations(read_only_hint = true)
     )]
     async fn search(
@@ -159,7 +158,7 @@ impl Gateway {
     }
 
     #[tool(
-        description = "Do the whole task in one execute. Call listed tools directly; invalid arguments raise ToolError with the signature. Provide Python code or a saved scriptId with args.\nDiscover with await tools.search('tool_name') only when needed; use OR between alternatives. print(help(tool)) gives full signatures.\nUse asyncio.gather(*calls) without keyword arguments for independent calls and .all(max_pages=20, _fields=[...]) for rows; compute the answer locally.\nUse memo.get(key) / memo.set(key, value), not indexing: 64 KiB per session for non-sensitive IDs/small summaries, never datasets. Return only the answer.\nUse IDs returned by list tools, never guessed titles or IDs. Avoid generators and next(list). Catch ToolError and PermissionError.\nLimits: 60 s, 64 MB, 100 calls, 64 KB source; no inheritance, generators, files, network or secrets."
+        description = "Do the whole task in one execute. Call listed tools directly; invalid arguments raise ToolError with the signature. Provide Python code or a saved scriptId with args.\nDiscover with await tools.search('tool_name') only when needed; use OR between alternatives. print(help(tool)) gives full signatures.\nUse asyncio.gather(*calls) without keyword arguments for independent calls and .all(max_pages=20, _fields=[...]) for rows (for example, await tools.example.list.all(_fields=['id','title'])); compute the answer locally.\nUse memo.get(key) / memo.set(key, value), not indexing: 64 KiB per session for non-sensitive IDs/small summaries, never datasets. Return only the answer.\nUse IDs returned by list tools, never guessed titles or IDs. Avoid generators and next(list). Catch ToolError and PermissionError.\nLimits: 60 s, 64 MB, 100 calls, 64 KB source; no inheritance, generators, files, network or secrets."
     )]
     async fn execute(
         &self,
@@ -212,6 +211,16 @@ impl ServerHandler for Gateway {
         _request: Option<rmcp::model::PaginatedRequestParams>,
         context: RequestContext<RoleServer>,
     ) -> Result<rmcp::model::ListToolsResult, rmcp::ErrorData> {
+        let workspace = principal(&context)?.workspace_id;
+        let manifest = self
+            .state
+            .catalogue
+            .manifest(workspace)
+            .await
+            .map_err(|error| {
+                tracing::error!(?error, "workspace manifest unavailable");
+                rmcp::ErrorData::internal_error("workspace catalogue unavailable", None)
+            })?;
         let mut tools = Self::tool_router().list_all();
         for tool in &mut tools {
             if tool.name == "execute" {
@@ -219,7 +228,7 @@ impl ServerHandler for Gateway {
                     format!(
                         "{}\n{}",
                         tool.description.as_deref().unwrap_or_default(),
-                        self.manifest
+                        manifest
                     )
                     .into(),
                 );
@@ -329,27 +338,15 @@ fn principal(context: &RequestContext<RoleServer>) -> Result<Principal, rmcp::Er
 }
 
 async fn mcp_request(AxumState(state): AxumState<State>, request: Request) -> Response {
-    let Some(principal) = request.extensions().get::<Principal>() else {
+    if request.extensions().get::<Principal>().is_none() {
         return StatusCode::UNAUTHORIZED.into_response();
-    };
-    let manifest = match state.catalogue.manifest(principal.workspace_id).await {
-        Ok(manifest) => manifest,
-        Err(error) => {
-            tracing::error!(?error, "workspace manifest unavailable");
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "workspace catalogue unavailable",
-            )
-                .into_response();
-        }
-    };
+    }
     let config = transport(&state);
     let factory = state.clone();
     let service = StreamableHttpService::new(
         move || {
             Ok(Gateway {
                 state: factory.clone(),
-                manifest: manifest.clone(),
             })
         },
         Arc::new(LocalSessionManager::default()),

@@ -280,7 +280,7 @@ impl Sandbox for FakeSandbox {
     async fn resume(
         &self,
         _: (),
-        _: Vec<(u32, CallResult)>,
+        _: &[(u32, CallResult)],
     ) -> Result<((), Step), codemode_core::infrastructure::sandbox::Error> {
         unreachable!()
     }

@@ -475,6 +475,27 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         let result=tool_result(rpc(&client,&url,"TEST.example:443",&work_token,version,"tools/call",serde_json::json!({"name":"execute","arguments":{"code":"return await tools.alpha.echo(value='ok')"}})).await);
         assert_eq!(result["status"], "completed");
         assert_eq!(result["result"], "alpha:ok");
+        if version == "2025-11-25" {
+            let wrong_index = tool_result(
+                rpc(
+                    &client,
+                    &url,
+                    "test.example",
+                    &work_token,
+                    version,
+                    "tools/call",
+                    serde_json::json!({"name":"execute","arguments":{
+                        "code":"reply = await tools.alpha.echo(value='private-fixture')\nreturn reply[999]"
+                    }}),
+                )
+                .await,
+            );
+            let error = wrong_index["error"].as_str().unwrap();
+            assert_eq!(wrong_index["status"], "failed");
+            assert!(error.contains("IndexError"), "{error}");
+            assert!(error.contains("Last tool result shape: str"), "{error}");
+            assert!(!error.contains("private-fixture"), "{error}");
+        }
         let before = beta.load(Ordering::SeqCst);
         let hidden=tool_result(rpc(&client,&url,"test.example",&work_token,version,"tools/call",serde_json::json!({"name":"execute","arguments":{"code":"return await tools.beta.echo(value='hidden')"}})).await);
         assert_eq!(hidden["status"], "failed");

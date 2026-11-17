@@ -115,7 +115,11 @@ pub fn generate(path: &str, description: &str, input: &Value, output: Option<&Va
     } else {
         String::new()
     };
-    let brief = format!("async def tools.{path}({brief_arguments}): ...{pagination_note}");
+    let skeleton = output.map_or_else(String::new, |schema| {
+        format!(" -> {}", return_skeleton(schema))
+    });
+    let brief =
+        format!("async def tools.{path}({brief_arguments}){skeleton}: ...{pagination_note}");
     let full = format!(
         "from typing import Any, Literal, NotRequired, TypedDict\n\n{}\n{signature}\n# {}",
         generator.definitions.join("\n\n"),
@@ -487,6 +491,19 @@ mod tests {
         assert!(stub.full.contains("NotRequired[int | None]"));
         assert!(stub.full.contains("\"child\": NotRequired[Any]"));
     }
+    #[test]
+    fn brief_return_skeleton_names_keys_without_schema_values() {
+        let output = json!({
+            "properties": {"items": {"items": {"$ref": "#/$defs/Item"}}, "nextCursor": {"type":"string"}},
+            "$defs": {"Item": {"properties": {"id":{"const":"private-literal"}, "title":{"type":"string"}}}}
+        });
+        let stub = generate("app.list", "List rows.", &json!({}), Some(&output));
+        assert_eq!(
+            stub.brief,
+            "async def tools.app.list() -> {items:[{id,title}],nextCursor}: ..."
+        );
+    }
+
     #[test]
     fn real_trial_schema_corpus_has_stable_signatures() {
         let corpus: Value =

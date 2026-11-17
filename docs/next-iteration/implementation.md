@@ -44,5 +44,36 @@ enforced. Never grant provider consent or create non-eval production fixtures.
   `code_mode_host_output_truncation` stable and enabled. This confirms the current
   client defaults, not what every historical model request saw.
 
-Implementation and qualification are in progress. No new release or performance
-target is claimed yet.
+## Candidate changes and checks
+
+- W1 moves the manifest to the execute description. E2's two placements both
+  passed 120/120. Description-only reduced median input from 99,345.5 to
+  82,881.5 tokens and execute errors from 13.65% to 5.57%. The manifest is
+  capped at 3,072 UTF-8 bytes and shows ranked input signatures and declared
+  output keys for each visible source. Blocked tools keep their explicit label.
+- W2 gives brief search stubs a compact return skeleton and puts a real
+  projection example in the execute description. Tools with stored older
+  briefs gain the skeleton in the manifest immediately. Brief search stubs
+  are rebuilt on existing source synchronization. Shape feedback uses the
+  latest successful upstream reply from the same script. Memo/discovery
+  payloads are excluded. Only a worker KeyError, TypeError or IndexError
+  triggers the streaming structural summary.
+- The W2 prompt assembly queries the manifest only for tools/list after
+  authentication. Normal tools/call requests avoid fetching the expanded
+  catalogue. Both protocol eras still expose exactly search and execute.
+- W0 captures numeric input usage from isolated Codex request counter events
+  and Claude message usage. Counts must reconcile with the per-run total.
+  `fresh_after_first` excludes cache reads and the entire first request and
+  includes later cache writes. Warm-ups are recorded separately. Recovery
+  counts failed execute calls followed by a successful execute in the same run.
+- Three Codex 0.169.0 raw MCP probes failed before any upstream call with
+  `code-mode host is disabled`, including explicit direct exposure and disabled
+  incremental tools. A matching default-host probe passed. The Claude direct
+  probe passed. The failed Codex raw runs have no valid price comparison.
+- W1 optimized candidate SHA-256
+  `d33df24cae1d87ebcae0a879ae7de7118dba3a46902a5c7c984ab26cd559899c`.
+  Its standard qualification is in progress. The first W2 native qualification
+  passed 155 cases, including the error response and regression fixture, before
+  the manifest lookup moved to tools/list. Requalification covers that change.
+
+No new release or performance target is claimed yet.

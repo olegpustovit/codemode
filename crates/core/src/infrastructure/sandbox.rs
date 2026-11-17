@@ -76,7 +76,7 @@ pub trait Sandbox {
     fn resume(
         &self,
         run: Self::Run,
-        results: Vec<(u32, CallResult)>,
+        results: &[(u32, CallResult)],
     ) -> impl Future<Output = Result<(Self::Run, Step), Error>> + Send;
     fn start_for(
         &self,
@@ -610,17 +610,17 @@ impl Sandbox for MontySandbox {
     async fn resume(
         &self,
         mut run: Run,
-        results: Vec<(u32, CallResult)>,
+        results: &[(u32, CallResult)],
     ) -> Result<(Run, Step), Error> {
         let mut answers: Vec<_> = results
-            .into_iter()
+            .iter()
             .map(|(id, result)| {
-                let native = run.native_json.remove(&id);
+                let native = run.native_json.remove(id);
                 Ok((
-                    id,
+                    *id,
                     match result {
                         Ok(value) => ResumeValue::Return(if native {
-                            native_json(&value)?
+                            native_json(value)?
                         } else {
                             MontyObject::string(value.get())
                         }),
@@ -767,6 +767,14 @@ impl From<PoolError> for Error {
 }
 
 impl Error {
+    pub(crate) fn describes_result_shape(&self) -> bool {
+        matches!(
+            self,
+            Self::Worker(PoolError::Runtime(error))
+                if matches!(error.exc_type(), ExcType::KeyError | ExcType::TypeError | ExcType::IndexError)
+        )
+    }
+
     pub fn agent_message(&self) -> String {
         match self {
             Self::Worker(PoolError::Runtime(error)) => {

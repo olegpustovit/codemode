@@ -59,7 +59,7 @@ async fn gather_yields_all_fifty_calls_in_one_batch() {
         panic!("expected batch")
     };
     assert_eq!(calls.len(), 50);
-    let (_, step) = sb.resume(run, dispatch_stub(calls).await).await.unwrap();
+    let (_, step) = sb.resume(run, &dispatch_stub(calls).await).await.unwrap();
     let Step::Done { result, .. } = step else {
         panic!("expected result")
     };
@@ -136,7 +136,7 @@ async fn memory_limit_discards_only_its_worker() {
     let terminated = abusive.terminate().await;
     assert!(!PathBuf::from(format!("/proc/{abusive_pid}")).exists());
     let (_, done) = sb
-        .resume(healthy, dispatch_stub(calls).await)
+        .resume(healthy, &dispatch_stub(calls).await)
         .await
         .unwrap();
     let Step::Done { result, .. } = done else {
@@ -178,7 +178,7 @@ async fn deep_recursion_discards_only_its_worker() {
     abusive.terminate().await;
     assert!(!PathBuf::from(format!("/proc/{pid}")).exists());
     let (_, done) = sb
-        .resume(healthy, dispatch_stub(calls).await)
+        .resume(healthy, &dispatch_stub(calls).await)
         .await
         .unwrap();
     let Step::Done { result, .. } = done else {
@@ -265,7 +265,7 @@ async fn killed_worker_is_reported_and_replaced() {
     assert_ne!(replacement_pid, healthy_pid);
     replacement.finish().await.unwrap();
     let (_, done) = sb
-        .resume(healthy, dispatch_stub(calls).await)
+        .resume(healthy, &dispatch_stub(calls).await)
         .await
         .unwrap();
     let Step::Done { result, .. } = done else {
@@ -402,7 +402,7 @@ async fn execute(sb: &MontySandbox, code: &str) -> Result<Step, sandbox::Error> 
         match step {
             Step::Done { .. } => return Ok(step),
             Step::Calls(calls) => {
-                (run, step) = sb.resume(run, dispatch_stub(calls).await).await?;
+                (run, step) = sb.resume(run, &dispatch_stub(calls).await).await?;
             }
         }
     }
@@ -419,7 +419,7 @@ async fn a_worker_process_never_crosses_authenticated_caller_boundaries() {
         panic!("expected pending call")
     };
     let a_pid = run.worker.as_ref().unwrap().pid().unwrap();
-    let (_, done) = sb.resume(run, dispatch_stub(calls).await).await.unwrap();
+    let (_, done) = sb.resume(run, &dispatch_stub(calls).await).await.unwrap();
     assert!(matches!(done, Step::Done { .. }));
     let (run, step) = sb.start_for(a, code, PRELUDE).await.unwrap();
     let Step::Calls(calls) = step else {
@@ -430,7 +430,7 @@ async fn a_worker_process_never_crosses_authenticated_caller_boundaries() {
         Some(a_pid),
         "same caller can reuse its warm worker"
     );
-    let (_, done) = sb.resume(run, dispatch_stub(calls).await).await.unwrap();
+    let (_, done) = sb.resume(run, &dispatch_stub(calls).await).await.unwrap();
     assert!(matches!(done, Step::Done { .. }));
     let (run, step) = sb.start_for(b, code, PRELUDE).await.unwrap();
     let Step::Calls(calls) = step else {
@@ -441,7 +441,7 @@ async fn a_worker_process_never_crosses_authenticated_caller_boundaries() {
         Some(a_pid),
         "another caller must get a different process"
     );
-    let (_, done) = sb.resume(run, dispatch_stub(calls).await).await.unwrap();
+    let (_, done) = sb.resume(run, &dispatch_stub(calls).await).await.unwrap();
     assert!(matches!(done, Step::Done { .. }));
     sb.pool.close().await;
 }
@@ -539,7 +539,7 @@ async fn pagination_and_projection_use_real_workers_and_preserve_call_budgets() 
                     (run, step) = sb
                         .resume(
                             run,
-                            vec![(
+                            &[(
                                 call.id,
                                 Ok(serde_json::value::to_raw_value(&response).unwrap()),
                             )],
@@ -571,7 +571,7 @@ async fn pagination_and_projection_use_real_workers_and_preserve_call_budgets() 
                 )
                 .unwrap();
                 (run, step) = sb
-                    .resume(run, vec![(calls[0].id, Ok(response))])
+                    .resume(run, &[(calls[0].id, Ok(response))])
                     .await
                     .unwrap();
             }
@@ -683,7 +683,7 @@ async fn pagination_accepts_integer_cursors_sort_companions_and_omitted_terminal
     let (run, step) = sb
         .resume(
             run,
-            vec![(
+            &[(
                 first[0].id,
                 Ok(serde_json::value::to_raw_value(&page).unwrap()),
             )],
@@ -700,7 +700,7 @@ async fn pagination_accepts_integer_cursors_sort_companions_and_omitted_terminal
     let (_, step) = sb
         .resume(
             run,
-            vec![(
+            &[(
                 second[0].id,
                 Ok(serde_json::value::to_raw_value(&json!({"items":[{"id":"last"}]})).unwrap()),
             )],
@@ -737,7 +737,7 @@ async fn moneybag_recipe_uses_exact_decimal_postings_and_integer_pagination() {
     let (run, step) = sb
         .resume(
             run,
-            vec![(
+            &[(
                 first[0].id,
                 Ok(serde_json::value::to_raw_value(&page).unwrap()),
             )],
@@ -755,7 +755,7 @@ async fn moneybag_recipe_uses_exact_decimal_postings_and_integer_pagination() {
     let (_, step) = sb
         .resume(
             run,
-            vec![(
+            &[(
                 second[0].id,
                 Ok(serde_json::value::to_raw_value(&page).unwrap()),
             )],
@@ -814,7 +814,7 @@ async fn nudge_recipe_resolves_names_before_one_create_and_validates_args_first(
         (run, step) = sb
             .resume(
                 run,
-                vec![(
+                &[(
                     calls[0].id,
                     Ok(serde_json::value::to_raw_value(&response).unwrap()),
                 )],
@@ -921,7 +921,7 @@ async fn source_proxy_setup_does_not_reduce_the_one_hundred_call_budget() {
             }
             Step::Calls(calls) => {
                 count += calls.len();
-                (run, step) = sb.resume(run, dispatch_stub(calls).await).await.unwrap();
+                (run, step) = sb.resume(run, &dispatch_stub(calls).await).await.unwrap();
             }
         }
     }

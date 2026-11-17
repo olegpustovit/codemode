@@ -208,6 +208,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
     ) -> Result<ResultValue, Error> {
         use crate::infrastructure::sandbox::Error as SandboxError;
         let mut count = 0;
+        let mut last_reply = None;
         let capture = self.sandbox.capture();
         let future = async {
             let allowed = self
@@ -249,7 +250,12 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                         }
                         let first = count;
                         count += calls.len();
-                        let results = stream::iter(calls.into_iter().enumerate())
+                        let internal: Vec<_> = calls
+                            .iter()
+                            .filter(|call| call.path.starts_with("@"))
+                            .map(|call| call.id)
+                            .collect();
+                        let mut results: Vec<_> = stream::iter(calls.into_iter().enumerate())
                             .map(|(index, call)| {
                                 self.sources.dispatch(
                                     id,
@@ -262,7 +268,17 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                             .buffer_unordered(self.limits.concurrent_calls)
                             .collect()
                             .await;
-                        (run, step) = self.sandbox.resume(run, results).await?;
+                        let next = self.sandbox.resume(run, &results).await;
+                        if !matches!(next, Ok((_, Step::Done { .. }))) {
+                            // Keep one successful upstream reply, without cloning or parsing it.
+                            if let Some(index) = results
+                                .iter()
+                                .rposition(|(id, reply)| reply.is_ok() && !internal.contains(id))
+                            {
+                                last_reply = results.swap_remove(index).1.ok();
+                            }
+                        }
+                        (run, step) = next?;
                     }
                 }
             }
@@ -271,7 +287,17 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
             _=cancel.cancelled()=>("failed",Some("execution cancelled; calls already sent upstream may have completed".into()),None),
             outcome=tokio::time::timeout(Duration::from_secs(60),future)=>match outcome {
                 Err(_)=>("timed_out",Some("execution exceeded its 60 second wall deadline; worker terminated".into()),None),
-                Ok(Err(error))=>("failed",Some(error.agent_message()),None),
+                Ok(Err(error))=>{
+                    let mut message = error.agent_message();
+                    if error.describes_result_shape() && let Some(reply) = last_reply {
+                        let summary = shape::summarize(reply.get());
+                        message.push_str("\nLast tool result shape: ");
+                        for character in summary.chars().take(360) {
+                            message.push(character);
+                        }
+                    }
+                    ("failed",Some(message),None)
+                },
                 Ok(Ok(step))=>("completed",None,Some(step)),
             }
         };

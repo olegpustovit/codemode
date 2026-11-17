@@ -203,7 +203,14 @@ fn manifest(rows: Vec<ManifestTool>) -> String {
             let shape = output_schema.as_ref().map(stubs::return_skeleton);
             group.1.push(match (signature, shape) {
                 _ if blocked => format!("{name} [blocked]"),
-                (Some(signature), Some(shape)) => format!("{signature} -> {shape}"),
+                (Some(signature), Some(shape)) => {
+                    let suffix = format!(" -> {shape}");
+                    if signature.ends_with(&suffix) {
+                        signature.to_owned()
+                    } else {
+                        format!("{signature}{suffix}")
+                    }
+                }
                 (Some(signature), None) => signature.to_owned(),
                 (None, _) => format!("{name} (use help)"),
             });

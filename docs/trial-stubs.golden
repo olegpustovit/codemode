@@ -1,5 +1,5 @@
 ## artifacts.artifact_assets
-async def tools.artifacts.artifact_assets(*, action: str, id: str, assetId: str = None, base64: str = None, contentType: str = None, filePath: str = None): ...
+async def tools.artifacts.artifact_assets(*, action: str, id: str, assetId: str = None, base64: str = None, contentType: str = None, filePath: str = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -7,7 +7,7 @@ async def tools.artifacts.artifact_assets(*, action: str, id: str, assetId: str 
 # List, upload, or delete artifact assets. Upload content as base64 or from a local file on the stdio client. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_comments
-async def tools.artifacts.artifact_comments(*, action: str, id: str = None, status: str = None, text: str = None, threadId: str = None): ...
+async def tools.artifacts.artifact_comments(*, action: str, id: str = None, status: str = None, text: str = None, threadId: str = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -15,7 +15,7 @@ async def tools.artifacts.artifact_comments(*, action: str, id: str = None, stat
 # List artifact comment threads, reply to a thread, or resolve it. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_data
-async def tools.artifacts.artifact_data(*, action: str, id: str, after: str = None, body: dict[str, Any] = None, collection: str = None, limit: int = None, ops: None | list[dict[str, Any]] = None, orderBy: None | dict[str, Any] = None, patch: dict[str, Any] = None, path: str = None, where: None | list[None | list[Any]] = None): ...
+async def tools.artifacts.artifact_data(*, action: str, id: str, after: str = None, body: dict[str, Any] = None, collection: str = None, limit: int = None, ops: None | list[dict[str, Any]] = None, orderBy: None | dict[str, Any] = None, patch: dict[str, Any] = None, path: str = None, where: None | list[None | list[Any]] = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 artifacts_artifact_data_orderBy = TypedDict("artifacts_artifact_data_orderBy", {"dir": NotRequired[str], "field": str})
@@ -23,7 +23,7 @@ async def tools.artifacts.artifact_data(*, action: str, id: str, after: str = No
 # Read or modify an artifact's capability-checked document store. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_delete
-async def tools.artifacts.artifact_delete(*, confirm: bool, id: str): ...
+async def tools.artifacts.artifact_delete(*, confirm: bool, id: str) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -31,7 +31,7 @@ async def tools.artifacts.artifact_delete(*, confirm: bool, id: str) -> dict[str
 # Soft-delete an artifact after explicit confirmation. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_inbox
-async def tools.artifacts.artifact_inbox(*, ack: None | list[int] = None, after: int = None, limit: int = None, wait: int = None): ...
+async def tools.artifacts.artifact_inbox(*, ack: None | list[int] = None, after: int = None, limit: int = None, wait: int = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -39,7 +39,7 @@ async def tools.artifacts.artifact_inbox(*, ack: None | list[int] = None, after:
 # List the authenticated user's agent inbox and optionally acknowledge event IDs. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_list
-async def tools.artifacts.artifact_list(*, folder: str = None, limit: int = None, q: str = None, scope: str = None): ...
+async def tools.artifacts.artifact_list(*, folder: str = None, limit: int = None, q: str = None, scope: str = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -47,7 +47,7 @@ async def tools.artifacts.artifact_list(*, folder: str = None, limit: int = None
 # List artifacts visible to the authenticated user, with optional scope and search. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_move
-async def tools.artifacts.artifact_move(*, folder: str, ids: None | list[str]): ...
+async def tools.artifacts.artifact_move(*, folder: str, ids: None | list[str]) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -55,7 +55,7 @@ async def tools.artifacts.artifact_move(*, folder: str, ids: None | list[str]) -
 # Move artifacts you own to a folder path, or unfile them. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_publish
-async def tools.artifacts.artifact_publish(*, capabilities: dict[str, Any] = None, description: None | str = None, files: dict[str, Any] = None, folder: None | str = None, html: None | str = None, icon: None | str = None, id: str = None, ifVersion: None | int = None, label: str = None, markdown: None | str = None, title: None | str = None, visibility: None | str = None): ...
+async def tools.artifacts.artifact_publish(*, capabilities: dict[str, Any] = None, description: None | str = None, files: dict[str, Any] = None, folder: None | str = None, html: None | str = None, icon: None | str = None, id: str = None, ifVersion: None | int = None, label: str = None, markdown: None | str = None, title: None | str = None, visibility: None | str = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -63,7 +63,7 @@ async def tools.artifacts.artifact_publish(*, capabilities: dict[str, Any] = Non
 # Create or publish a new version of a sandboxed artifact. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_read
-async def tools.artifacts.artifact_read(*, id: str, format: str = None, path: str = None, version: int = None): ...
+async def tools.artifacts.artifact_read(*, id: str, format: str = None, path: str = None, version: int = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -71,7 +71,7 @@ async def tools.artifacts.artifact_read(*, id: str, format: str = None, path: st
 # Read an artifact's file index, one file, or its Markdown representation with format=markdown. Binary files are returned as base64. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_search
-async def tools.artifacts.artifact_search(*, query: str, folder: str = None, limit: int = None): ...
+async def tools.artifacts.artifact_search(*, query: str, folder: str = None, limit: int = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -79,7 +79,7 @@ async def tools.artifacts.artifact_search(*, query: str, folder: str = None, lim
 # Search artifacts visible to the authenticated user by title, description, and Markdown, with highlighted snippets. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.artifact_update_meta
-async def tools.artifacts.artifact_update_meta(*, id: str, capabilities: dict[str, Any] = None, description: None | str = None, icon: None | str = None, title: None | str = None, visibility: None | str = None): ...
+async def tools.artifacts.artifact_update_meta(*, id: str, capabilities: dict[str, Any] = None, description: None | str = None, icon: None | str = None, title: None | str = None, visibility: None | str = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -87,7 +87,7 @@ async def tools.artifacts.artifact_update_meta(*, id: str, capabilities: dict[st
 # Update artifact metadata without publishing a new version. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.doc_create
-async def tools.artifacts.doc_create(*, markdown: str, title: str, folder: str = None, visibility: str = None): ...
+async def tools.artifacts.doc_create(*, markdown: str, title: str, folder: str = None, visibility: str = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -95,7 +95,7 @@ async def tools.artifacts.doc_create(*, markdown: str, title: str, folder: str =
 # Create a Markdown document artifact. Give the user the returned artifact URL. Read the microapps-artifacts skill for document guidance.
 
 ## artifacts.doc_edit
-async def tools.artifacts.doc_edit(*, id: str, mode: str, edits: None | list[dict[str, Any]] = None, ifEtag: str = None, markdown: None | str = None): ...
+async def tools.artifacts.doc_edit(*, id: str, mode: str, edits: None | list[dict[str, Any]] = None, ifEtag: str = None, markdown: None | str = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 artifacts_doc_edit_edits = TypedDict("artifacts_doc_edit_edits", {"newStr": str, "oldStr": str})
@@ -103,7 +103,7 @@ async def tools.artifacts.doc_edit(*, id: str, mode: str, edits: None | list[art
 # Edit a Markdown document by exact replacements, append, or full replacement. Give the user the returned artifact URL. Read the microapps-artifacts skill for document guidance.
 
 ## artifacts.doc_read
-async def tools.artifacts.doc_read(*, id: str): ...
+async def tools.artifacts.doc_read(*, id: str) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -111,7 +111,7 @@ async def tools.artifacts.doc_read(*, id: str) -> dict[str, Any]: ...
 # Read a Markdown document, its content hash, and heading outline. Give the user the returned artifact URL. Read the microapps-artifacts skill for document guidance.
 
 ## artifacts.folder_list
-async def tools.artifacts.folder_list(): ...
+async def tools.artifacts.folder_list() -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -119,7 +119,7 @@ async def tools.artifacts.folder_list() -> dict[str, Any]: ...
 # List the authenticated user's folders with paths and artifact counts. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## artifacts.folder_manage
-async def tools.artifacts.folder_manage(*, action: str, path: str, newPath: str = None): ...
+async def tools.artifacts.folder_manage(*, action: str, path: str, newPath: str = None) -> dict: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 
@@ -127,7 +127,7 @@ async def tools.artifacts.folder_manage(*, action: str, path: str, newPath: str 
 # Create, rename, move, or delete one of your folders. Artifacts are sandboxed web pages with a small declared capability set: pages receive only the APIs declared in their manifest, sensitive capabilities require viewer consent, and server-side checks enforce artifact access and data rules. Give the user the returned artifact URL. Read the microapps-artifacts skill for design and capability rules.
 
 ## nudge.get_access_context
-async def tools.nudge.get_access_context(): ...
+async def tools.nudge.get_access_context() -> {data:{accountId,canWrite,identity:{avatarKey,name},name,projectScoped,scopedProjectId,…}}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 nudge_get_access_context_result_data_identity = TypedDict("nudge_get_access_context_result_data_identity", {"avatarKey": None | str, "name": str})
@@ -139,7 +139,7 @@ async def tools.nudge.get_access_context() -> nudge_get_access_context_result: .
 # Get the credential workspaceId, accountId, effective write access, and optional project scope. Start here before resolving resource IDs.
 
 ## nudge.get_issue
-async def tools.nudge.get_issue(*, id: str): ...
+async def tools.nudge.get_issue(*, id: str) -> {data:{archivedAtMs,assignee,assigneeId,createdAtMs,description,dueAtMs,…}}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 nudge_get_issue_result_data = TypedDict("nudge_get_issue_result_data", {"archivedAtMs": None | int, "assignee": None | str, "assigneeId": None | str, "createdAtMs": int, "description": str, "dueAtMs": None | int, "estimate": None | int, "externalId": None | str, "id": str, "identifier": str, "labels": None | list[str], "milestoneId": None | str, "parentId": None | str, "priority": int, "projectId": None | str, "sourceAuthor": None | str, "sourceCanceledAtMs": None | int, "sourceCompletedAtMs": None | int, "sourceCreatedAtMs": None | int, "sourceUpdatedAtMs": None | int, "sourceUrl": None | str, "statusId": str, "teamId": str, "title": str, "updatedAtMs": int})
@@ -149,7 +149,7 @@ async def tools.nudge.get_issue(*, id: str) -> nudge_get_issue_result: ...
 # Get an issue by stable ID or human-readable identifier such as ISS-7.
 
 ## nudge.get_project
-async def tools.nudge.get_project(*, id: str): ...
+async def tools.nudge.get_project(*, id: str) -> {data:{archivedAtMs,color,createdAtMs,description,externalId,icon,…}}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 nudge_get_project_result_data = TypedDict("nudge_get_project_result_data", {"archivedAtMs": None | int, "color": str, "createdAtMs": int, "description": str, "externalId": None | str, "icon": str, "id": str, "key": str, "labelIds": None | list[str], "lead": None | str, "leadId": None | str, "memberIds": None | list[str], "name": str, "priority": str, "sourceAuthor": None | str, "sourceCanceledAtMs": None | int, "sourceCompletedAtMs": None | int, "sourceCreatedAtMs": None | int, "sourceUpdatedAtMs": None | int, "sourceUrl": None | str, "startDate": None | str, "status": str, "targetDate": None | str, "updatedAtMs": int})
@@ -159,7 +159,7 @@ async def tools.nudge.get_project(*, id: str) -> nudge_get_project_result: ...
 # Get a project.
 
 ## nudge.get_team
-async def tools.nudge.get_team(*, id: str): ...
+async def tools.nudge.get_team(*, id: str) -> {data:{createdAtMs,estimateAllowZero,estimateExtended,estimatePolicyRevision,estimateScale,estimateUnestimatedAsOne,…}}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 nudge_get_team_result_data = TypedDict("nudge_get_team_result_data", {"createdAtMs": int, "estimateAllowZero": bool, "estimateExtended": bool, "estimatePolicyRevision": int, "estimateScale": str, "estimateUnestimatedAsOne": bool, "estimatesEnabled": bool, "id": str, "key": str, "name": str})
@@ -169,7 +169,7 @@ async def tools.nudge.get_team(*, id: str) -> nudge_get_team_result: ...
 # Get a team.
 
 ## nudge.list_actors
-async def tools.nudge.list_actors(*, cursor: str = None, limit: int = None): ...
+async def tools.nudge.list_actors(*, cursor: str = None, limit: int = None) -> {data:{items:[{avatarUrl,id,kind,name}],nextCursor}}: ...
 # Cursor pagination: await tools.nudge.list_actors.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -183,7 +183,7 @@ async def tools.nudge.list_actors(*, cursor: str = None, limit: int = None) -> n
 # Cursor pagination: await tools.nudge.list_actors.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## nudge.list_comments
-async def tools.nudge.list_comments(*, issueId: str, cursor: str = None, limit: int = None): ...
+async def tools.nudge.list_comments(*, issueId: str, cursor: str = None, limit: int = None) -> {data:{items:[{author,authorId,authorKind,body,createdAtMs,id,…}],nextCursor}}: ...
 # Cursor pagination: await tools.nudge.list_comments.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -197,7 +197,7 @@ async def tools.nudge.list_comments(*, issueId: str, cursor: str = None, limit: 
 # Cursor pagination: await tools.nudge.list_comments.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## nudge.list_issue_labels
-async def tools.nudge.list_issue_labels(*, cursor: str = None, limit: int = None): ...
+async def tools.nudge.list_issue_labels(*, cursor: str = None, limit: int = None) -> {data:{items:[{color,createdAtMs,id,name,scope}],nextCursor}}: ...
 # Cursor pagination: await tools.nudge.list_issue_labels.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -211,7 +211,7 @@ async def tools.nudge.list_issue_labels(*, cursor: str = None, limit: int = None
 # Cursor pagination: await tools.nudge.list_issue_labels.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## nudge.list_issue_statuses
-async def tools.nudge.list_issue_statuses(*, teamId: str, cursor: str = None, limit: int = None): ...
+async def tools.nudge.list_issue_statuses(*, teamId: str, cursor: str = None, limit: int = None) -> {data:{items:[{category,color,createdAtMs,icon,id,name,…}],nextCursor}}: ...
 # Cursor pagination: await tools.nudge.list_issue_statuses.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -225,7 +225,7 @@ async def tools.nudge.list_issue_statuses(*, teamId: str, cursor: str = None, li
 # Cursor pagination: await tools.nudge.list_issue_statuses.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## nudge.list_issues
-async def tools.nudge.list_issues(*, assigneeId: str = None, cursor: str = None, limit: int = None, milestoneId: str = None, projectId: str = None, query: str = None, sort: str = None, statusId: str = None, teamId: str = None): ...
+async def tools.nudge.list_issues(*, assigneeId: str = None, cursor: str = None, limit: int = None, milestoneId: str = None, projectId: str = None, query: str = None, sort: str = None, statusId: str = None, teamId: str = None) -> {data:{items:[{archivedAtMs,assignee,assigneeId,createdAtMs,description,dueAtMs,…}],nextCursor}}: ...
 # Cursor pagination: await tools.nudge.list_issues.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -239,7 +239,7 @@ async def tools.nudge.list_issues(*, assigneeId: str = None, cursor: str = None,
 # Cursor pagination: await tools.nudge.list_issues.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## nudge.list_projects
-async def tools.nudge.list_projects(*, cursor: str = None, includeArchived: bool = None, limit: int = None, query: str = None): ...
+async def tools.nudge.list_projects(*, cursor: str = None, includeArchived: bool = None, limit: int = None, query: str = None) -> {data:{items:[{archivedAtMs,color,createdAtMs,icon,id,key,…}],nextCursor}}: ...
 # Cursor pagination: await tools.nudge.list_projects.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -253,7 +253,7 @@ async def tools.nudge.list_projects(*, cursor: str = None, includeArchived: bool
 # Cursor pagination: await tools.nudge.list_projects.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## nudge.list_teams
-async def tools.nudge.list_teams(*, cursor: str = None, limit: int = None): ...
+async def tools.nudge.list_teams(*, cursor: str = None, limit: int = None) -> {data:{items:[{createdAtMs,estimateAllowZero,estimateExtended,estimatePolicyRevision,estimateScale,estimateUnestimatedAsOne,…}],nextCursor}}: ...
 # Cursor pagination: await tools.nudge.list_teams.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -267,7 +267,7 @@ async def tools.nudge.list_teams(*, cursor: str = None, limit: int = None) -> nu
 # Cursor pagination: await tools.nudge.list_teams.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## nudge.search_documentation
-async def tools.nudge.search_documentation(*, query: str): ...
+async def tools.nudge.search_documentation(*, query: str) -> {results:[{text,title,uri}]}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 nudge_search_documentation_result_results = TypedDict("nudge_search_documentation_result_results", {"text": str, "title": str, "uri": str})
@@ -277,7 +277,7 @@ async def tools.nudge.search_documentation(*, query: str) -> nudge_search_docume
 # Search the bundled Nudge MCP usage guide by case-insensitive words. Returns matching sections; an empty query returns all sections. For workspace document content use search_documents.
 
 ## researcher.compare_candidates
-async def tools.researcher.compare_candidates(*, candidates: None | list[dict[str, Any]]): ...
+async def tools.researcher.compare_candidates(*, candidates: None | list[dict[str, Any]]) -> {status}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_compare_candidates_candidates = TypedDict("researcher_compare_candidates_candidates", {"abstract": str, "title": str})
@@ -287,7 +287,7 @@ async def tools.researcher.compare_candidates(*, candidates: None | list[researc
 # Compare two to twelve title and abstract wordings after ranking migration; currently reports not_migrated.
 
 ## researcher.config_impact
-async def tools.researcher.config_impact(*, from_: int, key: str, to: int): ...
+async def tools.researcher.config_impact(*, from_: int, key: str, to: int) -> {added:[{after_sha256,before_sha256,id}],affected_subjects,answer_scope,baseline_subjects,cache_purge,changed:[{after_sha256,before_sha256,id}],…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_config_impact_result_added = TypedDict("researcher_config_impact_result_added", {"after_sha256": NotRequired[str], "before_sha256": NotRequired[str], "id": str})
@@ -309,7 +309,7 @@ async def tools.researcher.config_impact(*, from_: int, key: str, to: int) -> re
 # Estimate cached-assessment misses, requests, input tokens and (only with a verified price) USD for activating a question-set version. Reads stored evidence; makes no Jev request and purges nothing.
 
 ## researcher.config_usage
-async def tools.researcher.config_usage(*, key: str, kind: str, version: int, cursor: str = None, limit: int = None): ...
+async def tools.researcher.config_usage(*, key: str, kind: str, version: int, cursor: str = None, limit: int = None) -> {content_sha256,count,count_capped,items:[{completed_at,id,kind,mode,piece_code}],key,kind,…}: ...
 # Cursor pagination: await tools.researcher.config_usage.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -321,7 +321,7 @@ async def tools.researcher.config_usage(*, key: str, kind: str, version: int, cu
 # Cursor pagination: await tools.researcher.config_usage.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.fetch
-async def tools.researcher.fetch(*, id: str): ...
+async def tools.researcher.fetch(*, id: str) -> {id,next_id,offset,sha256,text,title,…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_fetch_result = TypedDict("researcher_fetch_result", {"id": str, "next_id": NotRequired[str], "offset": NotRequired[int], "sha256": NotRequired[str], "text": str, "title": str, "total_bytes": NotRequired[int], "url": NotRequired[str]})
@@ -329,7 +329,7 @@ async def tools.researcher.fetch(*, id: str) -> researcher_fetch_result: ...
 # Get a piece, venue, accepted paper, or general facts by an id from search. Read an attached private UTF-8 text/Markdown/JSON workflow output (pages of at most 128 KiB; objects at most 4 MiB) with id workflow-output:<piece-code>:<sha256> or its returned next_id; discover the hash in get_piece node outputs.
 
 ## researcher.find_corpus_sources
-async def tools.researcher.find_corpus_sources(*, item: str, venue: str, provider: str = None): ...
+async def tools.researcher.find_corpus_sources(*, item: str, venue: str, provider: str = None) -> {candidates:[{access,authors:[str],doi,identity_match:{authors,doi,exact_title,status,year},landing_url,license,…}],corpus_venue,item,limitations:…,…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_find_corpus_sources_result_candidates_identity_match = TypedDict("researcher_find_corpus_sources_result_candidates_identity_match", {"authors": str, "doi": str, "exact_title": bool, "status": str, "year": str})
@@ -345,7 +345,7 @@ async def tools.researcher.find_corpus_sources(*, item: str, venue: str, provide
 # Discover at most five metadata records each from Crossref and OpenAlex for one existing accepted corpus item. Requires registry venue and item; optional provider=both (default), crossref or openalex. Uses stored public title only for anonymous provider searches. Reports exact normalized title/year/full-author identity comparisons and provider-reported DOI, landing and PDF links. Unknown author/year fields never confirm identity. OA is only a provider claim; access and licenses remain independently unverified. No article body download, credential use, retries, paywall bypass, or corpus mutation. Provider failures are explicit and partial results are retained.
 
 ## researcher.get_config
-async def tools.researcher.get_config(*, key: str, kind: str, limit: int = None, offset: int = None, version: int = None): ...
+async def tools.researcher.get_config(*, key: str, kind: str, limit: int = None, offset: int = None, version: int = None) -> {approved_by,author,complete,content,content_bytes,content_sha256,…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_get_config_result = TypedDict("researcher_get_config_result", {"approved_by": NotRequired[str], "author": str, "complete": bool, "content": str, "content_bytes": int, "content_sha256": str, "created_at": str, "decided_by": NotRequired[str], "key": str, "kind": str, "next_offset": NotRequired[int], "offset": int, "reason": str, "restored_from": NotRequired[int], "revision": int, "state": str, "version": int})
@@ -353,7 +353,7 @@ async def tools.researcher.get_config(*, key: str, kind: str, limit: int = None,
 # Read the active or exact immutable version in bounded content pages.
 
 ## researcher.get_corpus_used_in
-async def tools.researcher.get_corpus_used_in(*, item: str, venue: str, cursor: str = None, limit: int = None): ...
+async def tools.researcher.get_corpus_used_in(*, item: str, venue: str, cursor: str = None, limit: int = None) -> {historical_indexed,indexed_sources,items:[{basis:[str],input_pin,kind,links:{piece,profile},piece_code,pin_kind,…}],method,next_cursor,note,…}: ...
 # Cursor pagination: await tools.researcher.get_corpus_used_in.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -367,7 +367,7 @@ async def tools.researcher.get_corpus_used_in(*, item: str, venue: str, cursor: 
 # Cursor pagination: await tools.researcher.get_corpus_used_in.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.get_edition_proposal
-async def tools.researcher.get_edition_proposal(*, id: str): ...
+async def tools.researcher.get_edition_proposal(*, id: str) -> {base_chars,base_edition,base_sha256,base_text,call_url,decided_at,…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_get_edition_proposal_result = TypedDict("researcher_get_edition_proposal_result", {"base_chars": int, "base_edition": str, "base_sha256": str, "base_text": str, "call_url": str, "decided_at": NotRequired[None | str], "decided_by": NotRequired[str], "fetched_at": str, "id": str, "new_edition": str, "proposed_chars": int, "proposed_sha256": str, "proposed_text": str, "status": str, "track_key": str, "venue_key": str})
@@ -375,7 +375,7 @@ async def tools.researcher.get_edition_proposal(*, id: str) -> researcher_get_ed
 # Read the existing and proposed call text for an edition proposal before relaying an owner decision.
 
 ## researcher.get_inventory
-async def tools.researcher.get_inventory(*, code: str, cursor: str = None): ...
+async def tools.researcher.get_inventory(*, code: str, cursor: str = None) -> {item:{code,kind,last_use:{code,created_at,created_by,date,link,notes,…},piece_code,summary,title,…},next_cursor,uses:[{code,created_at,…}]}: ...
 # Cursor pagination: await tools.researcher.get_inventory.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -391,7 +391,7 @@ async def tools.researcher.get_inventory(*, code: str, cursor: str = None) -> re
 # Cursor pagination: await tools.researcher.get_inventory.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.get_metrics
-async def tools.researcher.get_metrics(*, subject: str, cursor: str = None, from_: str = None, limit: int = None, metric: str = None, mode: str = None, source: str = None, to: str = None): ...
+async def tools.researcher.get_metrics(*, subject: str, cursor: str = None, from_: str = None, limit: int = None, metric: str = None, mode: str = None, source: str = None, to: str = None) -> {items:[{age_bucket,at,due_at,id,lateness_seconds,manual:{entered_by,evidence:{bucket,key,kind,sha256,verified},evidence_status,recorded_at,…},…}],…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_get_metrics_result_items_manual_evidence = TypedDict("researcher_get_metrics_result_items_manual_evidence", {"bucket": str, "key": str, "kind": str, "sha256": str, "verified": bool})
@@ -415,7 +415,7 @@ async def tools.researcher.get_metrics(*, subject: str, cursor: str = None, from
 # Read a bounded observation page and latest per metric/provider/mode within the filters. Unknown is absent, not zero. Subject is a piece code, piece:<code>, or confirmed manual:<id> record.
 
 ## researcher.get_piece
-async def tools.researcher.get_piece(*, code: str): ...
+async def tools.researcher.get_piece(*, code: str) -> {candidates:[{abstract,body,extra,name,source,source_key,…}],code,edges:[{…,id,kind,piece_code,to}],extra,facts,import_conflict:{at,incoming_hash,…},…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_get_piece_result_candidates = TypedDict("researcher_get_piece_result_candidates", {"abstract": str, "body": NotRequired[str], "extra": NotRequired[None | dict[str, Any]], "name": str, "source": NotRequired[str], "source_key": NotRequired[str], "title": str, "updated_at": NotRequired[str]})
@@ -445,7 +445,7 @@ async def tools.researcher.get_piece(*, code: str) -> researcher_get_piece_resul
 # Get one piece with saved candidates, facts, recent progress, and live workflow nodes and edges including attached output references.
 
 ## researcher.get_profile
-async def tools.researcher.get_profile(*, venue: str, track: str = None): ...
+async def tools.researcher.get_profile(*, venue: str, track: str = None) -> {profiles:[{descriptive_accepted_work:{exclusions,full_text_features,input_sha256,items,label,sources:[{item,split,text_sha256}],…},fit,n_full_text,…}],…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_get_profile_result_profiles_descriptive_accepted_work_sources = TypedDict("researcher_get_profile_result_profiles_descriptive_accepted_work_sources", {"item": str, "split": str, "text_sha256": str})
@@ -459,7 +459,7 @@ async def tools.researcher.get_profile(*, venue: str, track: str = None) -> rese
 # Read latest profiles for a venue and track (registry keys, or venue=venue/track). Top-level structure/sample counts retain the fitted calibration split and insufficiencies. descriptive_accepted_work separately describes all current hashed accepted-work full-text features including heldouts, excluding purged, with per-dimension denominators, source hashes and exclusions; never use it as fitted calibration, trained-model ranking or gate readiness. A draft informed by heldouts cannot claim blind evaluation against them. Refresh missing descriptive data with analyze_corpus apply=true. status none_imported means no stored profile.
 
 ## researcher.get_record
-async def tools.researcher.get_record(*, confirmation_state: str = None, cursor: str = None, id: str = None, kind: str = None, limit: int = None, year: int = None): ...
+async def tools.researcher.get_record(*, confirmation_state: str = None, cursor: str = None, id: str = None, kind: str = None, limit: int = None, year: int = None) -> {entry:{confirmation_state,confirmed_by,created_at,created_by,date,doi,…},items:[{confirmation_state,confirmed_by,created_at,created_by,date,…}],…}: ...
 # Cursor pagination: await tools.researcher.get_record.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -489,7 +489,7 @@ async def tools.researcher.get_record(*, confirmation_state: str = None, cursor:
 # Cursor pagination: await tools.researcher.get_record.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.get_track
-async def tools.researcher.get_track(*, track: str, venue: str, edition: str = None): ...
+async def tools.researcher.get_track(*, track: str, venue: str, edition: str = None) -> {call_note,deadline,deadline_note,editions:[{call_text,call_text_bytes,call_text_truncated,call_url,edition,page_limit,…}],profile_next_step,…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_get_track_result_editions = TypedDict("researcher_get_track_result_editions", {"call_text": NotRequired[str], "call_text_bytes": int, "call_text_truncated": NotRequired[bool], "call_url": NotRequired[str], "edition": str, "page_limit": NotRequired[int], "read_at": NotRequired[str], "snapshot_date": NotRequired[str]})
@@ -503,7 +503,7 @@ async def tools.researcher.get_track(*, track: str, venue: str, edition: str = N
 # Read one venue track: stored call text with its source URL and snapshot read date per edition, the venue's recorded deadline text, the track's lane and a summary of the latest imported accepted-work profile. Pass edition to read a single edition's call text in full; otherwise each call text is capped and flagged when cut.
 
 ## researcher.get_track_requirements
-async def tools.researcher.get_track_requirements(*, track: str, venue: str): ...
+async def tools.researcher.get_track_requirements(*, track: str, venue: str) -> {edition,format:{abstract_words,length_minutes,notes,page_limit,title_chars},items:[{category,evidence,id,text,verified,verified_at,…}],read_at,…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_get_track_requirements_result_format = TypedDict("researcher_get_track_requirements_result_format", {"abstract_words": NotRequired[int], "length_minutes": NotRequired[int], "notes": NotRequired[str], "page_limit": NotRequired[int], "title_chars": NotRequired[int]})
@@ -515,7 +515,7 @@ async def tools.researcher.get_track_requirements(*, track: str, venue: str) -> 
 # Read the current call requirements checklist for one venue track: source URL, read date, format limits and items, each verified or not with its evidence. Not found when none are recorded.
 
 ## researcher.get_venue
-async def tools.researcher.get_venue(*, key: str): ...
+async def tools.researcher.get_venue(*, key: str) -> {card,editions:[{call_text,call_url,edition,extra,page_limit,read_at,…}],facts:{ai_policy,applying,archival,attendance,corpus_aliases:[str],…},…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_get_venue_result_editions = TypedDict("researcher_get_venue_result_editions", {"call_text": NotRequired[str], "call_url": NotRequired[str], "edition": str, "extra": NotRequired[None | dict[str, Any]], "page_limit": NotRequired[int], "read_at": NotRequired[str], "track_key": str, "venue_key": str})
@@ -529,7 +529,7 @@ async def tools.researcher.get_venue(*, key: str) -> researcher_get_venue_result
 # Get one venue and its tracks and recent editions.
 
 ## researcher.git_status
-async def tools.researcher.git_status(): ...
+async def tools.researcher.git_status() -> {status}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_git_status_result = TypedDict("researcher_git_status_result", {"status": NotRequired[str]})
@@ -537,7 +537,7 @@ async def tools.researcher.git_status() -> researcher_git_status_result: ...
 # Deprecated compatibility name. Git is not the Foundry store; reports migration guidance.
 
 ## researcher.ingest_status
-async def tools.researcher.ingest_status(*, cursor: str = None, kind: str = None, limit: int = None, venue: str = None): ...
+async def tools.researcher.ingest_status(*, cursor: str = None, kind: str = None, limit: int = None, venue: str = None) -> {next_cursor,runs:[{attempt,completed_at,counts:{…,…,objects_added,objects_changed,objects_deleted,objects_unchanged,…},created_at,excluded_total,…}],…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_ingest_status_result_runs_counts = TypedDict("researcher_ingest_status_result_runs_counts", {"deletion_deferred_due_to_other_scopes": int, "deletion_deferred_due_to_rejections": int, "objects_added": int, "objects_changed": int, "objects_deleted": int, "objects_unchanged": int, "records_added": int, "records_changed": int, "records_deleted": int, "records_rejected": int, "records_unchanged": int, "unknown_fields": int})
@@ -551,7 +551,7 @@ async def tools.researcher.ingest_status(*, cursor: str = None, kind: str = None
 # Read bounded run pages and source parity states without manifest contents or credentials.
 
 ## researcher.list_config_proposals
-async def tools.researcher.list_config_proposals(*, cursor: str = None, limit: int = None): ...
+async def tools.researcher.list_config_proposals(*, cursor: str = None, limit: int = None) -> {items:[{approved_by,author,content,content_sha256,created_at,decided_by,…}],next_cursor,total}: ...
 # Cursor pagination: await tools.researcher.list_config_proposals.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -563,7 +563,7 @@ async def tools.researcher.list_config_proposals(*, cursor: str = None, limit: i
 # Cursor pagination: await tools.researcher.list_config_proposals.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.list_deadlines
-async def tools.researcher.list_deadlines(*, cursor: str = None, kind: str = None, lane: str = None, limit: int = None, status: str = None, venue_kind: str = None): ...
+async def tools.researcher.list_deadlines(*, cursor: str = None, kind: str = None, lane: str = None, limit: int = None, status: str = None, venue_kind: str = None) -> {items:[{at,edition,id,kind,lane,note,…}],next_cursor}: ...
 # Cursor pagination: await tools.researcher.list_deadlines.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -575,7 +575,7 @@ async def tools.researcher.list_deadlines(*, cursor: str = None, kind: str = Non
 # Cursor pagination: await tools.researcher.list_deadlines.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.list_edition_proposals
-async def tools.researcher.list_edition_proposals(*, cursor: str = None, limit: int = None, status: str = None): ...
+async def tools.researcher.list_edition_proposals(*, cursor: str = None, limit: int = None, status: str = None) -> {items:[{base_chars,base_edition,base_sha256,call_url,decided_at,decided_by,…}],next_cursor}: ...
 # Cursor pagination: await tools.researcher.list_edition_proposals.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -587,7 +587,7 @@ async def tools.researcher.list_edition_proposals(*, cursor: str = None, limit: 
 # Cursor pagination: await tools.researcher.list_edition_proposals.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.list_inventory
-async def tools.researcher.list_inventory(*, cursor: str = None, kind: str = None, limit: int = None, q: str = None): ...
+async def tools.researcher.list_inventory(*, cursor: str = None, kind: str = None, limit: int = None, q: str = None) -> {items:[{code,kind,last_use:{code,created_at,created_by,date,link,notes,…},piece_code,summary,title,…}],next_cursor}: ...
 # Cursor pagination: await tools.researcher.list_inventory.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -601,7 +601,7 @@ async def tools.researcher.list_inventory(*, cursor: str = None, kind: str = Non
 # Cursor pagination: await tools.researcher.list_inventory.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.list_owner_requests
-async def tools.researcher.list_owner_requests(*, cursor: str = None, limit: int = None): ...
+async def tools.researcher.list_owner_requests(*, cursor: str = None, limit: int = None) -> {items:[{node:{assignee,depends_on:[str],description,extra,gate,id,…},piece_code,piece_title}],next_cursor,total}: ...
 # Cursor pagination: await tools.researcher.list_owner_requests.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -629,7 +629,7 @@ async def tools.researcher.list_owner_requests(*, cursor: str = None, limit: int
 # Cursor pagination: await tools.researcher.list_owner_requests.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.list_venues
-async def tools.researcher.list_venues(*, cursor: str = None, grade: str = None, limit: int = None, query: str = None): ...
+async def tools.researcher.list_venues(*, cursor: str = None, grade: str = None, limit: int = None, query: str = None) -> {next_cursor,total_matching,venues:[{accepted_papers_in_corpus,deadline,format,grade,key,name,…}]}: ...
 # Cursor pagination: await tools.researcher.list_venues.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -641,7 +641,7 @@ async def tools.researcher.list_venues(*, cursor: str = None, grade: str = None,
 # Cursor pagination: await tools.researcher.list_venues.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.model_info
-async def tools.researcher.model_info(*, include_raw_json: bool = None): ...
+async def tools.researcher.model_info(*, include_raw_json: bool = None) -> {status}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_model_info_result = TypedDict("researcher_model_info_result", {"status": NotRequired[str]})
@@ -649,7 +649,7 @@ async def tools.researcher.model_info(*, include_raw_json: bool = None) -> resea
 # Report the active classifier after its model and evaluation are imported; currently reports not_migrated.
 
 ## researcher.next_action
-async def tools.researcher.next_action(*, piece: str): ...
+async def tools.researcher.next_action(*, piece: str) -> {allowed_tools:[str],blocking_reasons:[str],completed,current:{assignee,depends_on:[str],description,extra,gate,id,…},human_requests:[{assignee,…}],…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_next_action_result_current_import_conflict = TypedDict("researcher_next_action_result_current_import_conflict", {"at": str, "incoming_hash": str, "reason": str, "source_key": str})
@@ -693,7 +693,7 @@ async def tools.researcher.next_action(*, piece: str) -> researcher_next_action_
 # Get the pinned lane, first incomplete node, allowed tools, blockers, and owner requests.
 
 ## researcher.overview
-async def tools.researcher.overview(*, cursor: str = None): ...
+async def tools.researcher.overview(*, cursor: str = None) -> {guide,next_cursor,pieces:[{code,extra,import_conflict:{at,incoming_hash,reason,source_key},lane,lane_resolution,lane_version,…}],uncommitted_changes:…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_overview_result_pieces_import_conflict = TypedDict("researcher_overview_result_pieces_import_conflict", {"at": str, "incoming_hash": str, "reason": str, "source_key": str})
@@ -705,7 +705,7 @@ async def tools.researcher.overview(*, cursor: str = None) -> researcher_overvie
 # List the first page of pieces and how to continue in Research Foundry.
 
 ## researcher.rank_titles
-async def tools.researcher.rank_titles(*, titles: None | list[str], abstracts: None | list[str] = None, corpus: str = None, piece: str = None, track: str = None, venue: str = None): ...
+async def tools.researcher.rank_titles(*, titles: None | list[str], abstracts: None | list[str] = None, corpus: str = None, piece: str = None, track: str = None, venue: str = None) -> {config_pins:[{content_sha256,key,kind,version}],input_sha256,interpretation,model:{class_key,class_scope,fit_samples,kind,r2_key,sha256,…},…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_rank_titles_result_config_pins = TypedDict("researcher_rank_titles_result_config_pins", {"content_sha256": str, "key": str, "kind": str, "version": int})
@@ -743,7 +743,7 @@ async def tools.researcher.rank_titles(*, titles: None | list[str], abstracts: N
 # Rank one to twenty titles. With corpus=hn: the verified active HN title model, fitted-sample percentiles and validation metadata. With venue (and optional track) instead of corpus: compare titles, with optional parallel abstracts, to that venue stored accepted items (needs at least 10, for example added with add_corpus_items). Under venue_comparison each candidate has a meaning section (primary, and the order of candidates): cosine similarity of local sentence embeddings of the title plus abstract, the 5 nearest accepted items, and the percentile of the nearest similarity among accepted items; meaning.computed=false with a reason when the embedder is unavailable. The embedding model (BAAI/bge-small-en-v1.5) runs locally with no Jev or paid call; first use of a venue embeds and caches its accepted items, so that call is slower. Secondary lexical output: word-overlap neighbours and percentiles, title length and shape percentiles, vocabulary overlap, accepted items per year, and a list of what was not computed. With piece (one title and a non-empty abstract), the run is also saved on that piece's rankings and run_id is returned. Meaning is similarity to past accepted work, not acceptance odds. Neither path invents abstracts or calls Jev; both log titles and scores to the rank log.
 
 ## researcher.read_item
-async def tools.researcher.read_item(*, item: str, venue: str, section: str = None): ...
+async def tools.researcher.read_item(*, item: str, venue: str, section: str = None) -> {detail,markdown,metadata:{abstract,authors:[str],doi,item,language,read_depth_label,…},read_depth_note,reason,section,…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_read_item_result_metadata = TypedDict("researcher_read_item_result_metadata", {"abstract": NotRequired[str], "authors": None | list[str], "doi": NotRequired[str], "item": str, "language": NotRequired[str], "read_depth_label": NotRequired[str], "text_reference_recorded": bool, "title": str, "track": NotRequired[str], "type": NotRequired[str], "url": NotRequired[str], "venue": str, "year": NotRequired[int]})
@@ -757,7 +757,7 @@ async def tools.researcher.read_item(*, item: str, venue: str, section: str = No
 # Read one corpus item's metadata and, when the private text store has it, one Markdown section (default _full, capped per response). Third-party text is private and shown only to authenticated agents. When text is absent or the store is unavailable the result has status unavailable with a reason and the outline of sections that do exist; no text is invented and no public copy is substituted.
 
 ## researcher.read_public_source
-async def tools.researcher.read_public_source(*, url: str, expected_text_sha256: str = None, limit: int = None, offset: int = None): ...
+async def tools.researcher.read_public_source(*, url: str, expected_text_sha256: str = None, limit: int = None, offset: int = None) -> {content_sha256,content_type,extractor,final_url,links:[{text,url}],next_offset,…}: ...
 from typing import Any, Literal, NotRequired, TypedDict
 
 researcher_read_public_source_result_links = TypedDict("researcher_read_public_source_result_links", {"text": str, "url": str})
@@ -767,7 +767,7 @@ async def tools.researcher.read_public_source(*, url: str, expected_text_sha256:
 # Read one direct public HTTPS HTML/plain-text page (1 MiB) or PDF (10 MiB), with robots and network protection, no redirects, login, paywall bypass, ingestion or retained downloads. Whole read is bounded to 45 seconds; PDF extraction to 30 seconds, 100 pages and 8 MiB text, with no decryption or OCR. Returns untrusted text, extractor provenance and up to 100 HTML link metadata records, never fetches links. offset/limit count Unicode characters; limit defaults to 12000, max 24000. Each pagination call refetches; compare text_sha256 and pass expected_text_sha256 to reject changed text. content_sha256 hashes the raw body; source_pdf_sha256 hashes raw PDF bytes. Does not verify call requirements or licenses.
 
 ## researcher.search
-async def tools.researcher.search(*, query: str, cursor: str = None, limit: int = None, scope: str = None, venue: str = None): ...
+async def tools.researcher.search(*, query: str, cursor: str = None, limit: int = None, scope: str = None, venue: str = None) -> {next_action,next_cursor,results:[{id,text,title,url}],truncated}: ...
 # Cursor pagination: await tools.researcher.search.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -779,7 +779,7 @@ async def tools.researcher.search(*, query: str, cursor: str = None, limit: int 
 # Cursor pagination: await tools.researcher.search.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.search_corpus
-async def tools.researcher.search_corpus(*, q: str, cursor: str = None, limit: int = None, mode: str = None, track: str = None, venue: str = None): ...
+async def tools.researcher.search_corpus(*, q: str, cursor: str = None, limit: int = None, mode: str = None, track: str = None, venue: str = None) -> {items:[{item,read_depth_label,snippet,snippet_source,text_reference_recorded,title,…}],mode,next_cursor,read_depth_basis,reason,status}: ...
 # Cursor pagination: await tools.researcher.search_corpus.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -791,7 +791,7 @@ async def tools.researcher.search_corpus(*, q: str, cursor: str = None, limit: i
 # Cursor pagination: await tools.researcher.search_corpus.all(max_pages=20, _fields=None, **kwargs) returns rows
 
 ## researcher.search_venues
-async def tools.researcher.search_venues(*, applying: None | bool = None, cursor: str = None, lane: str = None, limit: int = None, q: str = None, tier: int = None): ...
+async def tools.researcher.search_venues(*, applying: None | bool = None, cursor: str = None, lane: str = None, limit: int = None, q: str = None, tier: int = None) -> {next_cursor,total_matching,venues:[{applying,corpus_items,corpus_key,deadline,key,name,…}]}: ...
 # Cursor pagination: await tools.researcher.search_venues.all(max_pages=20, _fields=None, **kwargs) returns rows
 from typing import Any, Literal, NotRequired, TypedDict
 

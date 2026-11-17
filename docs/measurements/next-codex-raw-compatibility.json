@@ -1,0 +1,80 @@
+{
+  "client_version": "codex-cli 0.169.0",
+  "catalog_client_version": "0.169.0",
+  "live_catalog_models": 12,
+  "tool_modes": [
+    "code_mode_only"
+  ],
+  "selected_model": "gpt-6.1-sol",
+  "selected_model_tool_mode": "code_mode_only",
+  "probes": [
+    {
+      "receipt": "next-e8-codex-probe.json",
+      "stamp": "20261117T205604Z",
+      "model": "gpt-6.1-sol",
+      "flags": [
+        "-c",
+        "features.code_mode_host=false",
+        "-c",
+        "features.code_mode=false"
+      ],
+      "rows": 2,
+      "passed": 0,
+      "mcp_calls": 0
+    },
+    {
+      "receipt": "next-e8-codex-explicit-raw-probe.json",
+      "stamp": "20261117T205704Z",
+      "model": "gpt-6.1-sol",
+      "flags": [
+        "-c",
+        "features.code_mode_host=false",
+        "-c",
+        "features.code_mode=false"
+      ],
+      "rows": 2,
+      "passed": 0,
+      "mcp_calls": 0
+    },
+    {
+      "receipt": "next-e8-codex-nonincremental-raw-probe.json",
+      "stamp": "20261117T210007Z",
+      "model": "gpt-6.1-sol",
+      "flags": [
+        "-c",
+        "features.code_mode_host=false",
+        "-c",
+        "features.code_mode=false",
+        "-c",
+        "features.incremental_tools=false",
+        "-c",
+        "features.incremental_tools_legacy=false"
+      ],
+      "rows": 2,
+      "passed": 0,
+      "mcp_calls": 0
+    }
+  ],
+  "app_server_probe": {
+    "tool_calls": 0,
+    "answer": "Unable to retrieve the code word: the provided tools are disabled.",
+    "settings": [
+      "code_mode_host=false",
+      "code_mode=false",
+      "experimental dynamic tools"
+    ]
+  },
+  "cost_ratio": null,
+  "valid_direct_probe": {
+    "receipt": "next-e8-codex-direct-catalog-probe.json",
+    "configuration_delta": {
+      "tool_mode": [
+        "code_mode_only",
+        "direct"
+      ]
+    },
+    "catalog_sha256": "ec8fcb44a18b92712933ad885a8825d8d366f30b955cea26c026500fb156164c",
+    "warmup_and_measured_passed": 2,
+    "upstream_calls": 2
+  }
+}

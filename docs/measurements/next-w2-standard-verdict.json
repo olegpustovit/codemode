@@ -1,0 +1,54 @@
+{
+  "correctness_pass": true,
+  "failures": [],
+  "runs": 120,
+  "metrics": {
+    "discovery_executes": 109,
+    "probe_executes": 65,
+    "work_executes": 262,
+    "execute_calls": 436,
+    "discovery_rate": 0.25,
+    "probe_rate": 0.14908256880733944,
+    "execute_errors": 11,
+    "execute_errors_followed_by_success": 11,
+    "fresh_after_first_median": 6841.0,
+    "fresh_after_first_coverage": 120,
+    "mcp_calls": 3.0,
+    "wall_s": 18.85,
+    "input_tokens": 50128.5,
+    "uncached_input_tokens": 13086.0,
+    "execute_error_rate": 0.02522935779816514
+  },
+  "targets": {
+    "mcp_calls": {
+      "target": 2,
+      "actual": 3.0,
+      "passed": false
+    },
+    "discovery_rate": {
+      "target": 0.1,
+      "actual": 0.25,
+      "passed": false
+    },
+    "probe_rate": {
+      "target": 0.05,
+      "actual": 0.14908256880733944,
+      "passed": false
+    },
+    "wall_s": {
+      "target": 13,
+      "actual": 18.85,
+      "passed": false
+    },
+    "input_tokens": {
+      "target": 40000,
+      "actual": 50128.5,
+      "passed": false
+    },
+    "execute_error_rate": {
+      "target": 0.05,
+      "actual": 0.02522935779816514,
+      "passed": true
+    }
+  }
+}

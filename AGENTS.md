@@ -6,7 +6,9 @@ Implementation plan: https://artifacts.microapps.space/a/saqdh2xm7jcd (revision 
 
 ## Active replacement proposal
 
-The owner requested full implementation of https://artifacts.microapps.space/a/npta97dqvf6a. This work is active on `codex/agent-efficiency`; its scope, native checkpoints and remaining requirements are in `docs/agent-efficiency/implementation.md`. The feature branch adds schema 23 for session memo and schema 24 for source-recipe installation receipts. It is not yet merged, release-qualified or deployed; the production Status below remains historical deployment evidence.
+The owner requested full implementation of https://artifacts.microapps.space/a/7m9atvt6k7xa. W1 and W2 are deployed. The working evidence and remaining W3 measurements are in `docs/next-iteration/implementation.md`. Use Codex only for current model evals at the owner's direction.
+
+The earlier agent-efficiency proposal at https://artifacts.microapps.space/a/npta97dqvf6a shipped in PR #4, including schema 23 for session memo and schema 24 for source recipe receipts. Its ledger is `docs/agent-efficiency/implementation.md`.
 
 The owner also requested full implementation of https://artifacts.microapps.space/a/jqm3ze7az66e. All twelve schema-20 fixes are implemented, qualified and deployed; exact scope and evidence are in `docs/control-plane-fixes/implementation.md`, the saved `proposal.html` and `docs/measurements/control-plane-fixes-qualification.json`.
 
@@ -18,9 +20,9 @@ OAuth-app client settings are encrypted, tenant-private and write-only. The regi
 
 ## Status
 
-Current release (2026-11-17): agent-efficiency proposal merged in PR #4 and deployed, schema **24**, source **8d0aae27091e8e7c88e5ca02011b920fed51f1b4**, ARM SHA-256 `8e997b61da8239bc3074de51762b09b4a3d244c3c79be226f1749ef866396011`, UI **5dd5ac2e52f0**. Restored-backup preflight preserved 26 existing tables; live eval gate, 84 public file comparisons and desktop/mobile checks pass. Owner requested release with disclosed unmet heavy-cost/pane timing targets; see `docs/status.md` and `docs/measurements/agent-efficiency-release.json`. The schema-20 details below are historical.
+Current release (2026-11-17): Codemode v6, schema **24**, source **4845aabf3bcc45cbad6a7d58daff59c3ed260c28**, ARM SHA-256 `9ec1fae425d6bbdb2d4f6c394a67b6fa3ff9bcae5bbd85b1ef39f9ae4bab8a01`, UI **5dd5ac2e52f0**. Restored-backup preflight preserved 28 tables. Live eval gate, 84 public UI file checks, and desktop/mobile sign-in pass. See `docs/status.md` and `docs/measurements/next-iteration-release.json`. The schema-20 release below is historical.
 
-The final-v5 proposal and all twelve control-plane fixes are implemented and deployed on `oracle-vm` under smdctl, loopback `127.0.0.1:2093`, at `https://codemode.microapps.space`. Current schema: **20**. Release build: **d45e6106a3a6**, [source commit d45e610](https://github.com/olegpustovit/codemode/commit/d45e6106a3a67a1456975f8421f814cfdb316d70). Release SHA-256: `f03d44a766ad41da3f0f1128a61eb7a26be44c14814f040a9958af4e8e7093f2`. UI fingerprint: **e16dc707d79d**. The React frontend is embedded in this Rust binary.
+The final-v5 proposal and all twelve control-plane fixes are implemented and deployed on `oracle-vm` under smdctl, loopback `127.0.0.1:2093`, at `https://codemode.microapps.space`. Historical schema: **20**. Release build: **d45e6106a3a6**, [source commit d45e610](https://github.com/olegpustovit/codemode/commit/d45e6106a3a67a1456975f8421f814cfdb316d70). Release SHA-256: `f03d44a766ad41da3f0f1128a61eb7a26be44c14814f040a9958af4e8e7093f2`. UI fingerprint: **e16dc707d79d**. The React frontend is embedded in this Rust binary.
 
 Qualification passes **111 native**, **111 hardened Oracle**, **98 exhaustive core**, **32 UI tests** and **12 optimized-binary browser workflows** across two accepted batches. Pane click-to-paint p95 is **46.4 ms**, down from **407.9 ms**; 300-row key-script p95 is **3.244 ms**, or **3.208 ms** with inclusion checkboxes. The fresh reviewer scored both material corrections resolved and returned **ship for that fix list**; whole-surface pixel equality is not claimed.
 

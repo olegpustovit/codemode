@@ -77,3 +77,44 @@ enforced. Never grant provider consent or create non-eval production fixtures.
   the manifest lookup moved to tools/list. Requalification covers that change.
 
 No new release or performance target is claimed yet.
+
+## Standard qualification and deployment
+
+W1 source `8a87565` passes all 120 clean gateway runs. W2 source `4845aab`
+passes all 120 clean gateway runs and all 114 comparable native Codex-host
+runs. The full cohort measurements are in the harness and the compact
+verdicts are in `docs/measurements/next-w{1,2}-standard-verdict.json`. The
+same classifier recounts E5 at 140/413 discovery-only executes and 91/413
+raw-probe executes. Those definitions differ from the original proposal's
+regex. V6 scores 109/436 and 65/436. Each of the 11 failed v6 executes was
+followed by a successful execute in its run. Per-request input usage
+reconciles for all 120 Codemode runs.
+
+The final candidate passes 155 native, 155 hardened ARM, 163 long-tier
+hardened ARM and 34 UI tests. The strict browser suite passes 11/12. The
+timing assertion measured p95 56.8 ms against 50 ms. A separate functional
+run passes the rest of that workflow with the timing assertion excluded.
+The disposable candidate passes all 23 L2 checks. Its limited proxy omits
+public metadata routes, admin audience handling and the live GitHub source.
+The production gate exercises those surfaces for the live build.
+
+Source `4845aabf3bcc45cbad6a7d58daff59c3ed260c28` is on main and deployed
+at schema 24. The staged and live ARM binaries match. The restored-backup
+preflight preserved 28 tables. L1/L2 regression checks and 8/8 live smoke
+tasks pass. All 84 public files match, desktop/mobile sign-in passes, and
+the service and backup timer are active. See
+`docs/measurements/next-iteration-release.json`.
+
+## E8 raw MCP compatibility
+
+The supported Codex model catalog resolves `gpt-6.1-sol` to
+`code_mode_only`, which explains why host-off probes could not dispatch.
+Using the supported startup catalog setting with the same model record
+and `tool_mode=direct` lets Codex issue native MCP calls with the host off.
+Both the warm-up and measured compatibility probe retrieved the correct
+code word through MCP. The isolated runner records the catalog SHA.
+See `docs/measurements/next-codex-raw-compatibility.json`.
+
+The owner stopped Claude testing. The completed compatibility probe and
+captured heavy warm-up remain in the research data. All subsequent model
+evals use Codex. E8 heavy measurements and report publication are in progress.

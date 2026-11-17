@@ -403,7 +403,7 @@ async fn discovery_manifest_prioritizes_useful_entry_points_over_alphabetical_no
     assert!(manifest.contains("list_issues"));
     assert!(manifest.contains("7 tools"));
     assert!(!manifest.contains("aaa5"));
-    assert!(manifest.len() <= 1536);
+    assert!(manifest.len() <= 3072);
     let alternatives = catalogue
         .search_scoped("list_issues OR aaa0", false, None, None, Some(workspace))
         .await

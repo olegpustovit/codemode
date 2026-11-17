@@ -389,7 +389,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
                 let initialized = rpc(&client,&url,host,token,version,"initialize",serde_json::json!({"protocolVersion":version,"capabilities":{},"clientInfo":{"name":"endpoint-test","version":"1"}})).await;
                 assert_eq!(initialized["serverInfo"]["name"], "codemode");
                 let instructions = initialized["instructions"].as_str().unwrap();
-                assert!(instructions.contains("Connected sources"));
+                assert!(!instructions.contains("Connected sources"));
                 assert!(instructions.contains("features.apps=false"));
                 assert_eq!(
                     initialized["serverInfo"]["version"],
@@ -417,6 +417,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
                 .unwrap();
             assert!(description.contains("await tools.search("));
             assert!(description.contains("Connected sources"));
+            assert!(description.contains("Do the whole task in one execute."));
             if token == work_token {
                 assert!(description.contains("alpha"));
                 assert!(!description.contains("beta"));

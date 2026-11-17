@@ -32,6 +32,8 @@ struct RankedMatch {
 struct ManifestTool {
     source: String,
     path: Option<String>,
+    brief: Option<String>,
+    output_schema: Option<Value>,
     total: i64,
     blocked: bool,
 }
@@ -74,7 +76,7 @@ impl Catalogue {
 
     pub async fn manifest(&self, workspace: Uuid) -> Result<String, Error> {
         let rows = sqlx::query_as!(ManifestTool, r#"WITH visible AS (
-            SELECT COALESCE(s.python_name,s.slug) AS source,t.path,
+            SELECT COALESCE(s.python_name,s.slug) AS source,t.path,t.stub_brief,t.output_schema,
             count(t.path) OVER(PARTITION BY s.id) AS total,
             row_number() OVER(PARTITION BY s.id ORDER BY CASE
                 WHEN t.upstream_name IN ('artifact_list','entries_list','list_issues') THEN 0
@@ -85,7 +87,7 @@ impl Catalogue {
             FROM sources s JOIN endpoints e ON e.id=$1 AND e.tenant_id=s.tenant_id
             LEFT JOIN tools t ON t.source_id=s.id AND (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=s.id AND scope.upstream_name=t.upstream_name))
             WHERE e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=s.id)
-        ) SELECT source AS "source!",path AS "path?",total AS "total!",blocked AS "blocked!" FROM visible WHERE position<=5 ORDER BY source,path"#, workspace)
+        ) SELECT source AS "source!",path AS "path?",stub_brief AS "brief?",output_schema AS "output_schema?",total AS "total!",blocked AS "blocked!" FROM visible WHERE position<=5 ORDER BY source,position"#, workspace)
             .fetch_all(&self.db.0).await?;
         Ok(manifest(rows))
     }
@@ -178,18 +180,33 @@ impl Catalogue {
 fn manifest(rows: Vec<ManifestTool>) -> String {
     let mut groups = std::collections::BTreeMap::<String, (i64, Vec<String>)>::new();
     for row in rows {
-        let group = groups
-            .entry(row.source)
-            .or_insert_with(|| (row.total, Vec::new()));
-        if let Some(path) = row.path {
+        let ManifestTool {
+            source,
+            path,
+            brief,
+            output_schema,
+            total,
+            blocked,
+        } = row;
+        let source_prefix = format!("async def tools.{source}.");
+        let group = groups.entry(source).or_insert_with(|| (total, Vec::new()));
+        if let Some(path) = path {
             let name = path
                 .rsplit_once('.')
                 .map_or(path.as_str(), |(_, name)| name);
-            group.1.push(format!(
-                "{}{}",
-                name.chars().take(64).collect::<String>(),
-                if row.blocked { " [blocked]" } else { "" }
-            ));
+            let signature = brief
+                .as_deref()
+                .and_then(|brief| brief.lines().next())
+                .and_then(|line| line.strip_prefix(&source_prefix))
+                .and_then(|line| line.strip_suffix(": ..."))
+                .filter(|line| line.len() <= 480);
+            let shape = output_schema.as_ref().map(stubs::return_skeleton);
+            group.1.push(match (signature, shape) {
+                _ if blocked => format!("{name} [blocked]"),
+                (Some(signature), Some(shape)) => format!("{signature} -> {shape}"),
+                (Some(signature), None) => signature.to_owned(),
+                (None, _) => format!("{name} (use help)"),
+            });
         }
     }
     let count: i64 = groups.values().map(|(count, _)| *count).sum();
@@ -204,12 +221,19 @@ fn manifest(rows: Vec<ManifestTool>) -> String {
         if count > names.len() as i64 {
             names.push("…".into());
         }
-        let entry = format!(
-            "{} ({count}: {})",
-            source.chars().take(80).collect::<String>(),
-            names.join(", ")
-        );
-        if text.len() + entry.len() + 80 > 1536 {
+        let source = source.chars().take(80).collect::<String>();
+        let available = 3072usize.saturating_sub(text.len() + source.len() + 90);
+        let mut entries = String::new();
+        for name in names {
+            if entries.len() + name.len() + 6 > available {
+                entries.push_str("…");
+                break;
+            }
+            entries.push_str(&name);
+            entries.push_str("; ");
+        }
+        let entry = format!("{source} ({count}: {})", entries.trim_end_matches("; "));
+        if text.len() + entry.len() + 80 > 3072 {
             text.push_str(&format!(
                 "… {} more sources; discover with tools.search",
                 total - index
@@ -307,29 +331,39 @@ mod tests {
             ManifestTool {
                 source: "nudge".into(),
                 path: Some("nudge.list_issues".into()),
+                brief: Some("async def tools.nudge.list_issues(*, limit: int = None): ...".into()),
+                output_schema: Some(
+                    serde_json::json!({"properties":{"issues":{"items":{"properties":{"id":{"type":"string"}}}}}}),
+                ),
                 total: 15,
                 blocked: false,
             },
             ManifestTool {
                 source: "artifacts".into(),
                 path: Some("artifacts.artifact_delete".into()),
+                brief: None,
+                output_schema: None,
                 total: 1,
                 blocked: true,
             },
         ]);
         assert!(text.contains("Connected sources (16 tools)"));
         assert!(text.contains("artifact_delete [blocked]"));
-        assert!(text.contains("nudge (15: list_issues, …)"));
+        assert!(
+            text.contains("nudge (15: list_issues(*, limit: int = None) -> {issues:[{id}]}; …)")
+        );
         let rows = (0..64)
             .map(|i| ManifestTool {
                 source: format!("source_{i}_{}", "s".repeat(80)),
                 path: Some("x".repeat(200)),
+                brief: None,
+                output_schema: None,
                 total: 100,
                 blocked: false,
             })
             .collect();
         let bounded = manifest(rows);
-        assert!(bounded.len() <= 1536);
+        assert!(bounded.len() <= 3072);
         assert!(bounded.contains("more sources"));
         assert!(manifest(vec![]).contains("none"));
     }

@@ -124,6 +124,63 @@ pub fn generate(path: &str, description: &str, input: &Value, output: Option<&Va
     Stubs { brief, full }
 }
 
+/// Compact documentation for declared output keys, without descriptions or literals.
+pub(super) fn return_skeleton(schema: &Value) -> String {
+    fn write(schema: &Value, root: &Value, depth: usize, out: &mut String) {
+        if depth == 0 || out.len() >= 140 {
+            out.push('…');
+        } else if let Some(reference) = schema.get("$ref").and_then(Value::as_str) {
+            if let Some(target) = reference.strip_prefix('#').and_then(|p| root.pointer(p)) {
+                write(target, root, depth - 1, out);
+            } else {
+                out.push_str("Any");
+            }
+        } else if let Some(properties) = schema.get("properties").and_then(Value::as_object) {
+            out.push('{');
+            for (index, (key, child)) in properties.iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                if index == 6 || out.len() >= 140 {
+                    out.push('…');
+                    break;
+                }
+                if key.len() <= 32 && identifier(key) == *key {
+                    out.push_str(key);
+                } else {
+                    out.push('…');
+                }
+                if ["properties", "items", "$ref"]
+                    .iter()
+                    .any(|name| child.get(name).is_some())
+                {
+                    out.push(':');
+                    write(child, root, depth - 1, out);
+                }
+            }
+            out.push('}');
+        } else if let Some(items) = schema.get("items") {
+            out.push('[');
+            write(items, root, depth - 1, out);
+            out.push(']');
+        } else {
+            out.push_str(match schema.get("type").and_then(Value::as_str) {
+                Some("boolean") => "bool",
+                Some("integer") => "int",
+                Some("number") => "float",
+                Some("string") => "str",
+                Some("null") => "None",
+                Some("object") => "dict",
+                Some("array") => "list",
+                _ => "Any",
+            });
+        }
+    }
+    let mut output = String::new();
+    write(schema, schema, 7, &mut output);
+    output
+}
+
 #[derive(Debug, PartialEq, serde::Serialize)]
 pub struct Pagination {
     pub items: Vec<String>,

@@ -579,3 +579,72 @@ async fn pagination_and_projection_use_real_workers_and_preserve_call_budgets() 
     }
     sb.pool.close().await;
 }
+
+#[tokio::test]
+async fn synchronous_broker_helpers_preserve_pending_async_calls() {
+    let sb = sandbox(Duration::from_secs(1)).await;
+    let code = "async def first():\n    return await tools.stub.echo(value=1)\nasync def second():\n    r = json.loads(_call_sync('stub.echo', '{\"value\":2}'))\n    return await tools.stub.echo(value=r['value'])\nreturn await asyncio.gather(first(), second())";
+    let Step::Done { result, .. } = execute(&sb, code).await.unwrap() else {
+        panic!("unfinished")
+    };
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(result.get()).unwrap(),
+        json!([{"value":1},{"value":2}])
+    );
+    let Step::Done { result, .. } = execute(
+        &sb,
+        "try:\n    _call_sync('stub.fail', '{}')\nexcept ToolError as e:\n    return str(e)",
+    )
+    .await
+    .unwrap() else {
+        panic!("unfinished")
+    };
+    assert_eq!(
+        serde_json::from_str::<String>(result.get()).unwrap(),
+        "deliberate upstream failure"
+    );
+    sb.pool.close().await;
+}
+
+#[tokio::test]
+async fn host_source_attributes_keep_python_callables_and_report_lazy_lookups() {
+    let sb = sandbox(Duration::from_secs(1)).await;
+    let mut worker = sb.checkout().await.unwrap();
+    let class = MontyObject::class_type(
+        "_Source_fixture",
+        monty_types::MontyUuid::from_bytes(*uuid::Uuid::new_v4().as_bytes()),
+        true,
+        false,
+        [],
+    );
+    let proxy = MontyObject::class_instance(
+        class,
+        monty_types::MontyUuid::from_bytes(*uuid::Uuid::new_v4().as_bytes()),
+        [],
+    );
+    let event = worker.feed("class Echo:\n    async def __call__(self):\n        return 42\nproxy.echo = Echo()\nasync def run():\n    result = await proxy.echo()\n    try:\n        proxy.no_such_tool\n    except RuntimeError as e:\n        return [result, str(e)]\nawait run()",vec![("proxy".into(),proxy)],vec![],false,&mut on_print_sync(|_,_|{})).await.unwrap();
+    let TurnEvent::NameLookup {
+        name, object_id, ..
+    } = event
+    else {
+        panic!("expected lazy attribute lookup, got {event:?}")
+    };
+    assert_eq!(name, "no_such_tool");
+    assert!(object_id.is_some());
+    let done = worker
+        .resume_name_lookup(
+            monty_types::NameLookupResult::Error(monty_types::MontyException::new(
+                monty_types::ExcType::RuntimeError,
+                Some("did you mean: echo".into()),
+            )),
+            &mut on_print_sync(|_, _| {}),
+        )
+        .await
+        .unwrap();
+    let TurnEvent::Complete(result) = done else {
+        panic!("expected completion")
+    };
+    assert_eq!(result.py_repr(), "[42, 'did you mean: echo']");
+    worker.finish().await.unwrap();
+    sb.pool.close().await;
+}

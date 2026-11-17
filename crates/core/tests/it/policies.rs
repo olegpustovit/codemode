@@ -409,7 +409,7 @@ async fn saved_script_execution_keeps_scope_policy_and_audit(pool: sqlx::PgPool)
     let id = script.summary.id;
     let result = f
         .execution
-        .execute_script(f.principal.clone(), id)
+        .execute_script(f.principal.clone(), id, Default::default())
         .await
         .unwrap();
     assert_eq!(result.status, "completed");
@@ -436,12 +436,14 @@ async fn saved_script_execution_keeps_scope_policy_and_audit(pool: sqlx::PgPool)
     let mut foreign = f.principal.clone();
     foreign.workspace_id = Uuid::new_v4();
     assert!(matches!(
-        f.execution.execute_script(foreign, script.summary.id).await,
+        f.execution
+            .execute_script(foreign, script.summary.id, Default::default())
+            .await,
         Err(Error::Script(_))
     ));
     let read = f
         .execution
-        .execute_script(f.principal.clone(), script.summary.id)
+        .execute_script(f.principal.clone(), script.summary.id, Default::default())
         .await
         .unwrap();
     assert_eq!(read.status, "completed");
@@ -453,7 +455,7 @@ async fn saved_script_execution_keeps_scope_policy_and_audit(pool: sqlx::PgPool)
         .unwrap();
     let blocked = f
         .execution
-        .execute_script(f.principal.clone(), script.summary.id)
+        .execute_script(f.principal.clone(), script.summary.id, Default::default())
         .await
         .unwrap();
     assert_eq!(blocked.status, "failed");
@@ -465,7 +467,7 @@ async fn saved_script_execution_keeps_scope_policy_and_audit(pool: sqlx::PgPool)
     endpoints.set_all_tools(f.endpoint, false).await.unwrap();
     let outside_scope = f
         .execution
-        .execute_script(f.principal.clone(), script.summary.id)
+        .execute_script(f.principal.clone(), script.summary.id, Default::default())
         .await
         .unwrap();
     assert_eq!(outside_scope.status, "failed");
@@ -667,5 +669,201 @@ async fn source_policy_updates_all_tools_atomically_and_rejects_stale_or_exclude
             .iter()
             .all(|t| t.effective_action == Action::Allow)
     );
+    f.close().await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn saved_script_args_are_data_and_have_their_own_bound(pool: sqlx::PgPool) {
+    use codemode_core::components::scripts::{Content, Scripts};
+    let f = Fixture::new(&pool).await;
+    let script = Scripts::new(f.db.clone())
+        .save(
+            f.endpoint,
+            None,
+            Content {
+                name: "Arguments".into(),
+                description: "".into(),
+                code: "return args".into(),
+            },
+        )
+        .await
+        .unwrap();
+    let input =
+        serde_json::json!({"text":"'); await tools.fixture.write() #", "nested":{"number":42}});
+    let result = f
+        .execution
+        .execute_script(
+            f.principal.clone(),
+            script.summary.id,
+            input.as_object().unwrap().clone(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.status, "completed", "{:?}", result.error);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(result.result.get()).unwrap(),
+        input
+    );
+    assert_eq!(result.tool_calls, 0);
+    assert!(f.hits.lock().unwrap().is_empty());
+    let large = serde_json::json!({"value":"x".repeat(65536)})
+        .as_object()
+        .unwrap()
+        .clone();
+    assert!(matches!(
+        f.execution
+            .execute_script(f.principal.clone(), script.summary.id, large)
+            .await,
+        Err(codemode_core::components::execution::Error::Args)
+    ));
+    f.close().await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn session_memo_persists_atomic_bounded_non_sensitive_json_and_expires(pool: sqlx::PgPool) {
+    use codemode_core::components::agent_sessions::{
+        AgentSessions, Error as SessionError, memo::Request,
+    };
+    let f = Fixture::new(&pool).await;
+    let first = f
+        .execution
+        .execute(
+            f.principal.clone(),
+            "memo.set('team', {'id': 'EVL'})\nraise ValueError('later failure')".into(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(first.status, "failed");
+    let next = f.execution.execute(f.principal.clone(), "return [memo.get('team'), memo.get('missing', 'fallback'), memo.set('empty', None), memo.get('empty', 'fallback')]".into()).await.unwrap();
+    assert_eq!(next.status, "completed", "{:?}", next.error);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(next.result.get()).unwrap(),
+        json!([{"id":"EVL"},"fallback",null,null])
+    );
+    let audit: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT args_redacted::text,preview FROM tool_calls WHERE execution_id=$1")
+            .bind(next.execution_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert!(audit.iter().all(|(args, preview)| args.contains("REDACTED")
+        && !args.contains("team")
+        && preview.is_none()));
+    let denied = f.execution.execute(f.principal.clone(), "try:\n    memo.set('api_key', 'rejected-memo-fixture')\nexcept ToolError as e:\n    return str(e)".into()).await.unwrap();
+    assert_eq!(denied.status, "completed", "{:?}", denied.error);
+    assert!(denied.result.get().contains("non-sensitive"));
+    let recorded: String =
+        sqlx::query_scalar("SELECT args_redacted::text FROM tool_calls WHERE execution_id=$1")
+            .bind(denied.execution_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(!recorded.contains("rejected-memo-fixture"));
+    let service = AgentSessions::new(f.db.clone());
+    let (a, b) = tokio::join!(
+        service.memo(
+            next.execution_id,
+            f.endpoint,
+            Request::Set {
+                key: "a".into(),
+                value: json!(1)
+            }
+        ),
+        service.memo(
+            next.execution_id,
+            f.endpoint,
+            Request::Set {
+                key: "b".into(),
+                value: json!(2)
+            }
+        )
+    );
+    assert_eq!(a.unwrap(), json!(1));
+    assert_eq!(b.unwrap(), json!(2));
+    for (key, value) in [("a", json!(1)), ("b", json!(2))] {
+        assert_eq!(
+            service
+                .memo(
+                    next.execution_id,
+                    f.endpoint,
+                    Request::Get { key: key.into() }
+                )
+                .await
+                .unwrap()["value"],
+            value
+        );
+    }
+    service
+        .memo(
+            next.execution_id,
+            f.endpoint,
+            Request::Set {
+                key: "large".into(),
+                value: json!("x".repeat(40000)),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        service
+            .memo(
+                next.execution_id,
+                f.endpoint,
+                Request::Set {
+                    key: "overflow".into(),
+                    value: json!("y".repeat(30000))
+                }
+            )
+            .await,
+        Err(SessionError::MemoLimit)
+    ));
+    assert_eq!(
+        service
+            .memo(
+                next.execution_id,
+                f.endpoint,
+                Request::Get {
+                    key: "overflow".into()
+                }
+            )
+            .await
+            .unwrap()["found"],
+        false
+    );
+    let (_, other_token) = Auth::new(f.db.clone())
+        .create("other agent", "test.example")
+        .await
+        .unwrap();
+    let other = Auth::new(f.db.clone())
+        .authenticate(&other_token, "test.example")
+        .await
+        .unwrap()
+        .unwrap();
+    let isolated = f
+        .execution
+        .execute(other, "return memo.get('team', 'isolated')".into())
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<String>(isolated.result.get()).unwrap(),
+        "isolated"
+    );
+    sqlx::query("UPDATE agent_sessions SET last_seen_at=now()-interval '5 days' WHERE id=(SELECT session_id FROM executions WHERE id=$1)").bind(next.execution_id).execute(&pool).await.unwrap();
+    assert!(matches!(
+        service
+            .memo(
+                next.execution_id,
+                f.endpoint,
+                Request::Get { key: "team".into() }
+            )
+            .await,
+        Err(SessionError::NotFound)
+    ));
+    service.sweep().await.unwrap();
+    let remaining: i64 = sqlx::query_scalar("SELECT count(*) FROM agent_session_memo")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(remaining, 0);
     f.close().await;
 }

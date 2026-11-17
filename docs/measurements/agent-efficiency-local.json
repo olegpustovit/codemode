@@ -4,17 +4,18 @@
   "branch": "codex/agent-efficiency",
   "rust": {
     "command": "tools/owned-postgres.py cargo t --workspace (two verification CPUs)",
-    "passed": 137,
+    "passed": 144,
     "failed": 0,
-    "total_seconds": 24.91,
-    "build_seconds": 14.55,
-    "slowest_seconds": 2.329
+    "total_seconds": 42.15,
+    "build_seconds": 31.13,
+    "slowest_seconds": 2.327
   },
   "clippy": {
     "command": "SQLX_OFFLINE=true cargo clippy --workspace --all-targets",
     "exit_code": 0,
-    "seconds": 8.32,
-    "warnings": true
+    "seconds": 7.4,
+    "warnings": true,
+    "scope": "Current native checkpoint"
   },
   "checks": [
     "cargo fmt --check",
@@ -27,5 +28,6 @@
     "metric targets",
     "production runtime"
   ],
-  "deployed": false
+  "deployed": false,
+  "schema": 23
 }

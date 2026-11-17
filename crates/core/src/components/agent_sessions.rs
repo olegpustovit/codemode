@@ -1,3 +1,4 @@
+pub mod memo;
 use super::{
     auth::Principal,
     execution::{log, title::title},
@@ -13,6 +14,12 @@ pub enum Error {
         "session title must contain 1–160 characters without control characters; search is limited to 1024 bytes"
     )]
     Invalid,
+    #[error("memo is limited to 64 KiB of JSON per agent session")]
+    MemoLimit,
+    #[error(
+        "memo accepts non-sensitive JSON only; credential keys and token values are not allowed"
+    )]
+    MemoSensitive,
     #[error(transparent)]
     Database(#[from] DbError),
 }

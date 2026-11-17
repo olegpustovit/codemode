@@ -1,5 +1,6 @@
 mod http;
 pub(crate) const SEARCH_PATH: &str = "@codemode/search";
+pub(crate) const MEMO_PATH: &str = "@codemode/memo";
 use super::{
     accounts::Accounts,
     catalogue::Definition,
@@ -154,7 +155,21 @@ impl Broker {
     ) -> (u32, CallResult) {
         let started = Instant::now();
         let args: Result<Value, _> = serde_json::from_str(call.args.get());
-        let redacted = args.as_ref().map(redact).unwrap_or(Value::Null);
+        let redacted = if call.path == MEMO_PATH {
+            let op = match args
+                .as_ref()
+                .ok()
+                .and_then(|args| args.get("op"))
+                .and_then(Value::as_str)
+            {
+                Some("get") => "get",
+                Some("set") => "set",
+                _ => "invalid",
+            };
+            serde_json::json!({"op":op,"contents":"[REDACTED]"})
+        } else {
+            args.as_ref().map(redact).unwrap_or(Value::Null)
+        };
         let audit=sqlx::query_scalar!("INSERT INTO tool_calls(execution_id,seq,path,args_redacted,outcome) VALUES($1,$2,$3,$4,'running') RETURNING id",execution,seq as i32,call.path,redacted).fetch_one(&self.db.0).await;
         let Ok(id) = audit else {
             return (
@@ -164,6 +179,33 @@ impl Broker {
         };
         let result = match args {
             Ok(args) if call.path == SEARCH_PATH => self.search(args, workspace).await,
+            Ok(args) if call.path == MEMO_PATH => {
+                match serde_json::from_value::<super::agent_sessions::memo::Request>(args) {
+                    Ok(request) => super::agent_sessions::AgentSessions::new(self.db.clone())
+                        .memo(execution, workspace, request)
+                        .await
+                        .map_err(|error| match error {
+                            super::agent_sessions::Error::NotFound => {
+                                CallError::Blocked("agent session memo is unavailable".into())
+                            }
+                            super::agent_sessions::Error::MemoLimit
+                            | super::agent_sessions::Error::MemoSensitive => {
+                                CallError::Invalid(error.to_string())
+                            }
+                            _ => {
+                                CallError::Upstream("agent session memo storage unavailable".into())
+                            }
+                        })
+                        .and_then(|value| {
+                            serde_json::value::to_raw_value(&value).map_err(|_| {
+                                CallError::Upstream("could not encode memo result".into())
+                            })
+                        }),
+                    Err(_) => Err(CallError::Invalid(
+                        "memo requires op=get/set, a string key, and a JSON value for set".into(),
+                    )),
+                }
+            }
             Ok(mut args) => match tool {
                 Ok(tool) => {
                     strip_optional_nulls(&mut args, &tool.omit_null);
@@ -227,10 +269,14 @@ impl Broker {
             Err(CallError::Upstream(_)) => "tool_error",
         };
         let error = result.as_ref().err().map(ToString::to_string);
-        let preview = result
-            .as_ref()
-            .ok()
-            .map(|value| super::execution::log::preview(value.get(), 2048));
+        let preview = if call.path == MEMO_PATH {
+            None
+        } else {
+            result
+                .as_ref()
+                .ok()
+                .map(|value| super::execution::log::preview(value.get(), 2048))
+        };
         let elapsed = started.elapsed().as_millis().min(i64::MAX as u128) as i64;
         if sqlx::query!(
             "UPDATE tool_calls SET outcome=$2,error=$3,duration_ms=$4,preview=$5 WHERE id=$1",
@@ -285,7 +331,7 @@ pub(crate) fn unavailable(path: &str, workspace: Uuid) -> String {
     format!("tool {path} is blocked in workspace {workspace}; use search to find allowed tools")
 }
 
-fn secret_key(key: &str) -> bool {
+pub(crate) fn secret_key(key: &str) -> bool {
     let key = key.to_ascii_lowercase().replace(['-', '_'], "");
     [
         "token",

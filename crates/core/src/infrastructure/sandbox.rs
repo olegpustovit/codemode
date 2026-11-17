@@ -132,6 +132,8 @@ pub struct Run {
     pub worker: Option<Checkout>,
     output: Arc<Mutex<Capture>>,
     calls: usize,
+    pending: Vec<PendingCall>,
+    sync_call: Option<u32>,
 }
 
 impl MontySandbox {
@@ -206,7 +208,6 @@ impl MontySandbox {
     }
 
     async fn advance(&self, mut run: Run, mut event: TurnEvent) -> Result<(Run, Step), Error> {
-        let mut pending = Vec::new();
         loop {
             let mut printer = on_print_sync(|_, text| Capture::append_shared(&run.output, text));
             let worker = run
@@ -242,7 +243,7 @@ impl MontySandbox {
                     object_id,
                     ..
                 } => {
-                    if function_name != "_call"
+                    if !matches!(function_name.as_str(), "_call" | "_call_sync")
                         || object_id.is_some()
                         || args.args().len() != 2
                         || args.kwargs().len() != 0
@@ -275,21 +276,28 @@ impl MontySandbox {
                         continue;
                     }
                     run.calls += 1;
-                    pending.push(PendingCall {
+                    let call = PendingCall {
                         id: call_id,
                         path,
                         args,
-                    });
+                    };
+                    if function_name == "_call_sync" {
+                        run.sync_call = Some(call_id);
+                        drop(printer);
+                        return Ok((run, Step::Calls(vec![call])));
+                    }
+                    run.pending.push(call);
                     self.turn(worker.resume(ResumeValue::Future, &mut printer))
                         .await?
                 }
                 TurnEvent::ResolveFutures {
                     pending_call_ids, ..
                 } => {
-                    if !pending_matches(&pending, &pending_call_ids) {
+                    if !pending_matches(&run.pending, &pending_call_ids) {
                         return Err(Error::Invalid("unmatched pending calls".into()));
                     }
                     drop(printer);
+                    let pending = std::mem::take(&mut run.pending);
                     return Ok((run, Step::Calls(pending)));
                 }
                 TurnEvent::OsCall { .. } => {
@@ -348,7 +356,13 @@ impl Sandbox for MontySandbox {
         let prelude_event = self
             .turn(worker.feed(
                 prelude.to_owned(),
-                vec![("_call".into(), MontyObject::function("_call", None))],
+                vec![
+                    ("_call".into(), MontyObject::function("_call", None)),
+                    (
+                        "_call_sync".into(),
+                        MontyObject::function("_call_sync", None),
+                    ),
+                ],
                 vec![],
                 false,
                 &mut on_print_sync(|_, _| {}),
@@ -371,7 +385,13 @@ impl Sandbox for MontySandbox {
         let event = self
             .turn(worker.feed(
                 source,
-                vec![("_call".into(), MontyObject::function("_call", None))],
+                vec![
+                    ("_call".into(), MontyObject::function("_call", None)),
+                    (
+                        "_call_sync".into(),
+                        MontyObject::function("_call_sync", None),
+                    ),
+                ],
                 vec![],
                 false,
                 &mut on_print_sync(|_, text| Capture::append_shared(&output, text)),
@@ -382,6 +402,8 @@ impl Sandbox for MontySandbox {
                 worker: Some(worker),
                 output,
                 calls: 0,
+                pending: Vec::new(),
+                sync_call: None,
             },
             event,
         )
@@ -393,7 +415,7 @@ impl Sandbox for MontySandbox {
         mut run: Run,
         results: Vec<(u32, CallResult)>,
     ) -> Result<(Run, Step), Error> {
-        let answers = results
+        let mut answers: Vec<_> = results
             .into_iter()
             .map(|(id, result)| {
                 (
@@ -415,12 +437,20 @@ impl Sandbox for MontySandbox {
             .worker
             .as_mut()
             .ok_or_else(|| Error::Invalid("worker already finished".into()))?;
-        let event = self
-            .turn(worker.resume_futures(
-                answers,
-                &mut on_print_sync(|_, text| Capture::append_shared(&run.output, text)),
-            ))
-            .await?;
+        let mut printer = on_print_sync(|_, text| Capture::append_shared(&run.output, text));
+        let event = if let Some(id) = run.sync_call.take() {
+            let Some((reply_id, answer)) = answers.pop() else {
+                return Err(Error::Invalid("missing synchronous reply".into()));
+            };
+            if reply_id != id || !answers.is_empty() {
+                return Err(Error::Invalid("unmatched synchronous reply".into()));
+            }
+            self.turn(worker.resume(answer, &mut printer)).await?
+        } else {
+            self.turn(worker.resume_futures(answers, &mut printer))
+                .await?
+        };
+        drop(printer);
         self.advance(run, event).await
     }
 }

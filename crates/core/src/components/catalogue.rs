@@ -29,6 +29,13 @@ struct RankedMatch {
     blocked: bool,
 }
 
+struct ManifestTool {
+    source: String,
+    path: Option<String>,
+    total: i64,
+    blocked: bool,
+}
+
 #[derive(Serialize)]
 pub struct Match {
     pub blocked: bool,
@@ -63,6 +70,20 @@ pub enum SearchError {
 impl Catalogue {
     pub fn new(db: Database) -> Self {
         Self { db }
+    }
+
+    pub async fn manifest(&self, workspace: Uuid) -> Result<String, Error> {
+        let rows = sqlx::query_as!(ManifestTool, r#"WITH visible AS (
+            SELECT COALESCE(s.python_name,s.slug) AS source,t.path,
+            count(t.path) OVER(PARTITION BY s.id) AS total,
+            row_number() OVER(PARTITION BY s.id ORDER BY t.path) AS position,
+            EXISTS(SELECT 1 FROM tool_policies p WHERE p.endpoint_id=e.id AND p.source_id=s.id AND p.upstream_name=t.upstream_name AND p.action='block') AS blocked
+            FROM sources s JOIN endpoints e ON e.id=$1 AND e.tenant_id=s.tenant_id
+            LEFT JOIN tools t ON t.source_id=s.id AND (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=s.id AND scope.upstream_name=t.upstream_name))
+            WHERE e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=s.id)
+        ) SELECT source AS "source!",path,total AS "total!",blocked AS "blocked!" FROM visible WHERE position<=5 ORDER BY source,path"#, workspace)
+            .fetch_all(&self.db.0).await?;
+        Ok(manifest(rows))
     }
 
     pub async fn replace(
@@ -150,6 +171,53 @@ impl Catalogue {
     }
 }
 
+fn manifest(rows: Vec<ManifestTool>) -> String {
+    let mut groups = std::collections::BTreeMap::<String, (i64, Vec<String>)>::new();
+    for row in rows {
+        let group = groups
+            .entry(row.source)
+            .or_insert_with(|| (row.total, Vec::new()));
+        if let Some(path) = row.path {
+            let name = path
+                .rsplit_once('.')
+                .map_or(path.as_str(), |(_, name)| name);
+            group.1.push(format!(
+                "{}{}",
+                name.chars().take(64).collect::<String>(),
+                if row.blocked { " [blocked]" } else { "" }
+            ));
+        }
+    }
+    let count: i64 = groups.values().map(|(count, _)| *count).sum();
+    let mut text = format!("Connected sources ({count} tools): ");
+    if groups.is_empty() {
+        text.push_str("none");
+    }
+    let total = groups.len();
+    for (index, (source, (count, mut names))) in groups.into_iter().enumerate() {
+        if count > names.len() as i64 {
+            names.push("…".into());
+        }
+        let entry = format!(
+            "{} ({count}: {})",
+            source.chars().take(80).collect::<String>(),
+            names.join(", ")
+        );
+        if text.len() + entry.len() + 80 > 1536 {
+            text.push_str(&format!(
+                "… {} more sources; discover with tools.search",
+                total - index
+            ));
+            break;
+        }
+        if index > 0 {
+            text.push_str("; ");
+        }
+        text.push_str(&entry);
+    }
+    text
+}
+
 // Budget: five allocations for a brief paginated 11-row response, excluding the reused output buffer.
 fn page(rows: Vec<RankedMatch>, query: &str, full: bool) -> Result<Page, SearchError> {
     let next = if rows.len() > 10 {
@@ -208,6 +276,39 @@ fn first_line(mut text: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn manifests_name_sources_tools_blocks_and_stay_within_the_byte_budget() {
+        let text = manifest(vec![
+            ManifestTool {
+                source: "nudge".into(),
+                path: Some("nudge.list_issues".into()),
+                total: 15,
+                blocked: false,
+            },
+            ManifestTool {
+                source: "artifacts".into(),
+                path: Some("artifacts.artifact_delete".into()),
+                total: 1,
+                blocked: true,
+            },
+        ]);
+        assert!(text.contains("Connected sources (16 tools)"));
+        assert!(text.contains("artifact_delete [blocked]"));
+        assert!(text.contains("nudge (15: list_issues, …)"));
+        let rows = (0..64)
+            .map(|i| ManifestTool {
+                source: format!("source_{i}_{}", "s".repeat(80)),
+                path: Some("x".repeat(200)),
+                total: 100,
+                blocked: false,
+            })
+            .collect();
+        let bounded = manifest(rows);
+        assert!(bounded.len() <= 1536);
+        assert!(bounded.contains("more sources"));
+        assert!(manifest(vec![]).contains("none"));
+    }
+
     #[test]
     fn ranked_rows_to_json_has_a_fixed_allocation_budget() {
         let rows = (0..11)

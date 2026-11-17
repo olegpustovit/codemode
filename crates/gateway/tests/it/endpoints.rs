@@ -388,6 +388,9 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
             if version == "2025-11-25" {
                 let initialized = rpc(&client,&url,host,token,version,"initialize",serde_json::json!({"protocolVersion":version,"capabilities":{},"clientInfo":{"name":"endpoint-test","version":"1"}})).await;
                 assert_eq!(initialized["serverInfo"]["name"], "codemode");
+                let instructions = initialized["instructions"].as_str().unwrap();
+                assert!(instructions.contains("Connected sources"));
+                assert!(instructions.contains("features.apps=false"));
                 assert_eq!(
                     initialized["serverInfo"]["version"],
                     option_env!("CODEMODE_BUILD_ID").unwrap_or(env!("CARGO_PKG_VERSION"))
@@ -404,6 +407,28 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
             )
             .await;
             assert_eq!(listed["tools"].as_array().unwrap().len(), 2);
+            let description = listed["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|t| t["name"] == "execute")
+                .unwrap()["description"]
+                .as_str()
+                .unwrap();
+            assert!(description.contains("await tools.search(query)"));
+            assert!(description.contains("Connected sources"));
+            if token == work_token {
+                assert!(description.contains("alpha"));
+                assert!(!description.contains("beta"));
+            }
+            if token == home_token {
+                assert!(description.contains("beta"));
+                assert!(!description.contains("alpha"));
+            }
+            if version == "2026-07-28" {
+                assert_eq!(listed["cacheScope"], "private");
+            }
+
             assert_eq!(
                 listed["tools"]
                     .as_array()

@@ -144,3 +144,56 @@ not a warning-free result. No UI, Oracle or external model comparisons have
 been claimed for this checkpoint, and no production changes have been made.
 The existing stub generator example remains the way to regenerate the golden;
 there is no test bypass or new golden-update option.
+
+## Manifest, script arguments and session memo checkpoint
+
+- B2: initialization instructions and `execute` descriptions contain a dynamic
+  workspace manifest, bounded to 1536 UTF-8 bytes. It names sources, tool counts,
+  representative Python names and blocked tools. The SQL explicitly binds source
+  and workspace tenants and honors source/tool scopes. Personalized tool lists
+  use private, immediately stale cache hints in the 2026 MCP era.
+- C2: migration 0023 adds `agent_session_memo`, a JSON object capped at 64 KiB,
+  keyed by the actual inferred agent session. `memo.get(key, default)` and
+  `memo.set(key, value)` are synchronous broker capabilities. They remain audited,
+  count toward the 100-call budget, and commit each write, including before a
+  later execution failure. Concurrent writes merge atomically. Session expiry
+  and deletion cascade to memo rows through the existing retention sweep.
+  RLS rejects foreign reads, updates and inserts. No host credentials enter the
+  worker; memo additionally rejects sensitive keys and common credential formats.
+  Memo audit arguments and previews withhold submitted contents.
+- C3 (binding portion): `execute(scriptId, args)` binds an optional JSON object as
+  Python `args`, without inserting it into Python source or the audited script
+  text. Arguments have their own 64 KiB limit. Normal `code` calls reject `args`.
+  Existing script authorization, policy and audit behavior is preserved. Source
+  recipe scripts are still outstanding.
+- D2/D3: the six-line execute contract promotes inline discovery, help, gather,
+  pagination, field projection, non-sensitive session memo, concise results and
+  catchable errors. Initialization instructions recommend `features.apps=false`
+  or disconnecting duplicate connectors when they overlap Codemode.
+
+The sandbox now validates a synchronous broker callback alongside async calls;
+real-worker checks prove that a synchronous helper preserves already-pending
+async futures and that its errors remain catchable. A separate real-worker probe
+proves host-backed source objects can retain Python callables while reporting
+lazy missing attributes. The A2 production fix still needs the callable source
+named `search` case handled before replacing existing source wrappers.
+
+**144/144 native Rust checks pass**, on an owned disposable PostgreSQL 18 cluster
+with two verification CPUs: 42.15 s total including 31.13 s build, slowest 2.327 s.
+The new memo behavior and RLS cases each take 0.303 s in focused qualification.
+The argument-binding test verifies code-like strings stay data, do not dispatch
+upstream calls, and respect the independent argument limit. Dual-era HTTP checks
+verify manifest scoping, playbook discovery, source names and private cache hints.
+Offline SQL metadata was refreshed through ordinary candidate startup migrations
+on the disposable cluster; production was not touched.
+
+Still required: complete caught unknown-tool guidance, source recipes, Tokens
+setup guidance, E1–E7 and the metric gates, final Oracle/UI/browser qualification,
+merge and gated deployment. Native checks are not external model performance
+acceptance. Existing incremental build-budget limits remain visible.
+
+Current checkpoint Clippy completes in 7.40 s with warnings, including the
+existing test-unwrap warning policy; formatting and diff-whitespace checks pass.
+The SDK probe also established that host class types do not permit adding a new
+`__call__` class attribute from Python. A2 must use a supported host callable
+mechanism for the source named `search`, not that unsupported assignment.

@@ -78,3 +78,13 @@ def _project(value, fields):
 
 async def _search(query):
     return json.loads(await _call('@codemode/search', json.dumps({'query': query})))
+
+class _Memo:
+    def get(self, key, default=None):
+        result = json.loads(_call_sync('@codemode/memo', json.dumps({'op': 'get', 'key': key})))
+        return result['value'] if result['found'] else default
+
+    def set(self, key, value):
+        return json.loads(_call_sync('@codemode/memo', json.dumps({'op': 'set', 'key': key, 'value': value})))
+
+memo = _Memo()

@@ -24,6 +24,8 @@ pub enum Error {
     Source,
     #[error("execution stopped")]
     Stopped,
+    #[error("script args must fit within 64 KiB of JSON")]
+    Args,
     #[error(transparent)]
     Session(#[from] super::agent_sessions::Error),
     #[error(transparent)]
@@ -134,25 +136,34 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         if code.len() > 64 * 1024 {
             return Err(Error::Source);
         }
-        self.submit(principal, code).await
+        self.submit(principal, code, "{}".into()).await
     }
     pub fn execute_script(
         self: &Arc<Self>,
         principal: Principal,
         id: Uuid,
+        args: serde_json::Map<String, serde_json::Value>,
     ) -> futures_util::future::BoxFuture<'_, Result<ResultValue, Error>> {
         // Erase this cold SQL-backed future before it enters the MCP dispatcher's state machine.
         Box::pin(async move {
             let code = super::scripts::Scripts::new(self.db.clone())
                 .code_for(principal.workspace_id, id)
                 .await?;
-            self.execute(principal, code).await
+            if code.len() > 64 * 1024 {
+                return Err(Error::Source);
+            }
+            let args = serde_json::to_string(&args).map_err(|_| Error::Args)?;
+            if args.len() > 65536 {
+                return Err(Error::Args);
+            }
+            self.submit(principal, code, args).await
         })
     }
     async fn submit(
         self: &Arc<Self>,
         principal: Principal,
         code: String,
+        args: String,
     ) -> Result<ResultValue, Error> {
         let mut lease = self.access.watch(principal.tenant_id).await?;
         let permit = self
@@ -171,7 +182,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                 .await
             {
                 Ok(id) => {
-                    let future = this.segment(principal, id, code, cancel.clone());
+                    let future = this.segment(principal, id, code, args, cancel.clone());
                     tokio::pin!(future);
                     tokio::select! { biased;
                         _=lease.stopped()=>{ cancel.cancel(); future.await },
@@ -192,6 +203,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         principal: Principal,
         id: Uuid,
         code: String,
+        args: String,
         cancel: CancellationToken,
     ) -> Result<ResultValue, Error> {
         use crate::infrastructure::sandbox::Error as SandboxError;
@@ -203,11 +215,15 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                 .allowed_sources(principal.workspace_id)
                 .await
                 .map_err(|_| SandboxError::Invalid("workspace scope unavailable".into()))?;
-            let prelude = self
+            let mut prelude = self
                 .sources
                 .prelude(allowed.as_deref(), principal.workspace_id)
                 .await
                 .map_err(|_| SandboxError::Invalid("workspace tool scope unavailable".into()))?;
+            prelude.push_str(&format!(
+                "\nargs = json.loads({})\n",
+                super::catalogue::stubs::quote(&args)
+            ));
             let (mut run, mut step) = self
                 .sandbox
                 .start_captured_for(principal.token_id, &code, &prelude, capture.clone())

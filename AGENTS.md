@@ -6,6 +6,8 @@ Implementation plan: https://artifacts.microapps.space/a/saqdh2xm7jcd (revision 
 
 ## Active replacement proposal
 
+The owner requested full implementation of https://artifacts.microapps.space/a/npta97dqvf6a. This work is active on `codex/agent-efficiency`; its scope, native checkpoints and remaining requirements are in `docs/agent-efficiency/implementation.md`. The feature branch adds schema 23 for a session-scoped memo. It is not yet merged, release-qualified or deployed; the production Status below remains historical deployment evidence.
+
 The owner also requested full implementation of https://artifacts.microapps.space/a/jqm3ze7az66e. All twelve schema-20 fixes are implemented, qualified and deployed; exact scope and evidence are in `docs/control-plane-fixes/implementation.md`, the saved `proposal.html` and `docs/measurements/control-plane-fixes-qualification.json`.
 
 The owner requested full implementation of https://artifacts.microapps.space/a/hkwwwp90n0dt, including its final v5 theme and UI kit. The exact reference is `docs/proposal/control-plane.html`; progress/evidence is in `docs/proposal/implementation.md`. This proposal supersedes the historical approval, resume, snapshot persistence and daytime UI requirements below. Changes are deployed only after qualification. The base proposal shipped at schema 19; the current schema-20 fixes build is in Status. Owner-only external acceptance remains explicitly unperformed.
@@ -56,7 +58,7 @@ The owner also authorized a separate `/mcp-admin` management surface: workspace 
 | Tool | Input | Behaviour |
 |---|---|---|
 | `search` | `query`, `detail`, `cursor` | Full-text search over the tools this caller may reach. Returns path, one-line description, input type. `detail: "full"` adds output type and docs. |
-| `execute` | `code` or `scriptId` | Runs Python in the sandbox. The only capability is the `tools` object. Returns the return value plus captured output, truncated at a fixed budget. |
+| `execute` | `code` or `scriptId` with optional `args` | Runs Python in the sandbox. Tools and session memo use the audited broker; saved scripts read JSON `args`. Returns the return value plus captured output, truncated at a fixed budget. |
 
 ## Components
 

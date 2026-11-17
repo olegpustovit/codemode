@@ -277,7 +277,13 @@ impl Sources {
     ) -> (u32, crate::infrastructure::sandbox::CallResult) {
         let tool = match self.lookup(&call.path).await {
             Some(tool) => Ok(tool),
-            None if call.path == super::broker::SEARCH_PATH => Err(String::new()),
+            None if matches!(
+                call.path.as_str(),
+                super::broker::SEARCH_PATH | super::broker::MEMO_PATH
+            ) =>
+            {
+                Err(String::new())
+            }
             None => Err(self.unknown(&call.path, workspace).await),
         };
         self.broker

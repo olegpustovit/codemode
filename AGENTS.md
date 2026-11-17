@@ -142,3 +142,4 @@ If the pool fails these, the fallback is `deno_core` with TypeScript in a worker
 - Control-plane sign-in is standalone.
 - The replacement proposal removes paused execution storage and snapshot signing. Historical paused runs finish as failed during migration and are never replayed.
 - Phase 0 measured the per-worker memory cap and worker-failure containment; keep the regression checks when changing the pool.
+- Clearly named eval fixtures are permitted in production: the `eval-smoke@microapps.space` tenant, its `eval-codex*` tokens and linked eval-account sources, and `eval-seed-*`/`eval-run-*` data in the apps. They are owned by the eval harness in `../codemode-evals` (gate: `tools/deploy.py --eval-gate ../codemode-evals`). Never create other production fixtures.

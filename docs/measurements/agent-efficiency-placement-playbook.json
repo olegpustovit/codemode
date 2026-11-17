@@ -1,0 +1,83 @@
+{
+  "scope": "Frozen optimized application candidate, 40 tasks x3 per variant; gates not met",
+  "variants": {
+    "e2-instructions": {
+      "pass": false,
+      "runs": 120,
+      "metrics": {
+        "mcp_calls": 5.0,
+        "pre_execute_calls": 1.5,
+        "execute_error_rate": 0.13649025069637882,
+        "input_tokens": 99345.5,
+        "uncached_input_tokens": 12238.5,
+        "wall_s": 25.85,
+        "search_median_bytes": 1502.0,
+        "search_max_bytes": 14791
+      },
+      "problems": [
+        "mcp_calls: 5.0 exceeds 3",
+        "pre_execute_calls: 1.5 exceeds 1",
+        "execute_error_rate: 0.13649025069637882 exceeds 0.03",
+        "input_tokens: 99345.5 exceeds 80000",
+        "wall_s: 25.85 exceeds 18",
+        "search_max_bytes: 14791 exceeds 12000"
+      ]
+    },
+    "e2-description": {
+      "pass": false,
+      "runs": 120,
+      "metrics": {
+        "mcp_calls": 5.0,
+        "pre_execute_calls": 0.0,
+        "execute_error_rate": 0.05565217391304348,
+        "input_tokens": 82881.5,
+        "uncached_input_tokens": 10718.0,
+        "wall_s": 24.7,
+        "search_median_bytes": 0,
+        "search_max_bytes": 0
+      },
+      "problems": [
+        "mcp_calls: 5.0 exceeds 3",
+        "execute_error_rate: 0.05565217391304348 exceeds 0.03",
+        "input_tokens: 82881.5 exceeds 80000",
+        "wall_s: 24.7 exceeds 18"
+      ]
+    },
+    "e3-off": {
+      "pass": false,
+      "runs": 120,
+      "metrics": {
+        "mcp_calls": 5.0,
+        "pre_execute_calls": 2.0,
+        "execute_error_rate": 0.06451612903225806,
+        "input_tokens": 93481.0,
+        "uncached_input_tokens": 10774.5,
+        "wall_s": 25.3,
+        "search_median_bytes": 1502,
+        "search_max_bytes": 9657
+      },
+      "problems": [
+        "mcp_calls: 5.0 exceeds 3",
+        "pre_execute_calls: 2.0 exceeds 1",
+        "execute_error_rate: 0.06451612903225806 exceeds 0.03",
+        "input_tokens: 93481.0 exceeds 80000",
+        "wall_s: 25.3 exceeds 18",
+        "unclean or failed run: mb-oct-groceries codemode r0"
+      ]
+    }
+  },
+  "compact_search_followup": {
+    "query": "entries",
+    "detail": "full",
+    "results": 10,
+    "full_stubs": 3,
+    "response_utf8_bytes": 11838,
+    "candidate": "new debug build; not optimized acceptance"
+  },
+  "native_followup": {
+    "cases": 154,
+    "failed": 0,
+    "build_s": 5.31,
+    "total_s": 17.2
+  }
+}

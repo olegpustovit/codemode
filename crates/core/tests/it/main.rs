@@ -54,7 +54,7 @@ async fn database(pool: &sqlx::PgPool) -> Database {
     let db = Database::connect(pool.connect_options().to_url_lossy().as_str())
         .await
         .unwrap();
-    assert_eq!(db.schema_version(), 22);
+    assert_eq!(db.schema_version(), 24);
     db
 }
 
@@ -162,15 +162,21 @@ async fn replacement_search_and_cursor_contract(pool: sqlx::PgPool) {
     let wire = serde_json::to_value(&first).unwrap();
     assert!(wire.get("nextCursor").is_some());
     assert!(wire.get("cursor").is_none());
-    assert_eq!(first.tools.len(), 20);
+    assert_eq!(first.tools.len(), 10);
     assert_eq!(first.tools[0].description, "List issues.");
     let cursor = first.cursor.unwrap();
     let second = catalogue
         .search("issues", false, Some(&cursor), None)
         .await
         .unwrap();
-    assert_eq!(second.tools.len(), 2);
-    assert!(second.cursor.is_none());
+    assert_eq!(second.tools.len(), 10);
+    let third = catalogue
+        .search("issues", false, second.cursor.as_deref(), None)
+        .await
+        .unwrap();
+    assert_eq!(third.tools.len(), 2);
+    assert!(third.cursor.is_none());
+    assert!(second.tools.last().unwrap().path < third.tools[0].path);
     assert!(first.tools.last().unwrap().path < second.tools[0].path);
     assert!(matches!(
         catalogue.search("other", false, Some(&cursor), None).await,
@@ -187,8 +193,17 @@ async fn replacement_search_and_cursor_contract(pool: sqlx::PgPool) {
             .unwrap()
             .tools
             .len(),
-        20
+        10
     );
+    let full = catalogue.search("", true, None, None).await.unwrap();
+    assert_eq!(
+        full.tools
+            .iter()
+            .filter(|t| t.signature.contains(" -> "))
+            .count(),
+        3
+    );
+    assert!(full.tools.iter().all(|t| !t.blocked));
     catalogue
         .replace(source, &definitions[..1], 0)
         .await
@@ -347,3 +362,60 @@ mod remote;
 mod stdio;
 
 mod pool;
+
+#[sqlx::test(migrations = "./migrations")]
+async fn discovery_manifest_prioritizes_useful_entry_points_over_alphabetical_noise(
+    pool: sqlx::PgPool,
+) {
+    let db = database(&pool).await;
+    let workspaces =
+        codemode_core::components::workspaces::Workspaces::new(db.clone(), "test.example".into())
+            .unwrap();
+    workspaces.initialize().await.unwrap();
+    let workspace = workspaces.default_id().await.unwrap();
+    let source: Uuid = sqlx::query_scalar("INSERT INTO sources(slug,python_name,kind,config) VALUES('nudge','nudge','mcp_http','{}') RETURNING id").fetch_one(&pool).await.unwrap();
+    let names = [
+        "aaa0",
+        "aaa1",
+        "aaa2",
+        "aaa3",
+        "aaa4",
+        "aaa5",
+        "list_issues",
+    ];
+    let definitions: Vec<_> = names
+        .into_iter()
+        .map(|name| Definition {
+            upstream_name: name.into(),
+            path: format!("nudge.{name}"),
+            description: name.into(),
+            input_schema: serde_json::json!({"type":"object"}),
+            output_schema: None,
+            read_only: true,
+            destructive: false,
+        })
+        .collect();
+    let catalogue = Catalogue::new(db);
+    let empty = catalogue.manifest(workspace).await.unwrap();
+    assert!(empty.contains("nudge (0:"));
+    catalogue.replace(source, &definitions, 0).await.unwrap();
+    let manifest = catalogue.manifest(workspace).await.unwrap();
+    assert!(manifest.contains("list_issues"));
+    assert!(manifest.contains("7 tools"));
+    assert!(!manifest.contains("aaa5"));
+    assert!(manifest.len() <= 1536);
+    let alternatives = catalogue
+        .search_scoped("list_issues OR aaa0", false, None, None, Some(workspace))
+        .await
+        .unwrap();
+    assert_eq!(alternatives.tools.len(), 2);
+    let conjunction = catalogue
+        .search_scoped("list_issues aaa0", false, None, None, Some(workspace))
+        .await
+        .unwrap();
+    assert!(conjunction.tools.is_empty());
+    workspaces.set_all_tools(workspace, false).await.unwrap();
+    let excluded = catalogue.manifest(workspace).await.unwrap();
+    assert!(excluded.contains("nudge (0:"));
+    assert!(!excluded.contains("list_issues"));
+}

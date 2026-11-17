@@ -1,0 +1,49 @@
+{
+  "scope": "Native development checkpoint, not release acceptance",
+  "proposal": "https://artifacts.microapps.space/a/npta97dqvf6a",
+  "branch": "codex/agent-efficiency",
+  "rust": {
+    "command": "tools/owned-postgres.py cargo t --workspace (two verification CPUs)",
+    "passed": 152,
+    "failed": 0,
+    "total_seconds": 45.81,
+    "build_seconds": 33.68,
+    "slowest_seconds": 2.342,
+    "additional_focused_check": {
+      "name": "manifest prioritization",
+      "passed": 1,
+      "seconds": 0.192
+    }
+  },
+  "clippy": {
+    "command": "SQLX_OFFLINE=true cargo clippy --workspace --all-targets",
+    "exit_code": 0,
+    "seconds": 8.47,
+    "warnings": true,
+    "scope": "Current native checkpoint"
+  },
+  "checks": [
+    "cargo fmt --check",
+    "git diff --check"
+  ],
+  "not_verified": [
+    "Oracle qualification",
+    "UI and optimized-browser qualification",
+    "E1\u2013E7 comparisons",
+    "metric targets",
+    "production runtime"
+  ],
+  "deployed": false,
+  "schema": 24,
+  "ui": {
+    "typecheck": "pass",
+    "lint": "pass with three existing shared-component warnings",
+    "unit_passed": 34,
+    "focused_browser_passed": 2,
+    "focused_browser_seconds": 42.0,
+    "fingerprint": "4fe138fb8eae",
+    "initial_js_gzip_bytes": 160473,
+    "initial_css_gzip_bytes": 15757,
+    "scope": "UI checkpoint; final combined artifact qualification pending"
+  }
+}

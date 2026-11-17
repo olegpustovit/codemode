@@ -54,6 +54,7 @@ pub struct State {
 #[derive(Clone)]
 struct Gateway {
     state: State,
+    manifest: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
@@ -78,8 +79,10 @@ enum Detail {
 struct ExecuteArgs {
     /// Python source, or provide scriptId instead.
     code: Option<String>,
-    /// A saved script from this hostname's endpoint. Mutually exclusive with code.
+    /// A saved script from the selected workspace. Mutually exclusive with code.
     script_id: Option<String>,
+    /// JSON arguments bound as the Python `args` dictionary for a saved script.
+    args: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 fn failure(message: impl Into<String>) -> CallToolResult {
@@ -95,7 +98,7 @@ fn success(value: &impl serde::Serialize) -> CallToolResult {
 #[tool_router]
 impl Gateway {
     #[tool(
-        description = "Search connected tools and saved scripts available to this hostname. Run a saved script with execute(scriptId=its id); refine the query for more than 20 script matches. Brief returns Python signatures and summaries; full adds output types and documentation. Use the cursor for the next page.",
+        description = "Prefer execute for tool lookup and work in one step, using await tools.search('tool_name') inside Python. This search browses tools and saved scripts in the selected workspace. Query one tool name, or join alternatives with OR; other words must all match. Run a saved script with execute(scriptId=its id, args={...}). Each page has ten tool hits; brief gives compact input signatures, full adds complete stubs for the top three. Use the cursor for more tools or refine the query for more than 20 script matches. Blocked tools are marked and cannot be dispatched.",
         annotations(read_only_hint = true)
     )]
     async fn search(
@@ -156,7 +159,7 @@ impl Gateway {
     }
 
     #[tool(
-        description = "Search first, then provide exactly one of code (Python source) or scriptId (a saved script from this endpoint). Run Python with await tools.source.tool(keyword=value). Use asyncio.gather for parallel calls, print for diagnostics, and return only what is needed. Catch ToolError for upstream failures and PermissionError for workspace blocks. No inheritance, generators, third-party imports, files, network or secrets. Limits: 60 seconds, 64 MB, 100 calls, 64 KB source."
+        description = "Use one execute per step; provide Python code or a saved scriptId with args.\nDiscover with await tools.search('tool_name') only when needed; use OR between alternatives. print(help(tool)) gives full signatures.\nUse asyncio.gather(*calls) without keyword arguments for independent calls and .all(max_pages=20, _fields=[...]) for rows; compute the answer locally.\nUse memo.get(key) / memo.set(key, value), not indexing: 64 KiB per session for non-sensitive IDs/small summaries, never datasets. Return only the answer.\nUse IDs returned by list tools, never guessed titles or IDs. Avoid generators and next(list). Catch ToolError and PermissionError.\nLimits: 60 s, 64 MB, 100 calls, 64 KB source; no inheritance, generators, files, network or secrets."
     )]
     async fn execute(
         &self,
@@ -171,17 +174,26 @@ impl Gateway {
         let Some(principal) = principal else {
             return failure("authentication required");
         };
-        let run = async {
-            match (args.code, args.script_id) {
-                (Some(code), None) => self.state.execution.execute(principal, code).await,
-                (None, Some(id)) => match uuid::Uuid::parse_str(&id) {
-                    Ok(id) => self.state.execution.execute_script(principal, id).await,
-                    Err(_) => return Err("scriptId must be a UUID".to_owned()),
-                },
-                _ => return Err("provide exactly one of code or scriptId".to_owned()),
-            }
-            .map_err(|error| error.to_string())
-        };
+        let run =
+            async {
+                match (args.code, args.script_id, args.args) {
+                    (Some(code), None, None) => self.state.execution.execute(principal, code).await,
+                    (None, Some(id), script_args) => match uuid::Uuid::parse_str(&id) {
+                        Ok(id) => {
+                            self.state
+                                .execution
+                                .execute_script(principal, id, script_args.unwrap_or_default())
+                                .await
+                        }
+                        Err(_) => return Err("scriptId must be a UUID".to_owned()),
+                    },
+                    _ => return Err(
+                        "provide exactly one of code or scriptId; args is only valid with scriptId"
+                            .to_owned(),
+                    ),
+                }
+                .map_err(|error| error.to_string())
+            };
         tokio::select! {
             _=ctx.ct.cancelled()=>failure("execution cancelled"),
             result=run=>match result {
@@ -195,6 +207,34 @@ impl Gateway {
 
 #[tool_handler]
 impl ServerHandler for Gateway {
+    async fn list_tools(
+        &self,
+        _request: Option<rmcp::model::PaginatedRequestParams>,
+        context: RequestContext<RoleServer>,
+    ) -> Result<rmcp::model::ListToolsResult, rmcp::ErrorData> {
+        let mut tools = Self::tool_router().list_all();
+        for tool in &mut tools {
+            if tool.name == "execute" {
+                tool.description = Some(
+                    format!(
+                        "{}\n{}",
+                        tool.description.as_deref().unwrap_or_default(),
+                        self.manifest
+                    )
+                    .into(),
+                );
+            }
+        }
+        let mut result = rmcp::model::ListToolsResult::with_all_items(tools);
+        if context
+            .protocol_version()
+            .is_some_and(|v| v >= rmcp::model::ProtocolVersion::V_2026_07_28)
+        {
+            result.ttl_ms = Some(0);
+            result.cache_scope = Some(rmcp::model::CacheScope::Private);
+        }
+        Ok(result)
+    }
     async fn call_tool(
         &self,
         request: rmcp::model::CallToolRequestParams,
@@ -274,8 +314,8 @@ impl ServerHandler for Gateway {
     }
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_tasks().build())
-            .with_server_info(Implementation::from_build_env())
-            .with_instructions("Search tools, then write Python using await tools.source.tool(...). Use return for the result and print for diagnostics. Upstream failures are catchable as ToolError; workspace blocks raise PermissionError naming the tool and workspace. Authentication is bound to the selected workspace and this /mcp resource.")
+            .with_server_info(Implementation::new("codemode", option_env!("CODEMODE_BUILD_ID").unwrap_or(env!("CARGO_PKG_VERSION"))))
+            .with_instructions(format!("{}\nDiscover with await tools.search('tool_name') inside execute only when needed; use OR for alternatives, print(help(tool)), asyncio.gather(*calls) without keyword arguments and .all(), and return only the answer. Use memo.get(key) and memo.set(key, value), not indexing; 64 KiB per session for IDs/small summaries, not datasets. Use real IDs returned by list tools; avoid generators and next(list). Catch ToolError and PermissionError. This /mcp resource is bound to your selected workspace. When Codemode covers the same apps as ChatGPT connectors, use features.apps=false or disconnect duplicate connectors so the client uses the intended gateway.", self.manifest))
     }
 }
 
@@ -289,12 +329,27 @@ fn principal(context: &RequestContext<RoleServer>) -> Result<Principal, rmcp::Er
 }
 
 async fn mcp_request(AxumState(state): AxumState<State>, request: Request) -> Response {
+    let Some(principal) = request.extensions().get::<Principal>() else {
+        return StatusCode::UNAUTHORIZED.into_response();
+    };
+    let manifest = match state.catalogue.manifest(principal.workspace_id).await {
+        Ok(manifest) => manifest,
+        Err(error) => {
+            tracing::error!(?error, "workspace manifest unavailable");
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "workspace catalogue unavailable",
+            )
+                .into_response();
+        }
+    };
     let config = transport(&state);
     let factory = state.clone();
     let service = StreamableHttpService::new(
         move || {
             Ok(Gateway {
                 state: factory.clone(),
+                manifest: manifest.clone(),
             })
         },
         Arc::new(LocalSessionManager::default()),
@@ -454,15 +509,60 @@ pub(crate) async fn authenticate(
                             .into_response();
                     }
                 }
-                if let Err(seconds) = state
-                    .rate_limit
-                    .check(principal.token_id, principal.workspace_id)
-                {
-                    let mut response=(StatusCode::TOO_MANY_REQUESTS,Json(serde_json::json!({"error":"MCP request rate limit exceeded; retry after the indicated delay"}))).into_response();
-                    if let Ok(value) = axum::http::HeaderValue::from_str(&seconds.to_string()) {
-                        response.headers_mut().insert(header::RETRY_AFTER, value);
+                let routed_call = request
+                    .headers()
+                    .get("Mcp-Method")
+                    .is_some_and(|v| v == "tools/call");
+                let (parts, body) = request.into_parts();
+                let bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
+                    Ok(bytes) => bytes,
+                    Err(_) => {
+                        return (StatusCode::PAYLOAD_TOO_LARGE, "MCP request exceeds 1 MiB")
+                            .into_response();
                     }
-                    return response;
+                };
+                let is_call = routed_call
+                    || serde_json::from_slice::<serde_json::Value>(&bytes).is_ok_and(|message| {
+                        message.get("method").and_then(serde_json::Value::as_str)
+                            == Some("tools/call")
+                    });
+                request = Request::from_parts(parts, axum::body::Body::from(bytes));
+                if is_call {
+                    let admission = if resource == "/mcp" {
+                        let session =
+                            match codemode_core::components::agent_sessions::AgentSessions::new(
+                                state.db.clone(),
+                            )
+                            .touch(&principal)
+                            .await
+                            {
+                                Ok(session) => session,
+                                Err(error) => {
+                                    tracing::error!(error=%error, "agent session admission failed");
+                                    return (
+                                        StatusCode::SERVICE_UNAVAILABLE,
+                                        "agent session unavailable",
+                                    )
+                                        .into_response();
+                                }
+                            };
+                        state.rate_limit.check_session(
+                            session,
+                            principal.token_id,
+                            principal.workspace_id,
+                        )
+                    } else {
+                        state
+                            .rate_limit
+                            .check(principal.token_id, principal.workspace_id)
+                    };
+                    if let Err(seconds) = admission {
+                        let mut response=(StatusCode::TOO_MANY_REQUESTS,Json(serde_json::json!({"error":"MCP tool-call rate limit exceeded; retry after the indicated delay"}))).into_response();
+                        if let Ok(value) = axum::http::HeaderValue::from_str(&seconds.to_string()) {
+                            response.headers_mut().insert(header::RETRY_AFTER, value);
+                        }
+                        return response;
+                    }
                 }
                 request.extensions_mut().insert(principal);
                 return next.run(request).await;

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO source_recipe_installs(workspace_id,source_id,recipe) VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING recipe",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "recipe",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "source_recipe_installs",
+            "name": "recipe"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a4cec29d8d3e7babe4029d1ad8eff812eb70a6c4970c8b4b65dda750aec1febd"
+}

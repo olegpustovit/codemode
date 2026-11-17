@@ -1,0 +1,43 @@
+{
+  "scope": "Early eight-job Codex check before nullable-manifest and duplicate-description corrections; not full L4 acceptance",
+  "source_commit": "46a507d",
+  "candidate": "local optimized gateway, disposable PostgreSQL 18, canonical Host via loopback proxy, identity disabled only on disposable candidate",
+  "jobs": 8,
+  "runs": 8,
+  "passed": 8,
+  "http_429": 0,
+  "execute_errors": 0,
+  "metrics": {
+    "pass": false,
+    "runs": 8,
+    "metrics": {
+      "mcp_calls": 5.0,
+      "pre_execute_calls": 1.5,
+      "execute_error_rate": 0.0,
+      "input_tokens": 96279.0,
+      "uncached_input_tokens": 13609.0,
+      "wall_s": 24.7,
+      "search_median_bytes": 1508,
+      "search_max_bytes": 12805
+    },
+    "problems": [
+      "mcp_calls: 5.0 exceeds 3",
+      "pre_execute_calls: 1.5 exceeds 1",
+      "input_tokens: 96279.0 exceeds 80000",
+      "wall_s: 24.7 exceeds 18",
+      "search_max_bytes: 12805 exceeds 12000"
+    ]
+  },
+  "native_slow": {
+    "cases": 161,
+    "failed": 0,
+    "build_s": 2.96,
+    "total_s": 89.18
+  },
+  "remaining": [
+    "E1\u2013E7 experiment coverage",
+    "full L4 comparison and all targets",
+    "final hardened/optimized browser qualification",
+    "merge and gated deployment"
+  ]
+}

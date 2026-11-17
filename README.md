@@ -66,8 +66,13 @@ The gateway applies embedded migrations at startup. Before the first Phase 2 sta
 | `CODEMODE_CONCURRENT_EXECUTIONS` | `8`; range 1–64, excess requests fail busy |
 | `CODEMODE_CONCURRENT_CALLS` | `16`; range 1–100 per execution |
 | `CODEMODE_UPSTREAM_TIMEOUT_SECS` | `30`; range 1–60, bounded by the execution deadline |
-| `CODEMODE_TOKEN_REQUESTS_PER_MINUTE` | `60`; range 1–60000; authenticated MCP request budget per token |
-| `CODEMODE_ENDPOINT_REQUESTS_PER_MINUTE` | `600`; range 1–600000; authenticated MCP request budget shared by an endpoint |
+| `CODEMODE_SESSION_REQUESTS_PER_MINUTE` | `600`; range 1–60000; `tools/call` budget per inferred agent session |
+| `CODEMODE_TOKEN_REQUESTS_PER_MINUTE` | `6000`; range 1–60000; `tools/call` ceiling per token |
+| `CODEMODE_ENDPOINT_REQUESTS_PER_MINUTE` | `6000`; range 1–600000; `tools/call` ceiling shared by a workspace |
+
+Initialization, tool listing and other protocol traffic do not consume these budgets.
+Rate-limited tool calls return HTTP 429 with `Retry-After`. Existing environment
+overrides still apply; remove a legacy 60/min token override to use the new defaults.
 
 With the database configured, `codemode token create NAME` prints a new bearer token once. `codemode token list` lists metadata and `codemode token revoke UUID` revokes one. Tokens are bound to `CODEMODE_HOSTNAME`.
 
@@ -145,7 +150,15 @@ The Phase 4 production worker entrypoint requires aarch64 Linux, Bubblewrap, the
 
 ## Saved scripts (Phase 4)
 
-Open an endpoint and choose **Saved scripts** to create, edit or delete reusable Python. Scripts belong to one endpoint: agents find their names/descriptions through `search` and call `execute` with exactly one of `code` or `scriptId`. Search returns at most 20 script matches; refine the query to narrow them. Existing tool pagination is unchanged. Each endpoint can store 128 scripts, each with at most 64 KiB of Python.
+Open a workspace and choose **Saved scripts** to create, edit or delete reusable Python. Agents find scripts through `search` and run `execute(scriptId=id, args={...})`; the JSON object is available as Python `args`, separate from source code. Both source and arguments have independent 64 KiB limits. Normal `code` calls cannot also supply `args`. Search returns at most 20 script matches; refine the query to narrow them. Each workspace can store 128 scripts.
+
+Connected Nudge and Moneybag sources get scoped starter recipes for issue creation by team/status name and exact monthly account totals. They are ordinary saved scripts: edits survive and deletion stays deleted. Installation respects the existing 128-script limit and never overwrites a matching custom script. Monthly totals keep decimal strings exact and currencies separate; provide `from`, `to` and the account ID (including its descendants).
+
+Use one tool name, or `OR` between alternative names, in search queries; other words must all match. Discovery summaries are capped at 180 UTF-8 bytes; full stubs and `help()` retain their complete documentation.
+
+Inside Python, `await tools.search(query)` discovers tools in the current workspace without another MCP turn. `help(tool)` returns a full stub; cursor-capable tools support `await tool.all(max_pages=20, _fields=[...])`. Pagination follows string or integer cursors and declared sort companions, fails on repeated cursors or page limits, and shares the 100-call and 60-second limits. `_fields` trims rows inside the worker. Root search uses ten-hit pages; full detail expands only the top three. Blocked tools carry `blocked: true` and stay undispatchable.
+
+`memo.get(key, default)` and `memo.set(key, value)` persist non-sensitive JSON within the inferred agent session, with a 64 KiB total limit. Each memo operation uses the audited broker and counts toward the call budget; submitted contents stay out of tool-call audit arguments/previews. Credential-shaped keys and values are rejected. Memo expires with the session and remains tenant-private. `ToolError` is the supported catch name for upstream and validation failures; it is an alias of Python `RuntimeError`. Unknown tool errors include scoped suggestions, including when caught inside Python.
 
 Saved scripts use the ordinary execution path, including audit, limits, tool scopes and allow/block policies. A script ID from another workspace is rejected. Editing or deleting a script affects future runs; running executions retain their audited original code. Conflicting browser edits return an error and preserve your draft; copy it before reloading the latest version.
 

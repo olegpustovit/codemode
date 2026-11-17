@@ -1,0 +1,19 @@
+{
+  "nudge": {
+    "team": "team_feb8892b4a6f791dfe7c7f3b",
+    "statuses": {
+      "status_db9ea52bcb530afca5b8e3ab": "Backlog",
+      "status_258a19417236cd8e290c2517": "Todo",
+      "status_f7b98d41eaf4a389cfb114f9": "In Progress",
+      "status_b5fb2e00ee548ec39c487cc5": "Done",
+      "status_f46531cc0cb5710543a035b5": "Canceled",
+      "status_duplicate_team_feb8892b4a6f791dfe7c7f3b": "Duplicate"
+    },
+    "count": 1000,
+    "sha256": "3af2e694f51cc4d7f9aa57beede5abff9c92bf5419f31d01676d7ca920f939b9"
+  },
+  "moneybag": {
+    "count": 1000,
+    "sha256": "b02d6333c3fb6d6c7896b855fe3f47c0ae22d368ad4de4d102d67d2a18035cc2"
+  }
+}

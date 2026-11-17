@@ -1,4 +1,5 @@
 pub mod log;
+mod shape;
 pub(crate) mod title;
 use super::{auth::Principal, sources::Sources};
 use crate::infrastructure::{
@@ -23,6 +24,8 @@ pub enum Error {
     Source,
     #[error("execution stopped")]
     Stopped,
+    #[error("script args must fit within 64 KiB of JSON")]
+    Args,
     #[error(transparent)]
     Session(#[from] super::agent_sessions::Error),
     #[error(transparent)]
@@ -133,25 +136,34 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         if code.len() > 64 * 1024 {
             return Err(Error::Source);
         }
-        self.submit(principal, code).await
+        self.submit(principal, code, "{}".into()).await
     }
     pub fn execute_script(
         self: &Arc<Self>,
         principal: Principal,
         id: Uuid,
+        args: serde_json::Map<String, serde_json::Value>,
     ) -> futures_util::future::BoxFuture<'_, Result<ResultValue, Error>> {
         // Erase this cold SQL-backed future before it enters the MCP dispatcher's state machine.
         Box::pin(async move {
             let code = super::scripts::Scripts::new(self.db.clone())
                 .code_for(principal.workspace_id, id)
                 .await?;
-            self.execute(principal, code).await
+            if code.len() > 64 * 1024 {
+                return Err(Error::Source);
+            }
+            let args = serde_json::to_string(&args).map_err(|_| Error::Args)?;
+            if args.len() > 65536 {
+                return Err(Error::Args);
+            }
+            self.submit(principal, code, args).await
         })
     }
     async fn submit(
         self: &Arc<Self>,
         principal: Principal,
         code: String,
+        args: String,
     ) -> Result<ResultValue, Error> {
         let mut lease = self.access.watch(principal.tenant_id).await?;
         let permit = self
@@ -170,7 +182,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                 .await
             {
                 Ok(id) => {
-                    let future = this.segment(principal, id, code, cancel.clone());
+                    let future = this.segment(principal, id, code, args, cancel.clone());
                     tokio::pin!(future);
                     tokio::select! { biased;
                         _=lease.stopped()=>{ cancel.cancel(); future.await },
@@ -191,6 +203,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         principal: Principal,
         id: Uuid,
         code: String,
+        args: String,
         cancel: CancellationToken,
     ) -> Result<ResultValue, Error> {
         use crate::infrastructure::sandbox::Error as SandboxError;
@@ -202,7 +215,15 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                 .allowed_sources(principal.workspace_id)
                 .await
                 .map_err(|_| SandboxError::Invalid("workspace scope unavailable".into()))?;
-            let prelude = self.sources.prelude(allowed.as_deref()).await;
+            let mut prelude = self
+                .sources
+                .prelude(allowed.as_deref(), principal.workspace_id)
+                .await
+                .map_err(|_| SandboxError::Invalid("workspace tool scope unavailable".into()))?;
+            prelude.push_str(&format!(
+                "\nargs = json.loads({})\n",
+                super::catalogue::stubs::quote(&args)
+            ));
             let (mut run, mut step) = self
                 .sandbox
                 .start_captured_for(principal.token_id, &code, &prelude, capture.clone())
@@ -300,9 +321,22 @@ fn truncate_result(value: Box<RawValue>, budget: usize) -> (Box<RawValue>, usize
     if value.get().len() <= budget {
         return (value, 0);
     }
-    // Truncated JSON becomes a string preview, so the MCP result always remains valid JSON.
-    // Escaping quotes, backslashes and controls also consumes the response budget.
-    let mut remaining = budget.saturating_sub(2);
+    // Summarize through a bounded streaming visitor; large replies never become a host-side tree.
+    let mut shape = shape::summarize(value.get());
+    let suffix = loop {
+        let suffix = format!("\n[shape: {shape}]");
+        let encoded = serde_json::to_string(&suffix).unwrap_or_default();
+        if encoded.len() <= budget.saturating_sub(2) / 2 || shape.is_empty() {
+            break suffix;
+        }
+        let mut end = shape.len() / 2;
+        while !shape.is_char_boundary(end) {
+            end -= 1;
+        }
+        shape.truncate(end);
+    };
+    let suffix_bytes = serde_json::to_string(&suffix).map_or(0, |s| s.len().saturating_sub(2));
+    let mut remaining = budget.saturating_sub(2 + suffix_bytes);
     let mut length = 0;
     for c in value.get().chars() {
         let encoded = match c {
@@ -319,7 +353,8 @@ fn truncate_result(value: Box<RawValue>, budget: usize) -> (Box<RawValue>, usize
     let preview = &value.get()[..length];
     let dropped = value.get().len() - preview.len();
     (
-        serde_json::value::to_raw_value(preview).unwrap_or_else(|_| RawValue::NULL.to_owned()),
+        serde_json::value::to_raw_value(&format!("{preview}{suffix}"))
+            .unwrap_or_else(|_| RawValue::NULL.to_owned()),
         dropped,
     )
 }
@@ -334,8 +369,26 @@ mod tests {
         let original = raw.get().len();
         let (preview, dropped) = truncate_result(raw, OUTPUT);
         let decoded: String = serde_json::from_str(preview.get()).unwrap();
-        assert_eq!(decoded.len() + dropped, original);
+        assert_eq!(
+            decoded.rsplit_once("\n[shape: ").unwrap().0.len() + dropped,
+            original
+        );
         assert!(preview.get().len() <= OUTPUT + 8);
+    }
+
+    #[test]
+    fn truncated_result_describes_rows_and_retains_a_hard_budget() {
+        let rows = vec![serde_json::json!({"id":1,"title":"x".repeat(100)}); 36];
+        let raw = serde_json::value::to_raw_value(
+            &serde_json::json!({"data":{"items":rows,"nextCursor":null}}),
+        )
+        .unwrap();
+        let (preview, dropped) = truncate_result(raw, 256);
+        assert!(dropped > 0);
+        assert!(preview.get().len() <= 256);
+        let decoded: String = serde_json::from_str(preview.get()).unwrap();
+        assert!(decoded.contains("36×"));
+        assert!(decoded.contains("nextCursor"));
     }
 
     #[test]
@@ -350,7 +403,10 @@ mod tests {
             let (preview, dropped) = truncate_result(raw, OUTPUT);
             let decoded: String = serde_json::from_str(preview.get()).unwrap();
             assert!(preview.get().len() <= OUTPUT);
-            assert_eq!(decoded.len() + dropped, original);
+            assert_eq!(
+                decoded.rsplit_once("\n[shape: ").unwrap().0.len() + dropped,
+                original
+            );
         }
     }
 }

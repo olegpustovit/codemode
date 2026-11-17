@@ -236,6 +236,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         mcp_tasks: mcp_tasks.clone(),
         rate_limit: Arc::new(
             codemode_core::components::auth::rate_limit::RateLimiter::new(
+                config.session_requests_per_minute,
                 config.token_requests_per_minute,
                 config.endpoint_requests_per_minute,
             ),

@@ -170,6 +170,12 @@ impl Workspaces {
         tx.commit().await.map_err(DbError::from)?;
         Ok(true)
     }
+    pub async fn tool_scope(&self, workspace: Uuid) -> Result<Option<BTreeSet<String>>, Error> {
+        let row = sqlx::query!(r#"SELECT e.all_tools,
+            ARRAY(SELECT t.path FROM endpoint_tools scope JOIN tools t ON t.source_id=scope.source_id AND t.upstream_name=scope.upstream_name WHERE scope.endpoint_id=e.id) AS "paths!"
+            FROM endpoints e WHERE e.id=$1"#, workspace).fetch_optional(&self.db.0).await.map_err(DbError::from)?.ok_or(Error::NotFound)?;
+        Ok((!row.all_tools).then(|| row.paths.into_iter().collect()))
+    }
     pub async fn sources(&self, workspace: Uuid) -> Result<Option<Vec<Uuid>>, Error> {
         let row = self.get(workspace).await?.ok_or(Error::NotFound)?;
         Ok(if row.all_sources {

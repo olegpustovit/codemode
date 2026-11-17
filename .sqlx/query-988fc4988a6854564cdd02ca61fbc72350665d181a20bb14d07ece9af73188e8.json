@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO agent_session_memo(session_id,tenant_id,data)\n                    SELECT $1,$2,jsonb_build_object($3::text,$4::jsonb)\n                    WHERE octet_length(jsonb_build_object($3::text,$4::jsonb)::text)<=65536\n                    ON CONFLICT(session_id) DO UPDATE SET data=agent_session_memo.data || EXCLUDED.data\n                    WHERE agent_session_memo.tenant_id=EXCLUDED.tenant_id AND octet_length((agent_session_memo.data || EXCLUDED.data)::text)<=65536\n                    RETURNING session_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "session_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "agent_session_memo",
+            "name": "session_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "988fc4988a6854564cdd02ca61fbc72350665d181a20bb14d07ece9af73188e8"
+}

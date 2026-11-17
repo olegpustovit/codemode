@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.all_tools,\n            ARRAY(SELECT t.path FROM endpoint_tools scope JOIN tools t ON t.source_id=scope.source_id AND t.upstream_name=scope.upstream_name WHERE scope.endpoint_id=e.id) AS \"paths!\"\n            FROM endpoints e WHERE e.id=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "all_tools",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "endpoints",
+            "name": "all_tools"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "paths!",
+        "type_info": "TextArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "6aa308561544cf69d9d2cb1d15d6854746b93573d5bb6ca83c4523771d696812"
+}

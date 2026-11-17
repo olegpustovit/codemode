@@ -26,10 +26,19 @@ struct RankedMatch {
     description: String,
     signature: String,
     rank: f32,
+    blocked: bool,
+}
+
+struct ManifestTool {
+    source: String,
+    path: Option<String>,
+    total: i64,
+    blocked: bool,
 }
 
 #[derive(Serialize)]
 pub struct Match {
+    pub blocked: bool,
     pub path: String,
     pub description: String,
     pub signature: String,
@@ -61,6 +70,24 @@ pub enum SearchError {
 impl Catalogue {
     pub fn new(db: Database) -> Self {
         Self { db }
+    }
+
+    pub async fn manifest(&self, workspace: Uuid) -> Result<String, Error> {
+        let rows = sqlx::query_as!(ManifestTool, r#"WITH visible AS (
+            SELECT COALESCE(s.python_name,s.slug) AS source,t.path,
+            count(t.path) OVER(PARTITION BY s.id) AS total,
+            row_number() OVER(PARTITION BY s.id ORDER BY CASE
+                WHEN t.upstream_name IN ('artifact_list','entries_list','list_issues') THEN 0
+                WHEN t.upstream_name IN ('artifact_read','doc_create','list_teams','accounts_list','get_issue') THEN 1
+                WHEN t.upstream_name IN ('list_issue_statuses','entry_post','tags_set','create_issue') THEN 2
+                ELSE 3 END,t.path) AS position,
+            EXISTS(SELECT 1 FROM tool_policies p WHERE p.endpoint_id=e.id AND p.source_id=s.id AND p.upstream_name=t.upstream_name AND p.action='block') AS blocked
+            FROM sources s JOIN endpoints e ON e.id=$1 AND e.tenant_id=s.tenant_id
+            LEFT JOIN tools t ON t.source_id=s.id AND (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=s.id AND scope.upstream_name=t.upstream_name))
+            WHERE e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=s.id)
+        ) SELECT source AS "source!",path AS "path?",total AS "total!",blocked AS "blocked!" FROM visible WHERE position<=5 ORDER BY source,path"#, workspace)
+            .fetch_all(&self.db.0).await?;
+        Ok(manifest(rows))
     }
 
     pub async fn replace(
@@ -133,22 +160,74 @@ impl Catalogue {
         let rank = cursor.as_ref().map(|c| c.rank);
         let path = cursor.as_ref().map(|c| c.path.as_str());
         let rows=sqlx::query_as!(RankedMatch, r#"WITH ranked AS (
-          SELECT path,description,CASE WHEN $2 THEN stub_full ELSE stub_brief END AS signature,
+          SELECT path,description,stub_brief,stub_full,
+          EXISTS(SELECT 1 FROM tool_policies p WHERE p.endpoint_id=$6 AND p.source_id=t.source_id AND p.upstream_name=t.upstream_name AND p.action='block') AS blocked,
           CASE WHEN btrim($1)='' THEN 0::real ELSE ts_rank(search,websearch_to_tsquery('simple',$1)) END AS rank
           FROM tools t WHERE ($5::uuid[] IS NULL OR source_id=ANY($5)) AND (btrim($1)='' OR search @@ websearch_to_tsquery('simple',$1))
-          AND ($6::uuid IS NULL OR NOT EXISTS(SELECT 1 FROM tool_policies p JOIN endpoints e ON e.id=p.endpoint_id WHERE e.id=$6 AND p.source_id=t.source_id AND p.upstream_name=t.upstream_name AND p.action='block'))
           AND ($6::uuid IS NULL OR NOT EXISTS(SELECT 1 FROM endpoints e WHERE e.id=$6 AND NOT e.all_tools AND NOT EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=t.source_id AND scope.upstream_name=t.upstream_name)))
-        ) SELECT path,description,signature AS "signature!",rank AS "rank!" FROM ranked
-          WHERE $3::real IS NULL OR rank < $3 OR (rank=$3 AND path>$4)
-          ORDER BY rank DESC,path LIMIT 21"#,query,full,rank,path,allowed,workspace).fetch_all(&self.db.0).await.map_err(Error::from)?;
+        ), paged AS (
+          SELECT * FROM ranked WHERE $3::real IS NULL OR rank < $3 OR (rank=$3 AND path>$4)
+          ORDER BY rank DESC,path LIMIT 11
+        ) SELECT path,description,
+          CASE WHEN $2 AND row_number() OVER(ORDER BY rank DESC,path)<=3 THEN stub_full ELSE stub_brief END AS "signature!",
+          rank AS "rank!",blocked AS "blocked!" FROM paged ORDER BY rank DESC,path"#,query,full,rank,path,allowed,workspace).fetch_all(&self.db.0).await.map_err(Error::from)?;
         page(rows, query, full)
     }
 }
 
-// Budget: five allocations for a paginated 21-row response, excluding the reused output buffer.
+fn manifest(rows: Vec<ManifestTool>) -> String {
+    let mut groups = std::collections::BTreeMap::<String, (i64, Vec<String>)>::new();
+    for row in rows {
+        let group = groups
+            .entry(row.source)
+            .or_insert_with(|| (row.total, Vec::new()));
+        if let Some(path) = row.path {
+            let name = path
+                .rsplit_once('.')
+                .map_or(path.as_str(), |(_, name)| name);
+            group.1.push(format!(
+                "{}{}",
+                name.chars().take(64).collect::<String>(),
+                if row.blocked { " [blocked]" } else { "" }
+            ));
+        }
+    }
+    let count: i64 = groups.values().map(|(count, _)| *count).sum();
+    let mut text = format!(
+        "Connected sources ({count} tools), already loaded inside execute as tools.<source>.<tool>: "
+    );
+    if groups.is_empty() {
+        text.push_str("none");
+    }
+    let total = groups.len();
+    for (index, (source, (count, mut names))) in groups.into_iter().enumerate() {
+        if count > names.len() as i64 {
+            names.push("…".into());
+        }
+        let entry = format!(
+            "{} ({count}: {})",
+            source.chars().take(80).collect::<String>(),
+            names.join(", ")
+        );
+        if text.len() + entry.len() + 80 > 1536 {
+            text.push_str(&format!(
+                "… {} more sources; discover with tools.search",
+                total - index
+            ));
+            break;
+        }
+        if index > 0 {
+            text.push_str("; ");
+        }
+        text.push_str(&entry);
+    }
+    text
+}
+
+// Budget: five allocations for a brief paginated 11-row response, excluding the reused output buffer.
 fn page(rows: Vec<RankedMatch>, query: &str, full: bool) -> Result<Page, SearchError> {
-    let next = if rows.len() > 20 {
-        let row = &rows[19];
+    let next = if rows.len() > 10 {
+        let row = &rows[9];
         Some(
             URL_SAFE_NO_PAD.encode(
                 serde_json::to_vec(&Cursor {
@@ -163,13 +242,28 @@ fn page(rows: Vec<RankedMatch>, query: &str, full: bool) -> Result<Page, SearchE
     } else {
         None
     };
+    let mut definitions = std::collections::BTreeSet::new();
     let tools = rows
         .into_iter()
-        .take(20)
-        .map(|r| Match {
-            path: r.path,
-            description: first_line(r.description),
-            signature: r.signature,
+        .take(10)
+        .map(|mut r| {
+            if full && r.signature.contains("from typing import") {
+                r.signature = r
+                    .signature
+                    .lines()
+                    .filter(|line| {
+                        (!line.starts_with("from typing import") && !line.contains(" = TypedDict("))
+                            || definitions.insert((*line).to_owned())
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+            }
+            Match {
+                path: r.path,
+                description: first_line(r.description),
+                signature: r.signature,
+                blocked: r.blocked,
+            }
         })
         .collect();
     Ok(Page {
@@ -182,6 +276,14 @@ fn first_line(mut text: String) -> String {
     if let Some(end) = text.find(['\n', '\r']) {
         text.truncate(end);
     }
+    if text.len() > 180 {
+        let mut end = 177;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.truncate(end);
+        text.push_str("...");
+    }
     text
 }
 
@@ -189,13 +291,58 @@ fn first_line(mut text: String) -> String {
 mod tests {
     use super::*;
     #[test]
+    fn discovery_descriptions_are_compact_utf8_without_extra_allocations() {
+        assert_eq!(first_line("First line.\nMore docs.".into()), "First line.");
+        assert_eq!(first_line("x".repeat(180)).len(), 180);
+        let long = "界".repeat(100);
+        let mut compact = String::new();
+        let allocations = allocation_counter::measure(|| compact = first_line(long));
+        assert_eq!(allocations.count_total, 0);
+        assert_eq!(compact.len(), 180);
+        assert!(compact.ends_with("..."));
+    }
+    #[test]
+    fn manifests_name_sources_tools_blocks_and_stay_within_the_byte_budget() {
+        let text = manifest(vec![
+            ManifestTool {
+                source: "nudge".into(),
+                path: Some("nudge.list_issues".into()),
+                total: 15,
+                blocked: false,
+            },
+            ManifestTool {
+                source: "artifacts".into(),
+                path: Some("artifacts.artifact_delete".into()),
+                total: 1,
+                blocked: true,
+            },
+        ]);
+        assert!(text.contains("Connected sources (16 tools)"));
+        assert!(text.contains("artifact_delete [blocked]"));
+        assert!(text.contains("nudge (15: list_issues, …)"));
+        let rows = (0..64)
+            .map(|i| ManifestTool {
+                source: format!("source_{i}_{}", "s".repeat(80)),
+                path: Some("x".repeat(200)),
+                total: 100,
+                blocked: false,
+            })
+            .collect();
+        let bounded = manifest(rows);
+        assert!(bounded.len() <= 1536);
+        assert!(bounded.contains("more sources"));
+        assert!(manifest(vec![]).contains("none"));
+    }
+
+    #[test]
     fn ranked_rows_to_json_has_a_fixed_allocation_budget() {
-        let rows = (0..21)
+        let rows = (0..11)
             .map(|i| RankedMatch {
                 path: format!("example.tool_{i}"),
                 description: "First line.\nFull documentation.".into(),
                 signature: "async def tools.example.tool(*, text: str) -> str".into(),
                 rank: 0.5,
+                blocked: false,
             })
             .collect();
         let mut output = Vec::with_capacity(32768);
@@ -209,7 +356,7 @@ mod tests {
             allocations.count_total
         );
         let response: serde_json::Value = serde_json::from_slice(&output).unwrap();
-        assert_eq!(response["tools"].as_array().unwrap().len(), 20);
+        assert_eq!(response["tools"].as_array().unwrap().len(), 10);
         assert_eq!(response["tools"][0]["description"], "First line.");
         assert!(response["nextCursor"].is_string());
     }

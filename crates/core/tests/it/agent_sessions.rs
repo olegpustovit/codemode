@@ -477,3 +477,107 @@ async fn sessions_migration_backfills_idle_boundaries_titles_grants_and_four_day
             .is_err()
     );
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn session_memo_rls_rejects_foreign_reads_and_writes(pool: sqlx::PgPool) {
+    use codemode_core::components::{
+        agent_sessions::{AgentSessions, Error as SessionError, memo::Request},
+        sessions::Sessions,
+        workspaces::Workspaces,
+    };
+    use secrecy::ExposeSecret;
+    let global = database(&pool).await;
+    let browser = Sessions::new(global.clone());
+    let mut owned = Vec::new();
+    for email in ["ursus95@gmail.com", "alice@olegpustovit.com"] {
+        let cookie = browser
+            .register(email, "fixture-browser-password".into())
+            .await
+            .unwrap();
+        let user = browser.user(cookie.expose_secret()).await.unwrap().unwrap();
+        let db = global.for_tenant(user.tenant_id).await.unwrap();
+        let workspaces = Workspaces::new(db.clone(), "test.example".into()).unwrap();
+        workspaces.initialize().await.unwrap();
+        let workspace = workspaces.default_id().await.unwrap();
+        let auth = Auth::new(db.clone());
+        let (_, token) = auth
+            .create_for_workspace("memo agent", workspace, "test.example", "/mcp")
+            .await
+            .unwrap()
+            .unwrap();
+        let principal = auth
+            .authenticate(&token, "test.example")
+            .await
+            .unwrap()
+            .unwrap();
+        let service = AgentSessions::new(db.clone());
+        let session = service.touch(&principal).await.unwrap();
+        let execution: Uuid = sqlx::query_scalar("INSERT INTO executions(token_id,session_id,code,status) VALUES($1,$2,'return None','completed') RETURNING id").bind(principal.token_id).bind(session).fetch_one(&pool).await.unwrap();
+        service
+            .memo(
+                execution,
+                workspace,
+                Request::Set {
+                    key: "team".into(),
+                    value: serde_json::json!(email),
+                },
+            )
+            .await
+            .unwrap();
+        owned.push((db, user.tenant_id, session, workspace, execution));
+    }
+    for (own, other) in [(0, 1), (1, 0)] {
+        let service = AgentSessions::new(owned[own].0.clone());
+        assert!(matches!(
+            service
+                .memo(
+                    owned[other].4,
+                    owned[other].3,
+                    Request::Get { key: "team".into() }
+                )
+                .await,
+            Err(SessionError::NotFound)
+        ));
+        assert!(matches!(
+            service
+                .memo(
+                    owned[other].4,
+                    owned[other].3,
+                    Request::Set {
+                        key: "team".into(),
+                        value: serde_json::json!("foreign")
+                    }
+                )
+                .await,
+            Err(SessionError::NotFound)
+        ));
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("SET LOCAL ROLE codemode_tenant")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        sqlx::query("SELECT set_config('codemode.tenant_id',$1,true)")
+            .bind(owned[own].1.to_string())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let foreign: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM agent_session_memo WHERE session_id=$1")
+                .bind(owned[other].2)
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        assert_eq!(foreign, 0);
+        let altered = sqlx::query("UPDATE agent_session_memo SET data='{}' WHERE session_id=$1")
+            .bind(owned[other].2)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        assert_eq!(altered.rows_affected(), 0);
+        assert!(sqlx::query("INSERT INTO agent_session_memo(session_id,tenant_id,data) VALUES($1,$2,'{}') ON CONFLICT(session_id) DO UPDATE SET tenant_id=EXCLUDED.tenant_id,data=EXCLUDED.data").bind(owned[other].2).bind(owned[own].1).execute(&mut *tx).await.is_err());
+        tx.rollback().await.unwrap();
+    }
+    for (db, ..) in owned {
+        db.close().await;
+    }
+}

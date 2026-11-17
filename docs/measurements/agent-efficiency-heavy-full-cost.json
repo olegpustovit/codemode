@@ -1,0 +1,25 @@
+{
+  "runs": 60,
+  "basis": "price_independent_nonnegative_unit_price_bound",
+  "cost_ratio_or_upper_bound": 0.9057599020392785,
+  "token_totals": {
+    "codemode": {
+      "fresh_input": 271900,
+      "cache_read": 1635456,
+      "cache_write": 0,
+      "output": 19232
+    },
+    "direct": {
+      "fresh_input": 685512,
+      "cache_read": 2167808,
+      "cache_write": 0,
+      "output": 21233
+    }
+  },
+  "reported_usd": null,
+  "problems": [
+    "unclean or failed run: heavy-moneybag-5 codemode r0",
+    "at least 2x lower total cost is not proven"
+  ],
+  "pass": false
+}

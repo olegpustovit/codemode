@@ -112,6 +112,6 @@ while True:
 assert task["status"] == "completed", task
 result = json.loads(task["result"]["content"][0]["text"])
 assert result["status"] == "completed" and result["result"] == 42, result
-print("PASS: both MCP eras, exactly three tools, auth, execution, errors, truncation and MCP task polling")
+print("PASS: both MCP eras, exactly two tools, auth, execution, errors, truncation and MCP task polling")
 if len(rejections) == 2:
     print("PASS: loopback unknown-host rejection")

@@ -1,4 +1,7 @@
 mod http;
+pub(crate) const SEARCH_PATH: &str = "@codemode/search";
+pub(crate) const MEMO_PATH: &str = "@codemode/memo";
+pub(crate) const UNKNOWN_PATH: &str = "@codemode/unknown";
 use super::{
     accounts::Accounts,
     catalogue::Definition,
@@ -45,6 +48,7 @@ pub struct Tool {
     pub revision: i64,
     pub definition: Definition,
     pub(crate) validator: Arc<jsonschema::Validator>,
+    pub(crate) omit_null: Arc<std::collections::BTreeSet<String>>,
     pub(crate) target: Target,
 }
 #[derive(Clone)]
@@ -73,6 +77,7 @@ pub(crate) struct Broker {
     db: Database,
     accounts: Accounts,
     origin: String,
+    workspaces: Workspaces,
     policies: Policies,
 }
 impl Broker {
@@ -84,6 +89,7 @@ impl Broker {
     ) -> Self {
         Self {
             origin: format!("https://{}", endpoints.main_hostname()),
+            workspaces: endpoints,
             db,
             accounts,
             policies,
@@ -112,6 +118,33 @@ impl Broker {
     pub(crate) fn account_link(&self, source: Uuid) -> String {
         format!("{}/sources/{source}/accounts", self.origin)
     }
+    async fn search(&self, args: Value, workspace: Uuid) -> Result<Box<RawValue>, CallError> {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Input {
+            query: String,
+        }
+        let input: Input = serde_json::from_value(args)
+            .map_err(|_| CallError::Invalid("tools.search requires query: str".into()))?;
+        let allowed = self
+            .workspaces
+            .sources(workspace)
+            .await
+            .map_err(|_| CallError::Blocked("workspace scope unavailable".into()))?;
+        let page = super::catalogue::Catalogue::new(self.db.clone())
+            .search_scoped(
+                &input.query,
+                false,
+                None,
+                allowed.as_deref(),
+                Some(workspace),
+            )
+            .await
+            .map_err(|error| CallError::Invalid(error.to_string()))?;
+        serde_json::value::to_raw_value(&page.tools)
+            .map_err(|_| CallError::Upstream("could not encode search results".into()))
+    }
+
     pub async fn dispatch(
         &self,
         execution: Uuid,
@@ -123,7 +156,21 @@ impl Broker {
     ) -> (u32, CallResult) {
         let started = Instant::now();
         let args: Result<Value, _> = serde_json::from_str(call.args.get());
-        let redacted = args.as_ref().map(redact).unwrap_or(Value::Null);
+        let redacted = if call.path == MEMO_PATH {
+            let op = match args
+                .as_ref()
+                .ok()
+                .and_then(|args| args.get("op"))
+                .and_then(Value::as_str)
+            {
+                Some("get") => "get",
+                Some("set") => "set",
+                _ => "invalid",
+            };
+            serde_json::json!({"op":op,"contents":"[REDACTED]"})
+        } else {
+            args.as_ref().map(redact).unwrap_or(Value::Null)
+        };
         let audit=sqlx::query_scalar!("INSERT INTO tool_calls(execution_id,seq,path,args_redacted,outcome) VALUES($1,$2,$3,$4,'running') RETURNING id",execution,seq as i32,call.path,redacted).fetch_one(&self.db.0).await;
         let Ok(id) = audit else {
             return (
@@ -132,8 +179,42 @@ impl Broker {
             );
         };
         let result = match args {
-            Ok(args) => match tool {
+            Ok(_) if call.path == UNKNOWN_PATH => {
+                Err(CallError::Invalid(tool.err().unwrap_or_else(|| {
+                    "unknown-tool lookup unavailable".into()
+                })))
+            }
+            Ok(args) if call.path == SEARCH_PATH => self.search(args, workspace).await,
+            Ok(args) if call.path == MEMO_PATH => {
+                match serde_json::from_value::<super::agent_sessions::memo::Request>(args) {
+                    Ok(request) => super::agent_sessions::AgentSessions::new(self.db.clone())
+                        .memo(execution, workspace, request)
+                        .await
+                        .map_err(|error| match error {
+                            super::agent_sessions::Error::NotFound => {
+                                CallError::Blocked("agent session memo is unavailable".into())
+                            }
+                            super::agent_sessions::Error::MemoLimit
+                            | super::agent_sessions::Error::MemoSensitive => {
+                                CallError::Invalid(error.to_string())
+                            }
+                            _ => {
+                                CallError::Upstream("agent session memo storage unavailable".into())
+                            }
+                        })
+                        .and_then(|value| {
+                            serde_json::value::to_raw_value(&value).map_err(|_| {
+                                CallError::Upstream("could not encode memo result".into())
+                            })
+                        }),
+                    Err(_) => Err(CallError::Invalid(
+                        "memo requires op=get/set, a string key, and a JSON value for set".into(),
+                    )),
+                }
+            }
+            Ok(mut args) => match tool {
                 Ok(tool) => {
+                    strip_optional_nulls(&mut args, &tool.omit_null);
                     let revision = sqlx::query_scalar!(
                         "SELECT s.revision FROM sources s JOIN endpoints e ON e.id=$2 WHERE s.id=$1 AND (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.source_id=s.id AND es.endpoint_id=e.id))",
                         tool.source_id,workspace
@@ -194,10 +275,14 @@ impl Broker {
             Err(CallError::Upstream(_)) => "tool_error",
         };
         let error = result.as_ref().err().map(ToString::to_string);
-        let preview = result
-            .as_ref()
-            .ok()
-            .map(|value| super::execution::log::preview(value.get(), 2048));
+        let preview = if call.path == MEMO_PATH {
+            None
+        } else {
+            result
+                .as_ref()
+                .ok()
+                .map(|value| super::execution::log::preview(value.get(), 2048))
+        };
         let elapsed = started.elapsed().as_millis().min(i64::MAX as u128) as i64;
         if sqlx::query!(
             "UPDATE tool_calls SET outcome=$2,error=$3,duration_ms=$4,preview=$5 WHERE id=$1",
@@ -252,7 +337,7 @@ pub(crate) fn unavailable(path: &str, workspace: Uuid) -> String {
     format!("tool {path} is blocked in workspace {workspace}; use search to find allowed tools")
 }
 
-fn secret_key(key: &str) -> bool {
+pub(crate) fn secret_key(key: &str) -> bool {
     let key = key.to_ascii_lowercase().replace(['-', '_'], "");
     [
         "token",
@@ -298,6 +383,36 @@ fn prefix(value: &str, max: usize) -> &str {
     &value[..n]
 }
 
+// Compile property validators against the original root so local references keep their meaning.
+pub(crate) fn optional_nonnullable(
+    schema: &Value,
+) -> Result<std::collections::BTreeSet<String>, jsonschema::ValidationError<'static>> {
+    let validators = jsonschema::options().offline().build_map(schema)?;
+    let required = schema.get("required").and_then(Value::as_array);
+    Ok(schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|p| p.keys())
+        .filter(|key| !required.is_some_and(|r| r.iter().any(|v| v.as_str() == Some(key.as_str()))))
+        .filter(|key| {
+            validators
+                .get(&format!(
+                    "#/properties/{}",
+                    key.replace('~', "~0").replace('/', "~1")
+                ))
+                .is_some_and(|v| !v.is_valid(&Value::Null))
+        })
+        .cloned()
+        .collect())
+}
+
+fn strip_optional_nulls(args: &mut Value, omit: &std::collections::BTreeSet<String>) {
+    if let Some(args) = args.as_object_mut() {
+        args.retain(|key, value| !value.is_null() || !omit.contains(key));
+    }
+}
+
 impl Tool {
     pub(crate) fn validate(&self, args: &Value) -> Result<(), String> {
         if let Some(error) = self.validator.iter_errors(args).next() {
@@ -320,9 +435,16 @@ impl Tool {
                 _ => format!("constraint {}", error.schema_path()),
             };
             return Err(format!(
-                "{}: invalid argument at {} ({expected})",
+                "{}: invalid argument at {} ({expected})\n  signature: {}",
                 self.definition.path,
-                error.instance_path()
+                error.instance_path(),
+                super::catalogue::stubs::generate(
+                    &self.definition.path,
+                    "",
+                    &self.definition.input_schema,
+                    None
+                )
+                .brief
             ));
         }
         if let Target::Graphql { kind, .. } = &self.target {
@@ -487,6 +609,26 @@ impl Tool {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn optional_nulls_preserve_required_nullable_nested_and_referenced_values() {
+        let schema = json!({"type":"object", "$defs":{"text":{"type":"string"}},
+            "required":["required"], "properties":{
+                "cursor":{"$ref":"#/$defs/text"}, "required":{"type":"string"},
+                "nullable":{"anyOf":[{"type":"string"},{"type":"null"}]},
+                "nested":{"type":"object"}, "a/b~c":{"type":"integer"}}});
+        let omit = optional_nonnullable(&schema).unwrap();
+        let mut args = json!({"cursor":null,"required":null,"nullable":null,
+            "nested":{"cursor":null},"unknown":null,"a/b~c":null});
+        strip_optional_nulls(&mut args, &omit);
+        assert_eq!(
+            args,
+            json!({"required":null,"nullable":null,"nested":{"cursor":null},"unknown":null})
+        );
+        assert!(!jsonschema::validator_for(&schema).unwrap().is_valid(&args));
+        args["required"] = json!("present");
+        assert!(jsonschema::validator_for(&schema).unwrap().is_valid(&args));
+    }
+
     #[test]
     fn redacts_nested_secrets_in_arguments_and_error_messages() {
         let args = json!({"nested":[{"api-key":"sekret","name":"fine"}],"long":"é".repeat(2000)});

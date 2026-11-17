@@ -285,7 +285,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         access: Default::default(),
         mcp_tasks: server::Tasks::default(),
         rate_limit: Arc::new(
-            codemode_core::components::auth::rate_limit::RateLimiter::new(60, 600),
+            codemode_core::components::auth::rate_limit::RateLimiter::new(60, 60, 600),
         ),
         oauth: Arc::new(codemode_core::components::auth::oauth::OAuth::new(
             db.clone(),
@@ -308,7 +308,9 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
     let limited_auth = state.auth.clone();
     let limited_state = server::State {
         access: Default::default(),
-        rate_limit: Arc::new(codemode_core::components::auth::rate_limit::RateLimiter::new(1, 2)),
+        rate_limit: Arc::new(
+            codemode_core::components::auth::rate_limit::RateLimiter::new(1, 1, 2),
+        ),
         ..state.clone()
     };
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -384,7 +386,15 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
             ("test.example", main_token.as_str()),
         ] {
             if version == "2025-11-25" {
-                rpc(&client,&url,host,token,version,"initialize",serde_json::json!({"protocolVersion":version,"capabilities":{},"clientInfo":{"name":"endpoint-test","version":"1"}})).await;
+                let initialized = rpc(&client,&url,host,token,version,"initialize",serde_json::json!({"protocolVersion":version,"capabilities":{},"clientInfo":{"name":"endpoint-test","version":"1"}})).await;
+                assert_eq!(initialized["serverInfo"]["name"], "codemode");
+                let instructions = initialized["instructions"].as_str().unwrap();
+                assert!(instructions.contains("Connected sources"));
+                assert!(instructions.contains("features.apps=false"));
+                assert_eq!(
+                    initialized["serverInfo"]["version"],
+                    option_env!("CODEMODE_BUILD_ID").unwrap_or(env!("CARGO_PKG_VERSION"))
+                );
             }
             let listed = rpc(
                 &client,
@@ -397,6 +407,28 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
             )
             .await;
             assert_eq!(listed["tools"].as_array().unwrap().len(), 2);
+            let description = listed["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|t| t["name"] == "execute")
+                .unwrap()["description"]
+                .as_str()
+                .unwrap();
+            assert!(description.contains("await tools.search("));
+            assert!(description.contains("Connected sources"));
+            if token == work_token {
+                assert!(description.contains("alpha"));
+                assert!(!description.contains("beta"));
+            }
+            if token == home_token {
+                assert!(description.contains("beta"));
+                assert!(!description.contains("alpha"));
+            }
+            if version == "2026-07-28" {
+                assert_eq!(listed["cacheScope"], "private");
+            }
+
             assert_eq!(
                 listed["tools"]
                     .as_array()
@@ -651,6 +683,19 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         .create("third rate-limit caller", "test.example")
         .await
         .unwrap();
+    for _ in 0..8 {
+        rpc(
+            &client,
+            &limited_url,
+            "test.example",
+            &main_token,
+            "2025-11-25",
+            "tools/list",
+            serde_json::json!({}),
+        )
+        .await;
+        rpc(&client, &limited_url, "test.example", &main_token, "2025-11-25", "initialize", serde_json::json!({"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"rate-test","version":"1"}})).await;
+    }
     for (token, status) in [
         (&main_token, 200),
         (&main_token, 429),
@@ -663,7 +708,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
             .bearer_auth(token)
             .header("accept", "application/json, text/event-stream")
             .header("MCP-Protocol-Version", "2025-11-25")
-            .json(&serde_json::json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}))
+            .json(&serde_json::json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"execute","arguments":{"code":"return 42"}}}))
             .send()
             .await
             .unwrap();

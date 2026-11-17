@@ -199,7 +199,7 @@ pub async fn router(
     Ok(client.routes().layer(middleware::from_fn_with_state(
         Boundary {
             hostname,
-            limit: Arc::new(RateLimiter::new(60, 60)),
+            limit: Arc::new(RateLimiter::new(60, 60, 60)),
         },
         boundary,
     )))

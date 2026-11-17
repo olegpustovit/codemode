@@ -15,6 +15,7 @@ pub struct Config {
     pub log_json: bool,
     pub execution_limits: Limits,
     pub output_bytes: usize,
+    pub session_requests_per_minute: u32,
     pub token_requests_per_minute: u32,
     pub endpoint_requests_per_minute: u32,
 }
@@ -75,11 +76,19 @@ impl Config {
                 )? as u64),
             },
             output_bytes: limit("CODEMODE_OUTPUT_BYTES", 32768, 256..=1048576)?,
-            token_requests_per_minute: limit("CODEMODE_TOKEN_REQUESTS_PER_MINUTE", 60, 1..=60_000)?
-                as u32,
+            session_requests_per_minute: limit(
+                "CODEMODE_SESSION_REQUESTS_PER_MINUTE",
+                600,
+                1..=60_000,
+            )? as u32,
+            token_requests_per_minute: limit(
+                "CODEMODE_TOKEN_REQUESTS_PER_MINUTE",
+                6000,
+                1..=60_000,
+            )? as u32,
             endpoint_requests_per_minute: limit(
                 "CODEMODE_ENDPOINT_REQUESTS_PER_MINUTE",
-                600,
+                6000,
                 1..=600_000,
             )? as u32,
         };

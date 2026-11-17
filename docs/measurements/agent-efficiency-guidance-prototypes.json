@@ -1,0 +1,63 @@
+{
+  "scope": "Frozen E4 and debug guidance prototypes; not final optimized/full L4 acceptance",
+  "measurements": {
+    "e4-off-valid": {
+      "pass": false,
+      "runs": 120,
+      "metrics": {
+        "mcp_calls": 5.0,
+        "pre_execute_calls": 2.0,
+        "execute_error_rate": 0.1550632911392405,
+        "input_tokens": 99105.5,
+        "uncached_input_tokens": 11245.0,
+        "wall_s": 25.4,
+        "search_median_bytes": 1502.0,
+        "search_max_bytes": 14791
+      },
+      "problems": [
+        "mcp_calls: 5.0 exceeds 3",
+        "pre_execute_calls: 2.0 exceeds 1",
+        "execute_error_rate: 0.1550632911392405 exceeds 0.03",
+        "input_tokens: 99105.5 exceeds 80000",
+        "wall_s: 25.4 exceeds 18",
+        "search_max_bytes: 14791 exceeds 12000"
+      ]
+    },
+    "guidance-prototype": {
+      "pass": false,
+      "runs": 8,
+      "metrics": {
+        "mcp_calls": 3.5,
+        "pre_execute_calls": 0.0,
+        "execute_error_rate": 0.07407407407407407,
+        "input_tokens": 69236.0,
+        "uncached_input_tokens": 10351.0,
+        "wall_s": 20.85,
+        "search_median_bytes": 0,
+        "search_max_bytes": 0
+      },
+      "problems": [
+        "mcp_calls: 3.5 exceeds 3",
+        "execute_error_rate: 0.07407407407407407 exceeds 0.03",
+        "wall_s: 20.85 exceeds 18"
+      ]
+    },
+    "memo-guidance-prototype": {
+      "pass": false,
+      "runs": 8,
+      "metrics": {
+        "mcp_calls": 3.0,
+        "pre_execute_calls": 0.0,
+        "execute_error_rate": 0.0,
+        "input_tokens": 60129.0,
+        "uncached_input_tokens": 10274.5,
+        "wall_s": 20.05,
+        "search_median_bytes": 0,
+        "search_max_bytes": 0
+      },
+      "problems": [
+        "wall_s: 20.05 exceeds 18"
+      ]
+    }
+  }
+}

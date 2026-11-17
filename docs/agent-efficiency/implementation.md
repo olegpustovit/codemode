@@ -610,3 +610,18 @@ deployment has occurred. A production-UI identity check verifies all 84 staged
 historical frontend files are byte-identical to public HTTPS. The attempted
 local historical-UI timing run stopped at the stale-bundle guard before any
 measurement; no baseline timing is claimed from its leftover output file.
+
+## Owner-directed release decision
+
+On 2026-11-17 the owner explicitly requested proceeding with deployment after
+being shown the remaining qualification limits ("dude pls get this deployed i
+think all is good"). Proceed with the existing correctness/safety deployment
+smoke gate and rollback, retaining the unmet 2x heavy-cost and 50 ms pane timing
+results as release limitations. This is an owner-directed release decision, not
+an assertion that those performance targets pass. The in-progress minimal-profile
+experiment remains research and does not change the qualified product profile.
+No shader changes are included. A proposed, uncommitted expansion of the gate
+was removed; the existing smoke gate remains unchanged.
+
+Research archive version 2 now contains 2,638 transcript files, 51 receipts and
+11,513 verified members. Receipt rows overlap and are not unique attempts.

@@ -398,3 +398,32 @@ headers. A real Codex probe and lowercase-header/rewritten-UTF-8 probes pass;
 the corrected 120-run E4 comparison is running. This is a harness correction,
 not a gateway or safety failure. E5 legacy-client compatibility is still being
 probed; E1, heavy-pack E6 and Claude E7 remain unfinished. No merge/deploy.
+
+## Corrected E4 and memo-guidance prototype
+
+The corrected E4 inline-off comparison completes **120/120 task successes**.
+Median calls remain 5, pre-execute calls 2, execute errors 15.51%, total input
+99,105.5, uncached input 11,245 and time 25.4 s. The 14,791 B search case belongs
+to the frozen pre-summary-correction binary; the old executable is preserved at
+ignored `target/agent-efficiency-frozen/codemode`, checksum-bound to its receipt.
+
+An eight-task debug prototype of the new guidance improves calls to 3.5 and
+input to 69,236 tokens, but its two execute errors exposed a documentation
+regression: the revised memo sentence omitted get/set, and agents attempted
+dictionary assignment. Explicit `memo.get(key)` / `memo.set(key, value)` guidance
+is restored, including that indexing is unsupported. The next eight-task debug
+prototype passes **8/8 with zero execute errors**, medians **3 calls**, **0
+pre-execute calls**, **60,129 input**, **10,274.5 uncached input**, **20.05 s**.
+Only the time gate fails in that small sample. These are debugging measurements
+concurrent with the old E4 cohort, not final optimized or full L4 acceptance.
+The optimized follow-up will run without overlapping model cohorts.
+
+E5 pinned-client probes are preserved as failures. Official CLI 0.134.0 retains
+the older always-defer switch, but cannot decode the current model catalogue's
+max reasoning level; selected model requests are rejected for that client. No
+valid on/off experiment is claimed. No global client or provider consent was
+changed. E1, valid E5, the ten-task heavy pack/cost gate and Claude E7 remain, as
+do the full optimized comparison and pane timing gate.
+
+Latest native verification after restoring the memo API wording: **154/154 pass**,
+15.52 s total including 3.62 s build. The application remains unmerged/undeployed.

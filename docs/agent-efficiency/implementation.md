@@ -462,3 +462,16 @@ previous harness at startup, so it retains its original grading and cleanup.
 The final help-correction commit is 22d4acf. Its optimized build and hardened
 ARM test run are in progress. A separate b779625-based E1 worktree has been
 created for the A1+A2 counterfactual; it is not qualified or part of the release.
+
+## Final help-correction isolation checkpoint
+
+Source 22d4acf passes the strict hardened Oracle suite: 154/154, build/staging
+183.43 s, total 219.85 s, slowest 3.999 s under its 5 s integration deadline.
+The hardened slow suite also passes 162/162: build/staging 172.18 s, total
+247.24 s. These checks include the real-worker parameter-help assertion.
+The optimized host build completes in 245 s; build budgets remain exceeded.
+
+The additional current-Codex E5 probe enabled code_mode, code_mode_tool_search
+and tool_suggest together with deferred-only MCP exposure. It still could not
+access the eval artifact and is retained as a failed compatibility probe, not
+a completed E5 experiment. No release qualification waiver is implied.

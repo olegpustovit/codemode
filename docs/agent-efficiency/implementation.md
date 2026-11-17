@@ -526,3 +526,27 @@ the preserved source-22d4acf optimized binary (SHA-256
 95a90c44faea63892cb5b5ab47889f4bdadefa6216e58b956566489d034e4ea1).
 The E1 binary embeds the copied historical UI staging and warns it is stale;
 this is an MCP-only counterfactual, never a deployable UI release artifact.
+
+## Current-client E5 compatibility and browser checkpoint
+
+The current-client deferral problem is resolved at probe level: earlier probes
+omitted code_mode exposure as well as initial/deferred tools. Keeping code_mode
+exposure, enabling code_mode and tool_suggest in both treatments, and toggling
+code_mode_tool_search plus the corresponding initial/deferred exposure yields
+two passing actual MCP probes (16.6 s on, 14.3 s off). The full E5 comparison
+is now running as interleaved matched treatments: 40 tasks x 3 repeats x 2, with
+order alternating per task/repeat under the same load. Every row records its
+treatment. The prior failed probes remain historical, not successful cohorts.
+
+A reused on-probe output filename briefly replaced the historical working-tree
+receipt; the original was restored from Git and the new receipt renamed. The
+runner now rejects existing output paths before starting work and writes with
+exclusive creation. The deployment gate's temporary output path was updated to
+match. All seventeen harness checks pass. No historical grade was changed.
+
+The source-22d4acf optimized browser run completes 11/12 workflows. Integration
+pane timing fails its unchanged 50 ms gate: click-to-paint p95 74.9 ms, handler
+8.9 ms, layout-ready 12.7 ms. The approved shader/UI has not been altered to
+hide the failure. This run overlapped E1 and small compatibility probes; it is
+not evidence of idle hardware acceptance. The structured timings are preserved
+in agent-efficiency-pane-final.json. No merge/deployment acceptance is claimed.

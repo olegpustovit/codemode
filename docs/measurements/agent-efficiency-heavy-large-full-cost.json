@@ -1,0 +1,66 @@
+{
+  "runs": 60,
+  "metric": "median_cost_per_run",
+  "basis": "published_api_equivalent_standard_short_context",
+  "cost_ratio_or_upper_bound": 0.8162016667177094,
+  "token_totals": {
+    "codemode": {
+      "fresh_input": 569317,
+      "cache_read": 893440,
+      "cache_write": 0,
+      "output": 20374
+    },
+    "direct": {
+      "fresh_input": 725513,
+      "cache_read": 2268672,
+      "cache_write": 0,
+      "output": 24695
+    }
+  },
+  "reported_usd": null,
+  "estimated_api_usd": {
+    "codemode": 1.431718,
+    "direct": 1.9248432
+  },
+  "median_reported_usd": null,
+  "median_estimated_api_usd": {
+    "codemode": 0.0479716,
+    "direct": 0.0587742
+  },
+  "api_usd_bounds": {
+    "codemode": {
+      "median_lower": 0.0479716,
+      "median_upper": 0.0479716,
+      "total_lower": 1.431718,
+      "total_upper": 1.431718
+    },
+    "direct": {
+      "median_lower": 0.0587742,
+      "median_upper": 0.0587742,
+      "total_lower": 1.9248432,
+      "total_upper": 1.9248432
+    }
+  },
+  "price_card": {
+    "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+    "verified_utc": "2026-11-17",
+    "basis": "Standard API-equivalent short-context estimate; not a Codex subscription bill",
+    "short_context_input_limit": 272000,
+    "usd_per_million": {
+      "fresh_input": "2.00",
+      "cache_read": "0.10",
+      "cache_write": "2.50",
+      "output": "10.00"
+    },
+    "long_context_multipliers": {
+      "fresh_input": "2",
+      "cache_read": "2",
+      "cache_write": "2",
+      "output": "1.5"
+    }
+  },
+  "problems": [
+    "at least 2x lower median cost is not proven"
+  ],
+  "pass": false
+}

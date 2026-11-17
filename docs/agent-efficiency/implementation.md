@@ -579,3 +579,34 @@ and refuses cache-write estimates without TTL evidence. A fresh explicit-model
 (1.74x, below the 2x gate). Original default-model receipts remain unpriced.
 A new comparison is running with the qualified gateway setup against the direct
 arm's unchanged native defaults; this distinction is explicit in metadata.
+
+## Research publication and final evaluation checkpoint
+
+The owner requested all captured evaluation runs for a future paper. Private
+research artifact: https://artifacts.microapps.space/a/favtgv57hd8n (version 1).
+Its 2026-11-17T18:18:27Z snapshot includes 2,623 CLI transcript files, 49 receipts,
+3,158 receipt rows (overlapping originals/recounts, not independent attempts),
+historical harness/gateway source, qualification logs and per-member hashes.
+Readback verifies all 11,110 archived member hashes. All raw results files needed
+zero credential redactions; credential-like literals in selected logs/source
+were masked. Download confirmation was not exercised; the complete files were
+retrieved through the artifact API and verified. The platform accepts encoded
+ZIP parts as text, with checksum-verified save controls and a local restore
+script. Updates will preserve the artifact ID and distinguish snapshot versions.
+
+The final source-9f36b2d Claude cohort is complete: 234/234 correct, all applicable
+standard gates pass. Codemode medians: 3 MCP calls, 1 pre-execute call, 2.1807%
+execute errors, 27,095 input tokens, 5,405.5 uncached input and 11.45 s. E1 is
+also complete: 120/120 correct but median 6 calls, 2.5 pre-execute, 8.55% execute
+errors, 108,711.5 input and 25.5 s. This isolates why A1+A2 alone are insufficient.
+
+The declared 5,000-row pack passed all 60 tasks, with the original 1,000-row
+fixture hashes preserved. Its estimated median API-equivalent cost is $0.0479716
+for Codemode versus $0.0587742 direct (1.225x); it fails the 2x cost gate. The
+negative result is retained. No data-size or threshold waiver is implied.
+
+Draft PR #4 contains the implementation and explicit open gates. No merge or
+deployment has occurred. A production-UI identity check verifies all 84 staged
+historical frontend files are byte-identical to public HTTPS. The attempted
+local historical-UI timing run stopped at the stale-bundle guard before any
+measurement; no baseline timing is claimed from its leftover output file.

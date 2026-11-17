@@ -1,0 +1,28 @@
+[
+  {
+    "protocol": "2025-11-25",
+    "tools": [
+      "execute",
+      "search"
+    ],
+    "manifest_bytes": 2784,
+    "manifest_single_copy": true,
+    "shape_example": true,
+    "description_sha256": "eeba36aaa5fc94867f107ab5905f8797e9a705803a4ed9ea797800532b6fa407",
+    "server_version": "4845aabf3bcc45cbad6a7d58daff59c3ed260c28",
+    "cache_scope": null
+  },
+  {
+    "protocol": "2026-07-28",
+    "tools": [
+      "execute",
+      "search"
+    ],
+    "manifest_bytes": 2784,
+    "manifest_single_copy": true,
+    "shape_example": true,
+    "description_sha256": "eeba36aaa5fc94867f107ab5905f8797e9a705803a4ed9ea797800532b6fa407",
+    "server_version": null,
+    "cache_scope": "private"
+  }
+]

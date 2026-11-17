@@ -1,0 +1,16 @@
+{
+  "cohort": "next-e8-codex-heavy-large",
+  "stamp": "20261117T212256Z",
+  "task": "heavy-moneybag-2",
+  "arm": "codemode",
+  "repeat": 2,
+  "run": "55b628",
+  "fixture_rows": 5000,
+  "initial_argument_error": "upstream allowed at most 500 rows per page",
+  "successful_retry_pages": 10,
+  "successful_retry_output_truncated": false,
+  "payee_medians_returned_by_gateway": 23,
+  "gateway_medians_match_fixture": true,
+  "final_answer": "reported total, mean, and vendor extremes instead of the requested median map",
+  "task_grade": false
+}

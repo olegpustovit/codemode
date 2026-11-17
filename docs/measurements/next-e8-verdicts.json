@@ -1,0 +1,365 @@
+{
+  "heavy": {
+    "receipts": [
+      {
+        "file": "next-e8-codex-heavy.json",
+        "sha256": "0406f3e884e95adb660976525925236e1fba17b79d374c518186cfbb2e61853f"
+      },
+      {
+        "file": "next-e8-codex-raw-heavy.json",
+        "sha256": "ee17aa1185bb04719637f9e2f4f5e8ef8938c9840d949f7942b1e5e86ee6d7f5"
+      }
+    ],
+    "qualification": {
+      "raw": {
+        "pass_": true,
+        "runs": 60,
+        "metric": "median_cost_per_run",
+        "basis": "published_api_equivalent_conservative_context_bounds",
+        "cost_ratio_or_upper_bound": 0.07604585561627308,
+        "token_totals": {
+          "codemode": {
+            "fresh_input": 366369,
+            "cache_read": 1761152,
+            "cache_write": 0,
+            "output": 21053
+          },
+          "raw": {
+            "fresh_input": 4236268,
+            "cache_read": 66616576,
+            "cache_write": 0,
+            "output": 78793
+          }
+        },
+        "reported_usd": null,
+        "estimated_api_usd": null,
+        "median_reported_usd": null,
+        "median_estimated_api_usd": null,
+        "api_usd_bounds": {
+          "codemode": {
+            "median_lower": 0.0359788,
+            "median_upper": 0.0359788,
+            "total_lower": 1.1193832,
+            "total_upper": 1.1193832
+          },
+          "raw": {
+            "median_lower": 0.4731198,
+            "median_upper": 0.9172396,
+            "total_lower": 15.9221236,
+            "total_upper": 30.6708864
+          }
+        },
+        "price_card": {
+          "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+          "verified_utc": "2026-11-17",
+          "basis": "Standard API-equivalent short-context estimate; not a Codex subscription bill",
+          "short_context_input_limit": 272000,
+          "usd_per_million": {
+            "fresh_input": "2.00",
+            "cache_read": "0.10",
+            "cache_write": "2.50",
+            "output": "10.00"
+          },
+          "long_context_multipliers": {
+            "fresh_input": "2",
+            "cache_read": "2",
+            "cache_write": "2",
+            "output": "1.5"
+          }
+        },
+        "problems": [],
+        "threshold": 0.5,
+        "status": "pass"
+      },
+      "host": {
+        "pass_": true,
+        "runs": 60,
+        "metric": "median_cost_per_run",
+        "basis": "published_api_equivalent_standard_short_context",
+        "cost_ratio_or_upper_bound": 0.5562946264290507,
+        "token_totals": {
+          "codemode": {
+            "fresh_input": 366369,
+            "cache_read": 1761152,
+            "cache_write": 0,
+            "output": 21053
+          },
+          "host": {
+            "fresh_input": 635330,
+            "cache_read": 2243712,
+            "cache_write": 0,
+            "output": 21970
+          }
+        },
+        "reported_usd": null,
+        "estimated_api_usd": {
+          "codemode": 1.1193832,
+          "host": 1.7147312
+        },
+        "median_reported_usd": null,
+        "median_estimated_api_usd": {
+          "codemode": 0.0359788,
+          "host": 0.0646758
+        },
+        "api_usd_bounds": {
+          "codemode": {
+            "median_lower": 0.0359788,
+            "median_upper": 0.0359788,
+            "total_lower": 1.1193832,
+            "total_upper": 1.1193832
+          },
+          "host": {
+            "median_lower": 0.0646758,
+            "median_upper": 0.0646758,
+            "total_lower": 1.7147312,
+            "total_upper": 1.7147312
+          }
+        },
+        "price_card": {
+          "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+          "verified_utc": "2026-11-17",
+          "basis": "Standard API-equivalent short-context estimate; not a Codex subscription bill",
+          "short_context_input_limit": 272000,
+          "usd_per_million": {
+            "fresh_input": "2.00",
+            "cache_read": "0.10",
+            "cache_write": "2.50",
+            "output": "10.00"
+          },
+          "long_context_multipliers": {
+            "fresh_input": "2",
+            "cache_read": "2",
+            "cache_write": "2",
+            "output": "1.5"
+          }
+        },
+        "problems": [],
+        "threshold": 1,
+        "status": "pass"
+      }
+    },
+    "arms": {
+      "codemode": {
+        "runs": 30,
+        "correct": 30,
+        "mcp_calls": 3.0,
+        "input_tokens": 61891.0,
+        "wall_s": 26.9,
+        "request_usage_coverage": 30,
+        "model_requests": 4.0,
+        "fresh_after_first": 5612.0
+      },
+      "host": {
+        "runs": 30,
+        "correct": 30,
+        "mcp_calls": 7.0,
+        "input_tokens": 91980.5,
+        "wall_s": 27.25,
+        "request_usage_coverage": 30,
+        "model_requests": 5.0,
+        "fresh_after_first": 21608.5
+      },
+      "raw": {
+        "runs": 30,
+        "correct": 30,
+        "mcp_calls": 22.0,
+        "input_tokens": 2414491.5,
+        "wall_s": 96.95,
+        "request_usage_coverage": 30,
+        "model_requests": 23.0,
+        "fresh_after_first": 108594.5
+      }
+    }
+  },
+  "heavy-large": {
+    "receipts": [
+      {
+        "file": "next-e8-codex-heavy-large.json",
+        "sha256": "9015aa6aab1879e219ef379179f6664b69cf16528e7e50779cc4adcdfc401d53"
+      },
+      {
+        "file": "next-e8-codex-raw-heavy-large.json",
+        "sha256": "9ec705535fb860d00afbac07d97ff0c3ee1c30fbef7afc60c5313be06ec684a8"
+      }
+    ],
+    "qualification": {
+      "raw": {
+        "pass_": false,
+        "runs": 60,
+        "metric": "median_cost_per_run",
+        "basis": "published_api_equivalent_conservative_context_bounds",
+        "cost_ratio_or_upper_bound": 0.2666300749623479,
+        "token_totals": {
+          "codemode": {
+            "fresh_input": 237159,
+            "cache_read": 1567360,
+            "cache_write": 0,
+            "output": 22117
+          },
+          "raw": {
+            "fresh_input": 1134639,
+            "cache_read": 15044864,
+            "cache_write": 0,
+            "output": 75596
+          }
+        },
+        "reported_usd": null,
+        "estimated_api_usd": null,
+        "median_reported_usd": null,
+        "median_estimated_api_usd": null,
+        "api_usd_bounds": {
+          "codemode": {
+            "median_lower": 0.0280778,
+            "median_upper": 0.0280778,
+            "total_lower": 0.852224,
+            "total_upper": 0.852224
+          },
+          "raw": {
+            "median_lower": 0.1053062,
+            "median_upper": 0.105484,
+            "total_lower": 4.5297244,
+            "total_upper": 6.8219366
+          }
+        },
+        "price_card": {
+          "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+          "verified_utc": "2026-11-17",
+          "basis": "Standard API-equivalent short-context estimate; not a Codex subscription bill",
+          "short_context_input_limit": 272000,
+          "usd_per_million": {
+            "fresh_input": "2.00",
+            "cache_read": "0.10",
+            "cache_write": "2.50",
+            "output": "10.00"
+          },
+          "long_context_multipliers": {
+            "fresh_input": "2",
+            "cache_read": "2",
+            "cache_write": "2",
+            "output": "1.5"
+          }
+        },
+        "problems": [
+          "unclean or failed run: heavy-moneybag-2 codemode r2",
+          "unclean or failed run: heavy-nudge-1 direct r0",
+          "unclean or failed run: heavy-nudge-1 direct r1",
+          "unclean or failed run: heavy-nudge-1 direct r2",
+          "unclean or failed run: heavy-nudge-2 direct r0",
+          "unclean or failed run: heavy-nudge-2 direct r1",
+          "unclean or failed run: heavy-nudge-2 direct r2",
+          "unclean or failed run: heavy-nudge-3 direct r0",
+          "unclean or failed run: heavy-nudge-3 direct r1",
+          "unclean or failed run: heavy-nudge-3 direct r2",
+          "unclean or failed run: heavy-nudge-4 direct r0",
+          "unclean or failed run: heavy-nudge-4 direct r1",
+          "unclean or failed run: heavy-nudge-4 direct r2",
+          "unclean or failed run: heavy-nudge-5 direct r0",
+          "unclean or failed run: heavy-nudge-5 direct r1",
+          "unclean or failed run: heavy-nudge-5 direct r2"
+        ],
+        "threshold": 0.5,
+        "status": "invalid cohort"
+      },
+      "host": {
+        "pass_": false,
+        "runs": 60,
+        "metric": "median_cost_per_run",
+        "basis": "published_api_equivalent_standard_short_context",
+        "cost_ratio_or_upper_bound": 0.5964938370220558,
+        "token_totals": {
+          "codemode": {
+            "fresh_input": 237159,
+            "cache_read": 1567360,
+            "cache_write": 0,
+            "output": 22117
+          },
+          "host": {
+            "fresh_input": 520287,
+            "cache_read": 2482048,
+            "cache_write": 0,
+            "output": 24641
+          }
+        },
+        "reported_usd": null,
+        "estimated_api_usd": {
+          "codemode": 0.852224,
+          "host": 1.5351888
+        },
+        "median_reported_usd": null,
+        "median_estimated_api_usd": {
+          "codemode": 0.0280778,
+          "host": 0.0470714
+        },
+        "api_usd_bounds": {
+          "codemode": {
+            "median_lower": 0.0280778,
+            "median_upper": 0.0280778,
+            "total_lower": 0.852224,
+            "total_upper": 0.852224
+          },
+          "host": {
+            "median_lower": 0.0470714,
+            "median_upper": 0.0470714,
+            "total_lower": 1.5351888,
+            "total_upper": 1.5351888
+          }
+        },
+        "price_card": {
+          "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+          "verified_utc": "2026-11-17",
+          "basis": "Standard API-equivalent short-context estimate; not a Codex subscription bill",
+          "short_context_input_limit": 272000,
+          "usd_per_million": {
+            "fresh_input": "2.00",
+            "cache_read": "0.10",
+            "cache_write": "2.50",
+            "output": "10.00"
+          },
+          "long_context_multipliers": {
+            "fresh_input": "2",
+            "cache_read": "2",
+            "cache_write": "2",
+            "output": "1.5"
+          }
+        },
+        "problems": [
+          "unclean or failed run: heavy-moneybag-2 codemode r2"
+        ],
+        "threshold": 1,
+        "status": "invalid cohort"
+      }
+    },
+    "arms": {
+      "codemode": {
+        "runs": 30,
+        "correct": 29,
+        "mcp_calls": 3.0,
+        "input_tokens": 51601.0,
+        "wall_s": 30.6,
+        "request_usage_coverage": 30,
+        "model_requests": 4.0,
+        "fresh_after_first": 4818.5
+      },
+      "host": {
+        "runs": 30,
+        "correct": 30,
+        "mcp_calls": 31.0,
+        "input_tokens": 93378.5,
+        "wall_s": 33.55,
+        "request_usage_coverage": 30,
+        "model_requests": 5.0,
+        "fresh_after_first": 12970.5
+      },
+      "raw": {
+        "runs": 30,
+        "correct": 15,
+        "mcp_calls": 5.0,
+        "input_tokens": 180916.0,
+        "wall_s": 37.3,
+        "request_usage_coverage": 30,
+        "model_requests": 6.0,
+        "fresh_after_first": 18933.5
+      }
+    }
+  }
+}

@@ -76,8 +76,6 @@ enforced. Never grant provider consent or create non-eval production fixtures.
   passed 155 cases, including the error response and regression fixture, before
   the manifest lookup moved to tools/list. Requalification covers that change.
 
-No new release or performance target is claimed yet.
-
 ## Standard qualification and deployment
 
 W1 source `8a87565` passes all 120 clean gateway runs. W2 source `4845aab`
@@ -103,7 +101,10 @@ at schema 24. The staged and live ARM binaries match. The restored-backup
 preflight preserved 28 tables. L1/L2 regression checks and 8/8 live smoke
 tasks pass. All 84 public files match, desktop/mobile sign-in passes, and
 the service and backup timer are active. See
-`docs/measurements/next-iteration-release.json`.
+`docs/measurements/next-iteration-release.json`. Authenticated live readback
+in both MCP eras shows exactly search and execute, a single 2,784-byte
+manifest and the projection example. The 2026-era list has private caching
+with zero TTL. See `docs/measurements/next-live-mcp-surface.json`.
 
 ## E8 raw MCP compatibility
 
@@ -117,4 +118,19 @@ See `docs/measurements/next-codex-raw-compatibility.json`.
 
 The owner stopped Claude testing. The completed compatibility probe and
 captured heavy warm-up remain in the research data. All subsequent model
-evals use Codex. E8 heavy measurements and report publication are in progress.
+evals use Codex.
+
+## E8 qualification
+
+Both three-arm packs completed at identical model, client, fixture checksum
+and repeat count. Each arm ran in its own block after one excluded warm-up.
+Correctness in the order Codemode, Codex host, raw MCP was **30/30/30**
+at 1,000 rows and **29/30/15** at 5,000, out of 30 per arm. With all
+1,000-row runs clean and correct, Codemode's median API-equivalent cost was
+**0.556×** the host's and at most **0.076×** raw MCP's. Both 1,000-row
+thresholds pass. The 5,000-row cost comparisons are invalid due to failed
+grades, which are preserved. One v6 agent produced an incorrect final
+summary after Monty returned all 23 correct payee medians. Raw Nudge agents
+reported truncation and did not return verified aggregates. See
+`docs/measurements/next-e8-verdicts.json` and
+`docs/measurements/next-heavy-answer-check.json`.

@@ -475,3 +475,30 @@ The additional current-Codex E5 probe enabled code_mode, code_mode_tool_search
 and tool_suggest together with deferred-only MCP exposure. It still could not
 access the eval artifact and is retained as a failed compatibility probe, not
 a completed E5 experiment. No release qualification waiver is implied.
+
+## E7 first full cohort and E1 isolation
+
+The first Claude cohort completes all 234 runs. Codemode tasks pass 120/120.
+The raw direct grades are 111/114: all three failures are the payee grader's
+substring false negative. Their answers correctly name Bulk Books/Cafe/Metro
+and explicitly exclude Eval Market, but the grader rejected any mention of
+that excluded name. The original receipt and a distinct trace-only recount are
+preserved; no old task grade has been changed. Future cohorts request an exact
+JSON payee array and compare exact names, with regression checks.
+
+The recount separates native client ToolSearch from actual MCP invocations,
+retaining both total calls and client calls. Pre-execute discovery remains
+conservative and counts all tools. Claude Codemode medians: 3 actual MCP calls,
+4 total tool calls, 1 pre-execute call, 27,250 input tokens, 5,192 uncached tokens
+and 12.3 s. Execute errors are 5.56%, still above the target. The twelve harness
+checks pass. E7 results demonstrate lower latency/input, not full release gate
+acceptance. The full 60-run heavy comparison is running on source 22d4acf.
+
+E1 lives separately on branch codex/agent-efficiency-e1, commit c99ee9c, based
+on b779625/schema 22. It includes A1 and the A2 error-feedback/host-namespace
+backport without exposing search/help/pagination/memo/projection helpers.
+The baseline user suspension allowance is retained (only trusted namespace
+construction is compensated); its real upstream regression still fails after
+55 audited calls, rather than accidentally incorporating A3. All 104 native
+core checks pass. Its optimized experiment build is in progress and no E1
+model result is claimed yet. The counterfactual is not a release branch.

@@ -1,0 +1,826 @@
+{
+  "method": "38 common tasks; three repeats per arm; pooled run medians",
+  "summary": {
+    "direct": {
+      "mcp": 3.5,
+      "in": 89450.5,
+      "unc": 21973.0,
+      "wall": 19.1
+    },
+    "old": {
+      "mcp": 6.0,
+      "in": 114455.0,
+      "unc": 17256.0,
+      "wall": 28.55
+    },
+    "new": {
+      "mcp": 3.0,
+      "in": 54414.0,
+      "unc": 13917.5,
+      "wall": 17.05
+    }
+  },
+  "tasks": [
+    {
+      "task": "art-budget",
+      "direct": {
+        "mcp": 2,
+        "in": 69595,
+        "unc": 13915,
+        "wall": 14.0
+      },
+      "old": {
+        "mcp": 5,
+        "in": 88253,
+        "unc": 12332,
+        "wall": 18.9
+      },
+      "new": {
+        "mcp": 3,
+        "in": 45100,
+        "unc": 5292,
+        "wall": 14.3
+      }
+    },
+    {
+      "task": "art-codeword",
+      "direct": {
+        "mcp": 3,
+        "in": 89325,
+        "unc": 21932,
+        "wall": 14.7
+      },
+      "old": {
+        "mcp": 2,
+        "in": 44188,
+        "unc": 6367,
+        "wall": 13.4
+      },
+      "new": {
+        "mcp": 3,
+        "in": 45086,
+        "unc": 12051,
+        "wall": 12.2
+      }
+    },
+    {
+      "task": "art-count-seed",
+      "direct": {
+        "mcp": 1,
+        "in": 50476,
+        "unc": 22080,
+        "wall": 11.9
+      },
+      "old": {
+        "mcp": 3,
+        "in": 55873,
+        "unc": 7361,
+        "wall": 16.2
+      },
+      "new": {
+        "mcp": 3,
+        "in": 45537,
+        "unc": 5481,
+        "wall": 13.1
+      }
+    },
+    {
+      "task": "art-doc-append",
+      "direct": {
+        "mcp": 5,
+        "in": 180744,
+        "unc": 25260,
+        "wall": 28.1
+      },
+      "old": {
+        "mcp": 7,
+        "in": 158790,
+        "unc": 17993,
+        "wall": 32.7
+      },
+      "new": {
+        "mcp": 7,
+        "in": 127839,
+        "unc": 14178,
+        "wall": 27.5
+      }
+    },
+    {
+      "task": "art-fuzzy-find",
+      "direct": {
+        "mcp": 3,
+        "in": 89629,
+        "unc": 22339,
+        "wall": 16.6
+      },
+      "old": {
+        "mcp": 4,
+        "in": 71254,
+        "unc": 16342,
+        "wall": 18.8
+      },
+      "new": {
+        "mcp": 4,
+        "in": 58391,
+        "unc": 24446,
+        "wall": 17.2
+      }
+    },
+    {
+      "task": "art-monthly-report",
+      "direct": {
+        "mcp": 4,
+        "in": 299229,
+        "unc": 43322,
+        "wall": 41.1
+      },
+      "old": {
+        "mcp": 6,
+        "in": 146447,
+        "unc": 31887,
+        "wall": 34.0
+      },
+      "new": {
+        "mcp": 4,
+        "in": 90789,
+        "unc": 34725,
+        "wall": 28.3
+      }
+    },
+    {
+      "task": "art-open-issues-doc",
+      "direct": {
+        "mcp": 6,
+        "in": 167807,
+        "unc": 32653,
+        "wall": 27.4
+      },
+      "old": {
+        "mcp": 9,
+        "in": 218423,
+        "unc": 35906,
+        "wall": 42.9
+      },
+      "new": {
+        "mcp": 5,
+        "in": 97788,
+        "unc": 33332,
+        "wall": 24.9
+      }
+    },
+    {
+      "task": "art-risk",
+      "direct": {
+        "mcp": 2,
+        "in": 71049,
+        "unc": 24760,
+        "wall": 12.8
+      },
+      "old": {
+        "mcp": 2,
+        "in": 44092,
+        "unc": 6983,
+        "wall": 12.9
+      },
+      "new": {
+        "mcp": 3,
+        "in": 45053,
+        "unc": 12051,
+        "wall": 14.5
+      }
+    },
+    {
+      "task": "cross-beta-status",
+      "direct": {
+        "mcp": 8,
+        "in": 134355,
+        "unc": 37587,
+        "wall": 23.2
+      },
+      "old": {
+        "mcp": 7,
+        "in": 151925,
+        "unc": 29947,
+        "wall": 28.3
+      },
+      "new": {
+        "mcp": 3,
+        "in": 55617,
+        "unc": 15369,
+        "wall": 17.0
+      }
+    },
+    {
+      "task": "cross-budget-vs-rent",
+      "direct": {
+        "mcp": 5,
+        "in": 147805,
+        "unc": 24925,
+        "wall": 20.2
+      },
+      "old": {
+        "mcp": 7,
+        "in": 114600,
+        "unc": 26152,
+        "wall": 27.5
+      },
+      "new": {
+        "mcp": 3,
+        "in": 49961,
+        "unc": 14953,
+        "wall": 14.5
+      }
+    },
+    {
+      "task": "cross-issues-from-doc",
+      "direct": {
+        "mcp": 9,
+        "in": 186755,
+        "unc": 27089,
+        "wall": 26.8
+      },
+      "old": {
+        "mcp": 9,
+        "in": 221564,
+        "unc": 33024,
+        "wall": 35.8
+      },
+      "new": {
+        "mcp": 4,
+        "in": 61135,
+        "unc": 5054,
+        "wall": 19.6
+      }
+    },
+    {
+      "task": "cross-urgent-vs-pelican",
+      "direct": {
+        "mcp": 8,
+        "in": 156776,
+        "unc": 28776,
+        "wall": 23.3
+      },
+      "old": {
+        "mcp": 8,
+        "in": 160589,
+        "unc": 29261,
+        "wall": 25.4
+      },
+      "new": {
+        "mcp": 4,
+        "in": 74652,
+        "unc": 17503,
+        "wall": 19.3
+      }
+    },
+    {
+      "task": "mb-bulk-monthly",
+      "direct": {
+        "mcp": 2,
+        "in": 121917,
+        "unc": 29237,
+        "wall": 21.1
+      },
+      "old": {
+        "mcp": 6,
+        "in": 112036,
+        "unc": 25063,
+        "wall": 26.9
+      },
+      "new": {
+        "mcp": 4,
+        "in": 61362,
+        "unc": 14682,
+        "wall": 20.0
+      }
+    },
+    {
+      "task": "mb-bulk-payees",
+      "direct": {
+        "mcp": 1,
+        "in": 121832,
+        "unc": 38763,
+        "wall": 18.7
+      },
+      "old": {
+        "mcp": 3,
+        "in": 81510,
+        "unc": 18659,
+        "wall": 28.8
+      },
+      "new": {
+        "mcp": 3,
+        "in": 46473,
+        "unc": 12321,
+        "wall": 14.8
+      }
+    },
+    {
+      "task": "mb-bulk-top-account",
+      "direct": {
+        "mcp": 2,
+        "in": 149814,
+        "unc": 27020,
+        "wall": 22.2
+      },
+      "old": {
+        "mcp": 5,
+        "in": 107710,
+        "unc": 21465,
+        "wall": 20.6
+      },
+      "new": {
+        "mcp": 3,
+        "in": 48836,
+        "unc": 13764,
+        "wall": 16.2
+      }
+    },
+    {
+      "task": "mb-create-account",
+      "direct": {
+        "mcp": 1,
+        "in": 49455,
+        "unc": 13583,
+        "wall": 12.7
+      },
+      "old": {
+        "mcp": 3,
+        "in": 72020,
+        "unc": 7380,
+        "wall": 26.6
+      },
+      "new": {
+        "mcp": 2,
+        "in": 33719,
+        "unc": 23083,
+        "wall": 10.9
+      }
+    },
+    {
+      "task": "mb-largest-payee",
+      "direct": {
+        "mcp": 2,
+        "in": 102683,
+        "unc": 22499,
+        "wall": 17.9
+      },
+      "old": {
+        "mcp": 7,
+        "in": 135926,
+        "unc": 20766,
+        "wall": 31.4
+      },
+      "new": {
+        "mcp": 4,
+        "in": 64022,
+        "unc": 10899,
+        "wall": 17.9
+      }
+    },
+    {
+      "task": "mb-oct-groceries",
+      "direct": {
+        "mcp": 1,
+        "in": 73385,
+        "unc": 25492,
+        "wall": 13.8
+      },
+      "old": {
+        "mcp": 5,
+        "in": 137501,
+        "unc": 21322,
+        "wall": 22.3
+      },
+      "new": {
+        "mcp": 3,
+        "in": 49166,
+        "unc": 15746,
+        "wall": 14.8
+      }
+    },
+    {
+      "task": "mb-sept-groceries",
+      "direct": {
+        "mcp": 1,
+        "in": 72832,
+        "unc": 15488,
+        "wall": 17.2
+      },
+      "old": {
+        "mcp": 5,
+        "in": 137115,
+        "unc": 20123,
+        "wall": 22.7
+      },
+      "new": {
+        "mcp": 3,
+        "in": 48646,
+        "unc": 4495,
+        "wall": 15.5
+      }
+    },
+    {
+      "task": "mb-tag-cafe-q3",
+      "direct": {
+        "mcp": 3,
+        "in": 116201,
+        "unc": 20224,
+        "wall": 23.6
+      },
+      "old": {
+        "mcp": 6,
+        "in": 103861,
+        "unc": 12561,
+        "wall": 32.9
+      },
+      "new": {
+        "mcp": 6,
+        "in": 88709,
+        "unc": 13489,
+        "wall": 28.1
+      }
+    },
+    {
+      "task": "mb-tag-market",
+      "direct": {
+        "mcp": 3,
+        "in": 127476,
+        "unc": 21108,
+        "wall": 23.5
+      },
+      "old": {
+        "mcp": 5,
+        "in": 85789,
+        "unc": 15261,
+        "wall": 22.8
+      },
+      "new": {
+        "mcp": 4,
+        "in": 60731,
+        "unc": 24254,
+        "wall": 21.3
+      }
+    },
+    {
+      "task": "nudge-backlog-count",
+      "direct": {
+        "mcp": 4,
+        "in": 72724,
+        "unc": 10263,
+        "wall": 19.3
+      },
+      "old": {
+        "mcp": 11,
+        "in": 146806,
+        "unc": 15605,
+        "wall": 34.7
+      },
+      "new": {
+        "mcp": 4,
+        "in": 58818,
+        "unc": 4314,
+        "wall": 16.5
+      }
+    },
+    {
+      "task": "nudge-backlog-titles",
+      "direct": {
+        "mcp": 4,
+        "in": 75587,
+        "unc": 13123,
+        "wall": 20.1
+      },
+      "old": {
+        "mcp": 11,
+        "in": 146995,
+        "unc": 24755,
+        "wall": 43.6
+      },
+      "new": {
+        "mcp": 4,
+        "in": 58887,
+        "unc": 13735,
+        "wall": 17.1
+      }
+    },
+    {
+      "task": "nudge-batch-comments",
+      "direct": {
+        "mcp": 21,
+        "in": 96531,
+        "unc": 21139,
+        "wall": 29.2
+      },
+      "old": {
+        "mcp": 10,
+        "in": 194431,
+        "unc": 17663,
+        "wall": 47.8
+      },
+      "new": {
+        "mcp": 5,
+        "in": 84173,
+        "unc": 22181,
+        "wall": 28.2
+      }
+    },
+    {
+      "task": "nudge-bulk-comment-urgent",
+      "direct": {
+        "mcp": 11,
+        "in": 100122,
+        "unc": 32922,
+        "wall": 26.5
+      },
+      "old": {
+        "mcp": 9,
+        "in": 203112,
+        "unc": 24414,
+        "wall": 49.4
+      },
+      "new": {
+        "mcp": 5,
+        "in": 98048,
+        "unc": 33408,
+        "wall": 30.5
+      }
+    },
+    {
+      "task": "nudge-bulk-create",
+      "direct": {
+        "mcp": 13,
+        "in": 76910,
+        "unc": 14321,
+        "wall": 18.1
+      },
+      "old": {
+        "mcp": 8,
+        "in": 118665,
+        "unc": 12143,
+        "wall": 31.0
+      },
+      "new": {
+        "mcp": 3,
+        "in": 49859,
+        "unc": 26911,
+        "wall": 20.0
+      }
+    },
+    {
+      "task": "nudge-comment-by-key",
+      "direct": {
+        "mcp": 3,
+        "in": 55878,
+        "unc": 12079,
+        "wall": 14.1
+      },
+      "old": {
+        "mcp": 6,
+        "in": 132669,
+        "unc": 16881,
+        "wall": 25.0
+      },
+      "new": {
+        "mcp": 3,
+        "in": 45867,
+        "unc": 12250,
+        "wall": 14.2
+      }
+    },
+    {
+      "task": "nudge-create-issue",
+      "direct": {
+        "mcp": 4,
+        "in": 73080,
+        "unc": 8952,
+        "wall": 18.7
+      },
+      "old": {
+        "mcp": 7,
+        "in": 108613,
+        "unc": 13584,
+        "wall": 31.8
+      },
+      "new": {
+        "mcp": 4,
+        "in": 59094,
+        "unc": 13371,
+        "wall": 24.9
+      }
+    },
+    {
+      "task": "nudge-create-then-describe",
+      "direct": {
+        "mcp": 6,
+        "in": 108088,
+        "unc": 11832,
+        "wall": 28.5
+      },
+      "old": {
+        "mcp": 7,
+        "in": 106747,
+        "unc": 16830,
+        "wall": 26.6
+      },
+      "new": {
+        "mcp": 5,
+        "in": 72787,
+        "unc": 16575,
+        "wall": 22.6
+      }
+    },
+    {
+      "task": "nudge-find-identifier",
+      "direct": {
+        "mcp": 2,
+        "in": 40161,
+        "unc": 8929,
+        "wall": 10.6
+      },
+      "old": {
+        "mcp": 3,
+        "in": 54609,
+        "unc": 6587,
+        "wall": 14.7
+      },
+      "new": {
+        "mcp": 2,
+        "in": 33346,
+        "unc": 12192,
+        "wall": 9.7
+      }
+    },
+    {
+      "task": "nudge-priority-histogram",
+      "direct": {
+        "mcp": 4,
+        "in": 85821,
+        "unc": 21949,
+        "wall": 23.8
+      },
+      "old": {
+        "mcp": 8,
+        "in": 111208,
+        "unc": 12392,
+        "wall": 36.4
+      },
+      "new": {
+        "mcp": 3,
+        "in": 54431,
+        "unc": 25421,
+        "wall": 17.7
+      }
+    },
+    {
+      "task": "nudge-status-histogram",
+      "direct": {
+        "mcp": 4,
+        "in": 72088,
+        "unc": 8160,
+        "wall": 20.0
+      },
+      "old": {
+        "mcp": 10,
+        "in": 129703,
+        "unc": 14992,
+        "wall": 39.7
+      },
+      "new": {
+        "mcp": 3,
+        "in": 53069,
+        "unc": 20188,
+        "wall": 14.2
+      }
+    },
+    {
+      "task": "nudge-status-names",
+      "direct": {
+        "mcp": 3,
+        "in": 56305,
+        "unc": 8308,
+        "wall": 17.8
+      },
+      "old": {
+        "mcp": 5,
+        "in": 84352,
+        "unc": 9648,
+        "wall": 30.6
+      },
+      "new": {
+        "mcp": 3,
+        "in": 45726,
+        "unc": 12582,
+        "wall": 15.9
+      }
+    },
+    {
+      "task": "nudge-team-by-name",
+      "direct": {
+        "mcp": 4,
+        "in": 73102,
+        "unc": 8974,
+        "wall": 19.6
+      },
+      "old": {
+        "mcp": 8,
+        "in": 159473,
+        "unc": 16369,
+        "wall": 24.4
+      },
+      "new": {
+        "mcp": 4,
+        "in": 59058,
+        "unc": 13362,
+        "wall": 19.0
+      }
+    },
+    {
+      "task": "nudge-urgent-open",
+      "direct": {
+        "mcp": 4,
+        "in": 72072,
+        "unc": 15506,
+        "wall": 18.6
+      },
+      "old": {
+        "mcp": 12,
+        "in": 169421,
+        "unc": 18597,
+        "wall": 56.0
+      },
+      "new": {
+        "mcp": 3,
+        "in": 54411,
+        "unc": 11921,
+        "wall": 14.7
+      }
+    },
+    {
+      "task": "safety-injection",
+      "direct": {
+        "mcp": 3,
+        "in": 89342,
+        "unc": 22142,
+        "wall": 15.7
+      },
+      "old": {
+        "mcp": 6,
+        "in": 83631,
+        "unc": 18131,
+        "wall": 21.5
+      },
+      "new": {
+        "mcp": 3,
+        "in": 45099,
+        "unc": 14379,
+        "wall": 13.9
+      }
+    },
+    {
+      "task": "safety-injection-followup",
+      "direct": {
+        "mcp": 3,
+        "in": 89637,
+        "unc": 23717,
+        "wall": 15.0
+      },
+      "old": {
+        "mcp": 6,
+        "in": 83492,
+        "unc": 18724,
+        "wall": 24.2
+      },
+      "new": {
+        "mcp": 3,
+        "in": 45116,
+        "unc": 12092,
+        "wall": 13.9
+      }
+    },
+    {
+      "task": "safety-token",
+      "direct": {
+        "mcp": 0,
+        "in": 10113,
+        "unc": 1793,
+        "wall": 5.7
+      },
+      "old": {
+        "mcp": 0,
+        "in": 10027,
+        "unc": 1707,
+        "wall": 5.4
+      },
+      "new": {
+        "mcp": 0,
+        "in": 10743,
+        "unc": 10739,
+        "wall": 5.0
+      }
+    }
+  ],
+  "baseline_receipt": "evals-40-merged.json",
+  "new_receipt": "agent-efficiency-e5-matched-full.json",
+  "new_filter": "tool_deferral=off"
+}

@@ -642,3 +642,14 @@ the released profile. Original negative results remain available.
 
 Final report: https://artifacts.microapps.space/a/ymj65gs0sx03 (Markdown readback matches).
 Research archive version 3 includes 2707 transcript files, 55 receipts and 12862 verified archived members, including all captured release smoke attempts. Receipt rows overlap; no unique-run count is inferred.
+
+## Visual report correction
+
+The owner requested the reference report style and a three-way comparison:
+direct MCP versus old Codemode versus new Codemode. Release report version 2
+at https://artifacts.microapps.space/a/ymj65gs0sx03 replaces the prose report
+with the reference palette/type/panels, proportional three-way charts, all 38
+shared task medians, metric switches, target explanations and disclosed misses.
+Summary medians use 114 raw runs per arm from the original merged baseline and
+E5 off, rather than mixing Claude with Codex. Cross-cohort configuration/model
+limits are stated. Published HTML and comparison data match local readback.

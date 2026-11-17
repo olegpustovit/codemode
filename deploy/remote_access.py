@@ -22,6 +22,9 @@ def run(args, **kwargs):
 
 
 def json_http(url):
+    if url.startswith("https://"):
+        raw = subprocess.check_output(["curl", "--fail", "--silent", "--show-error", "--connect-timeout", "3", "--max-time", "6", "-H", "Cache-Control: no-cache", url], text=True, stderr=subprocess.DEVNULL)
+        return json.loads(raw)
     request = urllib.request.Request(url, headers={"Cache-Control": "no-cache"})
     with urllib.request.urlopen(request, timeout=5) as response:
         if response.status != 200:

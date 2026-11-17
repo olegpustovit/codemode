@@ -90,7 +90,7 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--inspect", action="store_true", help="read-only running version/mode/configuration inspection")
     group.add_argument("--rollback", action="store_true", help="restore previous complete bundle, preserving enforcement")
-    parser.add_argument("--eval-gate", metavar="EVALS_REPO", help="after activation run EVALS_REPO/evals/gate.py; roll back if it fails")
+    parser.add_argument("--eval-gate", default=os.environ.get("CODEMODE_EVAL_GATE") or None, metavar="EVALS_REPO", help="after activation run EVALS_REPO/evals/gate.py; roll back if it fails")
     args = parser.parse_args()
     access = desired_mode()
     state = inspection(None if args.rollback else access)

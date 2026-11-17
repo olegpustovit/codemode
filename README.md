@@ -105,7 +105,7 @@ Browser consent uses session-protected `GET /api/oauth/authorize` and `POST /api
 
 The `/authorize` React consent screen is deployed and exercised in Chromium against the embedded binary. On Oracle, real Nudge, Researcher and Artifacts discovery, DCR, S256, advertised-resource binding and denied-callback replay checks pass in a disposable database. Successful provider consent/token exchange and claude.ai acceptance remain unperformed.
 
-This access-groups branch is a PR-only draft. `tools/deploy.sh` delegates to `tools/deploy.py`, which prepares an exact pushed source revision and selects a private, complete binary/worker bundle with a frozen access mode. The deployment coordinator still needs end-to-end release qualification; see [the access-groups checkpoint](docs/access-groups.md). Codemode production deployment is explicitly excluded from this rollout. The existing service environment, key material and backup timer must remain intact.
+The owner authorized merging and deploying the access-groups implementation. `tools/deploy.sh` delegates to `tools/deploy.py`, which prepares an exact pushed source revision and selects a private, complete binary/worker bundle with a frozen access mode. The deployment coordinator still needs end-to-end release qualification; see [the access-groups checkpoint](docs/access-groups.md). Deployment keeps the existing access mode until the coordinated ID migration. The existing service environment, key material and backup timer must remain intact.
 
 `python3 tools/smoke.py http://127.0.0.1:2093 codemode.microapps.space TOKEN_FILE` checks a running gateway without printing its token.
 

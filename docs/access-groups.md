@@ -1,9 +1,11 @@
 # Microapps ID access groups — PR checkpoint
 
-The owner requested a Codemode PR only and explicitly excluded Codemode from the
-production rollout on 2026-11-17. This branch is a draft; production remains on
-`e9a23bbeb1b42a7e1d773809cc9825391c9c55b6`, schema 22, without central access
-enforcement. No production data, files, services, consent or credentials were changed.
+The owner subsequently authorized merging, pushing and deploying Codemode on
+2026-11-17. The earlier PR-only exception is superseded. Deployment retains the
+existing central-access mode until the coordinated ID migration. The qualification
+below records the implementation checkpoint; a production receipt follows verified
+cutover. Existing tenant data, provider consent, key material and backup tasks remain
+part of the preserved runtime contract.
 
 `CODEMODE_ID_ACCESS_ENABLED` defaults to `false` and requires the existing
 confidential ID configuration when enabled. The immutable published SDK is pinned

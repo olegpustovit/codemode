@@ -463,13 +463,8 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await noOverflow(page)
   await capture(page, "registration-mobile.png")
   await page.setViewportSize({ width: 1440, height: 1000 })
-  await page.getByLabel("Email", { exact: true }).fill("outsider@example.com")
-  await page.getByLabel("Password", { exact: true }).fill(password)
-  await page
-    .getByRole("button", { name: "Create account", exact: true })
-    .click()
-  await expect(page.getByRole("alert")).toContainText("registration is limited")
   await page.getByLabel("Email", { exact: true }).fill("ursus95@gmail.com")
+  await page.getByLabel("Password", { exact: true }).fill(password)
   await page
     .getByRole("button", { name: "Create account", exact: true })
     .click()

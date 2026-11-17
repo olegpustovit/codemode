@@ -285,7 +285,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         access: Default::default(),
         mcp_tasks: server::Tasks::default(),
         rate_limit: Arc::new(
-            codemode_core::components::auth::rate_limit::RateLimiter::new(60, 600),
+            codemode_core::components::auth::rate_limit::RateLimiter::new(60, 60, 600),
         ),
         oauth: Arc::new(codemode_core::components::auth::oauth::OAuth::new(
             db.clone(),
@@ -308,7 +308,9 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
     let limited_auth = state.auth.clone();
     let limited_state = server::State {
         access: Default::default(),
-        rate_limit: Arc::new(codemode_core::components::auth::rate_limit::RateLimiter::new(1, 2)),
+        rate_limit: Arc::new(
+            codemode_core::components::auth::rate_limit::RateLimiter::new(1, 1, 2),
+        ),
         ..state.clone()
     };
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -656,6 +658,19 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         .create("third rate-limit caller", "test.example")
         .await
         .unwrap();
+    for _ in 0..8 {
+        rpc(
+            &client,
+            &limited_url,
+            "test.example",
+            &main_token,
+            "2025-11-25",
+            "tools/list",
+            serde_json::json!({}),
+        )
+        .await;
+        rpc(&client, &limited_url, "test.example", &main_token, "2025-11-25", "initialize", serde_json::json!({"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"rate-test","version":"1"}})).await;
+    }
     for (token, status) in [
         (&main_token, 200),
         (&main_token, 429),
@@ -668,7 +683,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
             .bearer_auth(token)
             .header("accept", "application/json, text/event-stream")
             .header("MCP-Protocol-Version", "2025-11-25")
-            .json(&serde_json::json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}))
+            .json(&serde_json::json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"execute","arguments":{"code":"return 42"}}}))
             .send()
             .await
             .unwrap();

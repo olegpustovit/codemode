@@ -1,4 +1,5 @@
 pub mod log;
+mod shape;
 pub(crate) mod title;
 use super::{auth::Principal, sources::Sources};
 use crate::infrastructure::{
@@ -202,7 +203,11 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                 .allowed_sources(principal.workspace_id)
                 .await
                 .map_err(|_| SandboxError::Invalid("workspace scope unavailable".into()))?;
-            let prelude = self.sources.prelude(allowed.as_deref()).await;
+            let prelude = self
+                .sources
+                .prelude(allowed.as_deref(), principal.workspace_id)
+                .await
+                .map_err(|_| SandboxError::Invalid("workspace tool scope unavailable".into()))?;
             let (mut run, mut step) = self
                 .sandbox
                 .start_captured_for(principal.token_id, &code, &prelude, capture.clone())
@@ -308,9 +313,22 @@ fn truncate_result(value: Box<RawValue>, budget: usize) -> (Box<RawValue>, usize
     if value.get().len() <= budget {
         return (value, 0);
     }
-    // Truncated JSON becomes a string preview, so the MCP result always remains valid JSON.
-    // Escaping quotes, backslashes and controls also consumes the response budget.
-    let mut remaining = budget.saturating_sub(2);
+    // Summarize through a bounded streaming visitor; large replies never become a host-side tree.
+    let mut shape = shape::summarize(value.get());
+    let suffix = loop {
+        let suffix = format!("\n[shape: {shape}]");
+        let encoded = serde_json::to_string(&suffix).unwrap_or_default();
+        if encoded.len() <= budget.saturating_sub(2) / 2 || shape.is_empty() {
+            break suffix;
+        }
+        let mut end = shape.len() / 2;
+        while !shape.is_char_boundary(end) {
+            end -= 1;
+        }
+        shape.truncate(end);
+    };
+    let suffix_bytes = serde_json::to_string(&suffix).map_or(0, |s| s.len().saturating_sub(2));
+    let mut remaining = budget.saturating_sub(2 + suffix_bytes);
     let mut length = 0;
     for c in value.get().chars() {
         let encoded = match c {
@@ -327,7 +345,8 @@ fn truncate_result(value: Box<RawValue>, budget: usize) -> (Box<RawValue>, usize
     let preview = &value.get()[..length];
     let dropped = value.get().len() - preview.len();
     (
-        serde_json::value::to_raw_value(preview).unwrap_or_else(|_| RawValue::NULL.to_owned()),
+        serde_json::value::to_raw_value(&format!("{preview}{suffix}"))
+            .unwrap_or_else(|_| RawValue::NULL.to_owned()),
         dropped,
     )
 }
@@ -342,8 +361,26 @@ mod tests {
         let original = raw.get().len();
         let (preview, dropped) = truncate_result(raw, OUTPUT);
         let decoded: String = serde_json::from_str(preview.get()).unwrap();
-        assert_eq!(decoded.len() + dropped, original);
+        assert_eq!(
+            decoded.rsplit_once("\n[shape: ").unwrap().0.len() + dropped,
+            original
+        );
         assert!(preview.get().len() <= OUTPUT + 8);
+    }
+
+    #[test]
+    fn truncated_result_describes_rows_and_retains_a_hard_budget() {
+        let rows = vec![serde_json::json!({"id":1,"title":"x".repeat(100)}); 36];
+        let raw = serde_json::value::to_raw_value(
+            &serde_json::json!({"data":{"items":rows,"nextCursor":null}}),
+        )
+        .unwrap();
+        let (preview, dropped) = truncate_result(raw, 256);
+        assert!(dropped > 0);
+        assert!(preview.get().len() <= 256);
+        let decoded: String = serde_json::from_str(preview.get()).unwrap();
+        assert!(decoded.contains("36×"));
+        assert!(decoded.contains("nextCursor"));
     }
 
     #[test]
@@ -358,7 +395,10 @@ mod tests {
             let (preview, dropped) = truncate_result(raw, OUTPUT);
             let decoded: String = serde_json::from_str(preview.get()).unwrap();
             assert!(preview.get().len() <= OUTPUT);
-            assert_eq!(decoded.len() + dropped, original);
+            assert_eq!(
+                decoded.rsplit_once("\n[shape: ").unwrap().0.len() + dropped,
+                original
+            );
         }
     }
 }

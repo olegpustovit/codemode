@@ -59,8 +59,10 @@ pub fn generate(path: &str, description: &str, input: &Value, output: Option<&Va
         definitions: Vec::new(),
         active: BTreeSet::new(),
         used: BTreeSet::new(),
+        compact: false,
     };
     let mut args = Vec::new();
+    let mut brief_args = Vec::new();
     if let Some(properties) = input.get("properties").and_then(Value::as_object) {
         let required = input.get("required").and_then(Value::as_array);
         let aliases = names(properties.keys().map(String::as_str));
@@ -74,6 +76,14 @@ pub fn generate(path: &str, description: &str, input: &Value, output: Option<&Va
                 let hint =
                     generator.hint(schema, &format!("{}_{}", path.replace('.', "_"), name), 0);
                 args.push(format!(
+                    "{}: {hint}{}",
+                    aliases[name],
+                    if is_required { "" } else { " = None" }
+                ));
+                generator.compact = true;
+                let hint = generator.hint(schema, "", 0);
+                generator.compact = false;
+                brief_args.push(format!(
                     "{}: {hint}{}",
                     aliases[name],
                     if is_required { "" } else { " = None" }
@@ -94,13 +104,78 @@ pub fn generate(path: &str, description: &str, input: &Value, output: Option<&Va
     };
     let signature = format!("async def tools.{path}({arguments}) -> {result}: ...");
     let first_line = description.lines().next().unwrap_or_default();
-    let brief = format!("{signature}\n# {first_line}");
+    let brief_arguments = if brief_args.is_empty() {
+        String::new()
+    } else {
+        format!("*, {}", brief_args.join(", "))
+    };
+    let pagination_note = if pagination(input, output).is_some() {
+        format!(
+            "\n# Cursor pagination: await tools.{path}.all(max_pages=20, _fields=None, **kwargs) returns rows"
+        )
+    } else {
+        String::new()
+    };
+    let brief =
+        format!("async def tools.{path}({brief_arguments}): ...\n# {first_line}{pagination_note}");
     let full = format!(
         "from typing import Any, Literal, NotRequired, TypedDict\n\n{}\n{signature}\n# {}",
         generator.definitions.join("\n\n"),
         description.replace('\n', "\n# ")
-    );
+    ) + &pagination_note;
     Stubs { brief, full }
+}
+
+/// Item and cursor paths for an unambiguous cursor-paginated output envelope.
+pub fn pagination(input: &Value, output: Option<&Value>) -> Option<[Vec<String>; 2]> {
+    fn resolve<'a>(mut schema: &'a Value, root: &'a Value) -> Option<&'a Value> {
+        for _ in 0..16 {
+            let Some(reference) = schema.get("$ref").and_then(Value::as_str) else {
+                return Some(schema);
+            };
+            schema = root.pointer(reference.strip_prefix('#')?)?;
+        }
+        None
+    }
+    fn find(
+        schema: &Value,
+        root: &Value,
+        path: &mut Vec<String>,
+        depth: usize,
+    ) -> Option<[Vec<String>; 2]> {
+        if depth > 8 {
+            return None;
+        }
+        let properties = resolve(schema, root)?.get("properties")?.as_object()?;
+        if let Some(cursor) = ["nextCursor", "next_cursor"]
+            .into_iter()
+            .find(|k| properties.contains_key(*k))
+        {
+            let arrays: Vec<_> = properties
+                .iter()
+                .filter(|(_, value)| resolve(value, root).is_some_and(|v| v.get("items").is_some()))
+                .collect();
+            if let [(items, _)] = arrays.as_slice() {
+                let mut item_path = path.clone();
+                item_path.push((*items).clone());
+                let mut cursor_path = path.clone();
+                cursor_path.push(cursor.into());
+                return Some([item_path, cursor_path]);
+            }
+        }
+        for (name, child) in properties {
+            path.push(name.clone());
+            let found = find(child, root, path, depth + 1);
+            path.pop();
+            if found.is_some() {
+                return found;
+            }
+        }
+        None
+    }
+    resolve(input, input)?.get("properties")?.get("cursor")?;
+    let output = output?;
+    find(output, output, &mut Vec::new(), 0)
 }
 
 struct Generator<'a> {
@@ -108,6 +183,7 @@ struct Generator<'a> {
     definitions: Vec<String>,
     active: BTreeSet<String>,
     used: BTreeSet<String>,
+    compact: bool,
 }
 
 impl Generator<'_> {
@@ -180,6 +256,9 @@ impl Generator<'_> {
                     .unwrap_or_else(|| "Any".into())
             ),
             Some("object") | None if schema.get("properties").is_some() => {
+                if self.compact {
+                    return "dict[str, Any]".into();
+                }
                 let Some(properties) = schema.get("properties").and_then(Value::as_object) else {
                     return "dict[str, Any]".into();
                 };
@@ -265,6 +344,30 @@ mod tests {
     use super::*;
     use serde_json::json;
     #[test]
+    fn cursor_pagination_requires_input_cursor_and_unambiguous_output_rows() {
+        let input = json!({"type":"object","properties":{"cursor":{"type":"string"}}});
+        let output = json!({"type":"object","properties":{"data":{"$ref":"#/$defs/Page"}},
+            "$defs":{"Page":{"type":"object","properties":{"items":{"type":["array","null"],"items":{"type":"object"}},"nextCursor":{"type":["string","null"]}}}}});
+        assert_eq!(
+            pagination(&input, Some(&output)),
+            Some([
+                vec!["data".into(), "items".into()],
+                vec!["data".into(), "nextCursor".into()]
+            ])
+        );
+        assert!(pagination(&json!({}), Some(&output)).is_none());
+        assert!(pagination(&input, None).is_none());
+        let ambiguous =
+            json!({"properties":{"items":{"items":{}},"other":{"items":{}},"next_cursor":{}}});
+        assert!(pagination(&input, Some(&ambiguous)).is_none());
+        let snake = json!({"properties":{"entries":{"items":{}},"next_cursor":{}}});
+        assert_eq!(
+            pagination(&input, Some(&snake)),
+            Some([vec!["entries".into()], vec!["next_cursor".into()]])
+        );
+    }
+
+    #[test]
     fn aliases_are_safe_deterministic_and_distinct() {
         assert_eq!(identifier("__init__"), "__init___");
         assert_eq!(identifier("__dict__"), "__dict___");
@@ -286,7 +389,7 @@ mod tests {
         let schema = json!({"type":"object","properties":{"class":{"type":"string","enum":["a","b"]},"data":{"$ref":"#/$defs/Node"}},"required":["class"],"$defs":{"Node":{"type":"object","properties":{"count":{"type":["integer","null"]},"child":{"$ref":"#/$defs/Node"}}}}});
         let stub = generate("example.run", "description", &schema, None);
         assert!(stub.brief.contains("class_: Literal[\"a\", \"b\"]"));
-        assert!(stub.brief.contains("data: example_run_data = None"));
+        assert!(stub.brief.contains("data: dict[str, Any] = None"));
         assert!(stub.full.contains("NotRequired[int | None]"));
         assert!(stub.full.contains("\"child\": NotRequired[Any]"));
     }

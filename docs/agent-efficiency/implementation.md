@@ -76,3 +76,71 @@ A2 remaining fidelity check: Monty's caught `AttributeError` still has its origi
 message; gateway enrichment currently applies only to uncaught errors. Investigate
 the SDK's host-backed class `NameLookup` support before marking A2 complete. Do
 not replace the requirement with an eval that only checks uncaught failures.
+
+## Discovery, paging, projection and admission checkpoint
+
+Implemented locally, pending external comparison and deployment:
+
+- A4: only `tools/call` consumes the MCP rate budget. Session admission uses the
+  same inferred `agent_sessions.id` as execution history, including grant/refresh
+  continuity. Defaults are 600 calls/minute/session with token and workspace
+  ceilings of 6000. All three buckets admit atomically; HTTP 429 retains
+  `Retry-After`. Initialization and listing remain available after exhaustion.
+  Existing explicit environment overrides still apply and must be inspected at
+  rollout. Read request bodies are bounded at 1 MiB, above the escaped 64 KiB
+  Python source limit. Identity's separate HTTP rate limit retains its old values.
+- B1: `await tools.search(query)` returns brief matches inside an execution.
+  The reserved broker path `@codemode/search` is workspace-scoped, audited and
+  charged to the common 100-call limit. `help(tool)` synchronously returns the
+  generated full stub already loaded for this execution, without a broker call.
+  Full help is withheld for tools outside workspace tool scope. A source named
+  `search` can coexist with the inline search capability.
+- B3: ten-hit pages, full stubs for the first three hits only, compact input-only
+  brief signatures, and repeated exact TypedDict/import definitions emitted once
+  per full page. The 61-tool golden corpus was intentionally regenerated and
+  offline SQL metadata refreshed on disposable PostgreSQL. Search response size
+  targets have not yet been measured or enforced as L4 gates.
+- Blocked-tool visibility: in-scope blocked tools now carry `blocked: true` in
+  search. Out-of-scope tools stay absent and broker blocks remain enforced.
+- B4: truncated result strings append a structural summary with object keys,
+  array counts and the first item's shape. A streaming visitor bounds retained
+  shape depth, nodes, keys and fields; it never constructs a full JSON result
+  tree. Preview plus summary obeys the same escaped JSON byte budget, and dropped
+  bytes still count omitted original bytes rather than added summary text.
+- B5/C1: unambiguous cursor/nextCursor or next_cursor schemas gain `.all()`.
+  Nested envelopes and local schema references are supported. Every page remains
+  an ordinary broker call. Defaults to 20 pages, accepts 1–100, and raises instead
+  of silently returning an incomplete total when the limit is reached. Repeated
+  cursors and malformed envelopes fail precisely. The shared call cap and wall
+  deadline remain in force.
+- C4: `_fields` trims rows inside the worker, including `.all()` results. Invalid
+  options fail before upstream dispatch. Ordinary list responses retain their
+  envelopes and cursors. No dependencies were added.
+- Documentation: corrected the smoke receipt from three tools to two and
+  documented existing `execute(scriptId)` plus new rate defaults.
+
+Real-worker tests cover paging, projection, aliases, page/cursor limits, early
+option validation and exhausting the common call budget partway through `.all()`.
+The real MCP/Postgres test covers inline discovery, help, auditing, a 100-search
+cap, an empty workspace and a connected source named `search`. Policy tests cover
+blocked visibility, dispatch denial and withholding out-of-scope help.
+
+A 133-case workspace checkpoint passed before the later shape/admission changes.
+The next 137-case run had 136 passes and exposed that the shape depth bound cut
+primitive field types too early; the bound was corrected while preserving the
+32-node cap. The latest complete qualification result will be recorded below.
+
+Remaining original scope: caught unknown-attribute guidance (A2), the workspace
+manifest (B2), session memo (C2), recipes and script arguments (C3), Tokens setup
+and Codex instructions/playbook (D1–D3), all requested experiments and metric
+gates, final native/Oracle/UI/browser qualification, merge and gated deployment.
+The root `/mcp` surface still has exactly `search` and `execute`.
+
+Latest checkpoint: **137/137 native Rust checks pass**, on owned PostgreSQL 18
+with two verification CPUs; 24.91 s total including 14.55 s build. Slowest case
+2.329 s. `cargo fmt --check` and `git diff --check` pass. Clippy completes in
+8.32 s with the repository's warning set (including test `unwrap` warnings),
+not a warning-free result. No UI, Oracle or external model comparisons have
+been claimed for this checkpoint, and no production changes have been made.
+The existing stub generator example remains the way to regenerate the golden;
+there is no test bypass or new golden-update option.

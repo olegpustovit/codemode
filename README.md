@@ -66,8 +66,13 @@ The gateway applies embedded migrations at startup. Before the first Phase 2 sta
 | `CODEMODE_CONCURRENT_EXECUTIONS` | `8`; range 1–64, excess requests fail busy |
 | `CODEMODE_CONCURRENT_CALLS` | `16`; range 1–100 per execution |
 | `CODEMODE_UPSTREAM_TIMEOUT_SECS` | `30`; range 1–60, bounded by the execution deadline |
-| `CODEMODE_TOKEN_REQUESTS_PER_MINUTE` | `60`; range 1–60000; authenticated MCP request budget per token |
-| `CODEMODE_ENDPOINT_REQUESTS_PER_MINUTE` | `600`; range 1–600000; authenticated MCP request budget shared by an endpoint |
+| `CODEMODE_SESSION_REQUESTS_PER_MINUTE` | `600`; range 1–60000; `tools/call` budget per inferred agent session |
+| `CODEMODE_TOKEN_REQUESTS_PER_MINUTE` | `6000`; range 1–60000; `tools/call` ceiling per token |
+| `CODEMODE_ENDPOINT_REQUESTS_PER_MINUTE` | `6000`; range 1–600000; `tools/call` ceiling shared by a workspace |
+
+Initialization, tool listing and other protocol traffic do not consume these budgets.
+Rate-limited tool calls return HTTP 429 with `Retry-After`. Existing environment
+overrides still apply; remove a legacy 60/min token override to use the new defaults.
 
 With the database configured, `codemode token create NAME` prints a new bearer token once. `codemode token list` lists metadata and `codemode token revoke UUID` revokes one. Tokens are bound to `CODEMODE_HOSTNAME`.
 

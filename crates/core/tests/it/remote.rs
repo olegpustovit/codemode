@@ -91,6 +91,14 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
                     bearer_env: None,
                 },
             },
+            Source {
+                requires_account: false,
+                slug: "search".into(),
+                transport: Transport::McpHttp {
+                    url: format!("http://{address}/mcp"),
+                    bearer_env: None,
+                },
+            },
         ],
     })
     .await
@@ -105,7 +113,10 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
                     .fetch_one(&pool)
                     .await
                     .unwrap();
-            if sources.lookup("fixture.echo").await.is_some() && broken != "pending" {
+            if sources.lookup("fixture.echo").await.is_some()
+                && sources.lookup("search.echo").await.is_some()
+                && broken != "pending"
+            {
                 break;
             }
             tokio::task::yield_now().await;
@@ -125,7 +136,7 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
             .unwrap()
             .tools
             .len(),
-        1
+        2
     );
     let binary = std::env::var_os("CODEMODE_MONTY_BIN")
         .map(std::path::PathBuf::from)
@@ -143,13 +154,62 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
         .unwrap(),
     );
     let execution = Arc::new(Execution::new(
-        db,
+        db.clone(),
         sources,
         sandbox.clone(),
         tasks.clone(),
         stop.clone(),
         Default::default(),
     ));
+    let discovered = execution.execute(principal.clone(), "hits = await tools.search('echo')\nprint(help(tools.fixture.echo))\nreturn [hits[0]['path'], await tools.fixture.echo(value='inline'), await tools.search.echo(value='collision')]".into()).await.unwrap();
+    assert_eq!(discovered.status, "completed", "{:?}", discovered.error);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(discovered.result.get()).unwrap(),
+        serde_json::json!(["fixture.echo", "inline", "collision"])
+    );
+    assert_eq!(discovered.tool_calls, 3);
+    assert!(discovered.output.contains("async def tools.fixture.echo"));
+    let discovery_audit: Vec<(String, String)> =
+        sqlx::query_as("SELECT path,outcome FROM tool_calls WHERE execution_id=$1 ORDER BY seq")
+            .bind(discovered.execution_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        discovery_audit,
+        vec![
+            ("@codemode/search".into(), "ok".into()),
+            ("fixture.echo".into(), "ok".into()),
+            ("search.echo".into(), "ok".into())
+        ]
+    );
+    let workspaces =
+        codemode_core::components::workspaces::Workspaces::new(db.clone(), "test.example".into())
+            .unwrap();
+    let empty = workspaces.create("Empty", &[]).await.unwrap();
+    let (_, empty_token) = auth
+        .create_for_workspace("empty", empty, "test.example", "/mcp")
+        .await
+        .unwrap()
+        .unwrap();
+    let empty_principal = auth
+        .authenticate(&empty_token, "test.example")
+        .await
+        .unwrap()
+        .unwrap();
+    let hidden = execution
+        .execute(empty_principal, "return await tools.search('echo')".into())
+        .await
+        .unwrap();
+    assert_eq!(hidden.status, "completed", "{:?}", hidden.error);
+    assert_eq!(hidden.result.get(), "[]");
+    let cap = execution.execute(principal.clone(), "n = 0\ntry:\n    for _ in range(101):\n        await tools.search('echo')\n        n += 1\nexcept ToolError as e:\n    return [n, str(e)]".into()).await.unwrap();
+    assert_eq!(cap.status, "completed", "{:?}", cap.error);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(cap.result.get()).unwrap(),
+        serde_json::json!([100, "tool-call limit (100) reached"])
+    );
+    assert_eq!(cap.tool_calls, 100);
     let result = execution
         .execute(
             principal.clone(),
@@ -197,7 +257,7 @@ except ToolError as e:
     return str(e)"#,
             "completed",
             Some(
-                "fixture.echo: invalid argument at /value (expected string)\n  signature: async def tools.fixture.echo(*, value: str, prefix: str = None) -> Any: ...\n# ",
+                "fixture.echo: invalid argument at /value (expected string)\n  signature: async def tools.fixture.echo(*, value: str, prefix: str = None): ...\n# ",
             ),
         ),
         (
@@ -239,7 +299,7 @@ except ToolError:
         outcomes,
         vec![
             ("invalid_args".into(), 1),
-            ("ok".into(), 1),
+            ("ok".into(), 105),
             ("tool_error".into(), 2)
         ]
     );

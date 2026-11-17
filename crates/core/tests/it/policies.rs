@@ -201,14 +201,14 @@ async fn default_allow_and_blocked_python_permission_error_are_audited(pool: sql
         )
         .await
         .unwrap();
-    assert!(
-        f.catalogue
-            .search_scoped("write", false, None, None, Some(f.endpoint))
-            .await
-            .unwrap()
-            .tools
-            .is_empty()
-    );
+    let blocked_hits = f
+        .catalogue
+        .search_scoped("write", false, None, None, Some(f.endpoint))
+        .await
+        .unwrap();
+    assert_eq!(blocked_hits.tools.len(), 1);
+    assert!(blocked_hits.tools[0].blocked);
+    assert_eq!(blocked_hits.tools[0].path, "fixture.write");
     let blocked=f.execution.execute(f.principal.clone(),"try:\n    await tools.fixture.write()\nexcept PermissionError as e:\n    return str(e)".into()).await.unwrap();
     assert_eq!(blocked.status, "completed", "{:?}", blocked.error);
     assert!(blocked.result.get().contains("fixture.write"));
@@ -274,6 +274,20 @@ async fn tool_allowlists_override_allow_policies_survive_sync_and_identity_chang
         .unwrap();
     endpoints.set_all_tools(f.endpoint, false).await.unwrap();
     assert!(!endpoints.get(f.endpoint).await.unwrap().unwrap().all_tools);
+    let hidden_help = f
+        .execution
+        .execute(
+            f.principal.clone(),
+            "return help(tools.fixture.write)".into(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(hidden_help.status, "completed", "{:?}", hidden_help.error);
+    assert_eq!(
+        serde_json::from_str::<String>(hidden_help.result.get()).unwrap(),
+        "tool is outside workspace tool scope"
+    );
+    assert_eq!(hidden_help.tool_calls, 0);
     assert!(
         f.catalogue
             .search_scoped("", false, None, None, Some(f.principal.workspace_id))

@@ -56,7 +56,7 @@ The owner also authorized a separate `/mcp-admin` management surface: workspace 
 | Tool | Input | Behaviour |
 |---|---|---|
 | `search` | `query`, `detail`, `cursor` | Full-text search over the tools this caller may reach. Returns path, one-line description, input type. `detail: "full"` adds output type and docs. |
-| `execute` | `code` | Runs Python in the sandbox. The only capability is the `tools` object. Returns the return value plus captured output, truncated at a fixed budget. |
+| `execute` | `code` or `scriptId` | Runs Python in the sandbox. The only capability is the `tools` object. Returns the return value plus captured output, truncated at a fixed budget. |
 
 ## Components
 

@@ -1,4 +1,5 @@
 mod http;
+pub(crate) const SEARCH_PATH: &str = "@codemode/search";
 use super::{
     accounts::Accounts,
     catalogue::Definition,
@@ -74,6 +75,7 @@ pub(crate) struct Broker {
     db: Database,
     accounts: Accounts,
     origin: String,
+    workspaces: Workspaces,
     policies: Policies,
 }
 impl Broker {
@@ -85,6 +87,7 @@ impl Broker {
     ) -> Self {
         Self {
             origin: format!("https://{}", endpoints.main_hostname()),
+            workspaces: endpoints,
             db,
             accounts,
             policies,
@@ -113,6 +116,33 @@ impl Broker {
     pub(crate) fn account_link(&self, source: Uuid) -> String {
         format!("{}/sources/{source}/accounts", self.origin)
     }
+    async fn search(&self, args: Value, workspace: Uuid) -> Result<Box<RawValue>, CallError> {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Input {
+            query: String,
+        }
+        let input: Input = serde_json::from_value(args)
+            .map_err(|_| CallError::Invalid("tools.search requires query: str".into()))?;
+        let allowed = self
+            .workspaces
+            .sources(workspace)
+            .await
+            .map_err(|_| CallError::Blocked("workspace scope unavailable".into()))?;
+        let page = super::catalogue::Catalogue::new(self.db.clone())
+            .search_scoped(
+                &input.query,
+                false,
+                None,
+                allowed.as_deref(),
+                Some(workspace),
+            )
+            .await
+            .map_err(|error| CallError::Invalid(error.to_string()))?;
+        serde_json::value::to_raw_value(&page.tools)
+            .map_err(|_| CallError::Upstream("could not encode search results".into()))
+    }
+
     pub async fn dispatch(
         &self,
         execution: Uuid,
@@ -133,6 +163,7 @@ impl Broker {
             );
         };
         let result = match args {
+            Ok(args) if call.path == SEARCH_PATH => self.search(args, workspace).await,
             Ok(mut args) => match tool {
                 Ok(tool) => {
                     strip_optional_nulls(&mut args, &tool.omit_null);

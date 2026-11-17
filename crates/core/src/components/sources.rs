@@ -277,6 +277,7 @@ impl Sources {
     ) -> (u32, crate::infrastructure::sandbox::CallResult) {
         let tool = match self.lookup(&call.path).await {
             Some(tool) => Ok(tool),
+            None if call.path == super::broker::SEARCH_PATH => Err(String::new()),
             None => Err(self.unknown(&call.path, workspace).await),
         };
         self.broker
@@ -306,7 +307,12 @@ impl Sources {
         Ok(self.workspaces.sources(workspace).await?)
     }
 
-    pub async fn prelude(&self, allowed: Option<&[Uuid]>) -> String {
+    pub async fn prelude(
+        &self,
+        allowed: Option<&[Uuid]>,
+        workspace: Uuid,
+    ) -> Result<String, Error> {
+        let scope = self.workspaces.tool_scope(workspace).await?;
         let registry = self.tools.read().await;
         let mut groups: BTreeMap<&str, Vec<&Tool>> = BTreeMap::new();
         for (path, tool) in registry.iter() {
@@ -317,9 +323,11 @@ impl Sources {
                 groups.entry(source).or_default().push(tool);
             }
         }
-        let mut code = String::from("import asyncio\nimport json\nToolError = RuntimeError\n");
+        let mut code = String::from(include_str!("sources/prelude.py"));
         for (source, tools) in &groups {
-            code.push_str(&format!("class _Source_{source}:\n"));
+            code.push_str(&format!(
+                "class _Source_{source}:\n    def __init__(self):\n"
+            ));
             for tool in tools {
                 let name = tool
                     .definition
@@ -339,10 +347,39 @@ impl Sources {
                     }
                 }
                 let aliases = serde_json::to_string(&aliases).unwrap_or_else(|_| "{}".into());
-                code.push_str(&format!("    async def {name}(self, **kwargs):\n        aliases = {aliases}\n        args = {{aliases.get(k, k): v for k, v in kwargs.items()}}\n        return json.loads(await _call({}, json.dumps(args)))\n",stubs::quote(&tool.definition.path)));
+                let in_scope = scope
+                    .as_ref()
+                    .is_none_or(|paths| paths.contains(&tool.definition.path));
+                let full = if in_scope {
+                    stubs::generate(
+                        &tool.definition.path,
+                        &tool.definition.description,
+                        &tool.definition.input_schema,
+                        tool.definition.output_schema.as_ref(),
+                    )
+                    .full
+                } else {
+                    "tool is outside workspace tool scope".into()
+                };
+                let pagination = stubs::pagination(
+                    &tool.definition.input_schema,
+                    tool.definition.output_schema.as_ref(),
+                )
+                .map(|paths| serde_json::to_string(&paths).unwrap_or_else(|_| "None".into()))
+                .unwrap_or_else(|| "None".into());
+                code.push_str(&format!(
+                    "        self.{name} = _Tool({}, {aliases}, {}, {pagination})\n",
+                    stubs::quote(&tool.definition.path),
+                    stubs::quote(&full)
+                ));
+            }
+            if *source == "search" {
+                code.push_str(
+                    "    async def __call__(self, query):\n        return await _search(query)\n",
+                );
             }
         }
-        code.push_str("class _Tools:\n    def __init__(self):\n");
+        code.push_str("class _Tools:\n    async def search(self, query):\n        return await _search(query)\n    def __init__(self):\n");
         if groups.is_empty() {
             code.push_str("        pass\n");
         }
@@ -350,7 +387,7 @@ impl Sources {
             code.push_str(&format!("        self.{source} = _Source_{source}()\n"));
         }
         code.push_str("tools = _Tools()\n");
-        code
+        Ok(code)
     }
 
     pub(crate) async fn explain_error(&self, message: String, workspace: Uuid) -> String {

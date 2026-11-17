@@ -463,3 +463,119 @@ async fn call_cap_is_catchable_after_one_hundred_sequential_or_parallel_calls() 
     }
     sb.pool.close().await;
 }
+
+#[tokio::test]
+async fn pagination_and_projection_use_real_workers_and_preserve_call_budgets() {
+    let sb = sandbox(Duration::from_secs(1)).await;
+    let prelude = format!(
+        "{}\ntool = _Tool('stub.page', {{'from_': 'from'}}, 'full signature', [['data', 'items'], ['data', 'nextCursor']])\n",
+        include_str!("../../src/components/sources/prelude.py")
+    );
+    for (code, repeated, expected, expected_calls) in [
+        (
+            "return await tool.all(from_='date', _fields=['id'])",
+            false,
+            json!([{"id":1},{"id":2}]),
+            2,
+        ),
+        (
+            "try:\n    await tool.all(max_pages=1)\nexcept ToolError as e:\n    return str(e)",
+            false,
+            json!("pagination max_pages reached; narrow filters or increase max_pages"),
+            1,
+        ),
+        (
+            "try:\n    await tool.all()\nexcept ToolError as e:\n    return str(e)",
+            true,
+            json!("pagination cursor repeated; stopped to avoid a loop"),
+            2,
+        ),
+        (
+            "try:\n    await tool(_fields='id')\nexcept ToolError as e:\n    return str(e)",
+            false,
+            json!("_fields must be a list of field names"),
+            0,
+        ),
+        (
+            "return await tool(_fields=['id'])",
+            false,
+            json!({"data":{"items":[{"id":1}],"nextCursor":"next"}}),
+            1,
+        ),
+        (
+            "try:\n    await tool.all(max_pages=True)\nexcept ToolError as e:\n    return str(e)",
+            false,
+            json!("max_pages must be an integer from 1 to 100"),
+            0,
+        ),
+    ] {
+        let (mut run, mut step) = sb.start(code, &prelude).await.unwrap();
+        let mut count = 0;
+        loop {
+            match step {
+                Step::Done { result, .. } => {
+                    assert_eq!(
+                        serde_json::from_str::<serde_json::Value>(result.get()).unwrap(),
+                        expected,
+                        "{code}"
+                    );
+                    assert_eq!(count, expected_calls, "{code}");
+                    break;
+                }
+                Step::Calls(calls) => {
+                    assert_eq!(calls.len(), 1);
+                    count += 1;
+                    let call = &calls[0];
+                    let args: serde_json::Value = serde_json::from_str(call.args.get()).unwrap();
+                    assert!(args.get("_fields").is_none());
+                    assert!(args.get("max_pages").is_none());
+                    if code.contains("from_") {
+                        assert_eq!(args["from"], "date");
+                    }
+                    if count > 1 {
+                        assert_eq!(args["cursor"], "next");
+                    }
+                    let response = json!({"data":{"items":[{"id":count,"title":"extra","labels":["keep only if requested"]}], "nextCursor":if count == 1 || repeated {json!("next")} else {json!(null)}}});
+                    (run, step) = sb
+                        .resume(
+                            run,
+                            vec![(
+                                call.id,
+                                Ok(serde_json::value::to_raw_value(&response).unwrap()),
+                            )],
+                        )
+                        .await
+                        .unwrap();
+                }
+            }
+        }
+    }
+    let code = "await tool()\ntry:\n    await tool.all(max_pages=100)\nexcept ToolError as e:\n    return str(e)";
+    let (mut run, mut step) = sb.start(code, &prelude).await.unwrap();
+    let mut count = 0;
+    loop {
+        match step {
+            Step::Done { result, .. } => {
+                assert_eq!(
+                    serde_json::from_str::<String>(result.get()).unwrap(),
+                    "tool-call limit (100) reached"
+                );
+                assert_eq!(count, 100);
+                break;
+            }
+            Step::Calls(calls) => {
+                count += calls.len();
+                assert!(count <= 100);
+                let response = serde_json::value::to_raw_value(
+                    &json!({"data":{"items":[],"nextCursor":count.to_string()}}),
+                )
+                .unwrap();
+                (run, step) = sb
+                    .resume(run, vec![(calls[0].id, Ok(response))])
+                    .await
+                    .unwrap();
+            }
+        }
+    }
+    sb.pool.close().await;
+}

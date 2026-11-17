@@ -1,0 +1,31 @@
+{
+  "scope": "Native development checkpoint, not release acceptance",
+  "proposal": "https://artifacts.microapps.space/a/npta97dqvf6a",
+  "branch": "codex/agent-efficiency",
+  "rust": {
+    "command": "tools/owned-postgres.py cargo t --workspace (two verification CPUs)",
+    "passed": 137,
+    "failed": 0,
+    "total_seconds": 24.91,
+    "build_seconds": 14.55,
+    "slowest_seconds": 2.329
+  },
+  "clippy": {
+    "command": "SQLX_OFFLINE=true cargo clippy --workspace --all-targets",
+    "exit_code": 0,
+    "seconds": 8.32,
+    "warnings": true
+  },
+  "checks": [
+    "cargo fmt --check",
+    "git diff --check"
+  ],
+  "not_verified": [
+    "Oracle qualification",
+    "UI and optimized-browser qualification",
+    "E1\u2013E7 comparisons",
+    "metric targets",
+    "production runtime"
+  ],
+  "deployed": false
+}

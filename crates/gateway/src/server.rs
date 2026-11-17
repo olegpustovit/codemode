@@ -454,15 +454,60 @@ pub(crate) async fn authenticate(
                             .into_response();
                     }
                 }
-                if let Err(seconds) = state
-                    .rate_limit
-                    .check(principal.token_id, principal.workspace_id)
-                {
-                    let mut response=(StatusCode::TOO_MANY_REQUESTS,Json(serde_json::json!({"error":"MCP request rate limit exceeded; retry after the indicated delay"}))).into_response();
-                    if let Ok(value) = axum::http::HeaderValue::from_str(&seconds.to_string()) {
-                        response.headers_mut().insert(header::RETRY_AFTER, value);
+                let routed_call = request
+                    .headers()
+                    .get("Mcp-Method")
+                    .is_some_and(|v| v == "tools/call");
+                let (parts, body) = request.into_parts();
+                let bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
+                    Ok(bytes) => bytes,
+                    Err(_) => {
+                        return (StatusCode::PAYLOAD_TOO_LARGE, "MCP request exceeds 1 MiB")
+                            .into_response();
                     }
-                    return response;
+                };
+                let is_call = routed_call
+                    || serde_json::from_slice::<serde_json::Value>(&bytes).is_ok_and(|message| {
+                        message.get("method").and_then(serde_json::Value::as_str)
+                            == Some("tools/call")
+                    });
+                request = Request::from_parts(parts, axum::body::Body::from(bytes));
+                if is_call {
+                    let admission = if resource == "/mcp" {
+                        let session =
+                            match codemode_core::components::agent_sessions::AgentSessions::new(
+                                state.db.clone(),
+                            )
+                            .touch(&principal)
+                            .await
+                            {
+                                Ok(session) => session,
+                                Err(error) => {
+                                    tracing::error!(error=%error, "agent session admission failed");
+                                    return (
+                                        StatusCode::SERVICE_UNAVAILABLE,
+                                        "agent session unavailable",
+                                    )
+                                        .into_response();
+                                }
+                            };
+                        state.rate_limit.check_session(
+                            session,
+                            principal.token_id,
+                            principal.workspace_id,
+                        )
+                    } else {
+                        state
+                            .rate_limit
+                            .check(principal.token_id, principal.workspace_id)
+                    };
+                    if let Err(seconds) = admission {
+                        let mut response=(StatusCode::TOO_MANY_REQUESTS,Json(serde_json::json!({"error":"MCP tool-call rate limit exceeded; retry after the indicated delay"}))).into_response();
+                        if let Ok(value) = axum::http::HeaderValue::from_str(&seconds.to_string()) {
+                            response.headers_mut().insert(header::RETRY_AFTER, value);
+                        }
+                        return response;
+                    }
                 }
                 request.extensions_mut().insert(principal);
                 return next.run(request).await;

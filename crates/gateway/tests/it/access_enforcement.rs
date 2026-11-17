@@ -318,7 +318,7 @@ async fn setup_state(
         access: provider.access.clone(),
         mcp_tasks: server::Tasks::default(),
         db: db.clone(),
-        rate_limit: Arc::new(RateLimiter::new(600, 6000)),
+        rate_limit: Arc::new(RateLimiter::new(600, 600, 6000)),
         auth,
         catalogue,
         execution,

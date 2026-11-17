@@ -162,15 +162,21 @@ async fn replacement_search_and_cursor_contract(pool: sqlx::PgPool) {
     let wire = serde_json::to_value(&first).unwrap();
     assert!(wire.get("nextCursor").is_some());
     assert!(wire.get("cursor").is_none());
-    assert_eq!(first.tools.len(), 20);
+    assert_eq!(first.tools.len(), 10);
     assert_eq!(first.tools[0].description, "List issues.");
     let cursor = first.cursor.unwrap();
     let second = catalogue
         .search("issues", false, Some(&cursor), None)
         .await
         .unwrap();
-    assert_eq!(second.tools.len(), 2);
-    assert!(second.cursor.is_none());
+    assert_eq!(second.tools.len(), 10);
+    let third = catalogue
+        .search("issues", false, second.cursor.as_deref(), None)
+        .await
+        .unwrap();
+    assert_eq!(third.tools.len(), 2);
+    assert!(third.cursor.is_none());
+    assert!(second.tools.last().unwrap().path < third.tools[0].path);
     assert!(first.tools.last().unwrap().path < second.tools[0].path);
     assert!(matches!(
         catalogue.search("other", false, Some(&cursor), None).await,
@@ -187,8 +193,17 @@ async fn replacement_search_and_cursor_contract(pool: sqlx::PgPool) {
             .unwrap()
             .tools
             .len(),
-        20
+        10
     );
+    let full = catalogue.search("", true, None, None).await.unwrap();
+    assert_eq!(
+        full.tools
+            .iter()
+            .filter(|t| t.signature.contains(" -> "))
+            .count(),
+        3
+    );
+    assert!(full.tools.iter().all(|t| !t.blocked));
     catalogue
         .replace(source, &definitions[..1], 0)
         .await

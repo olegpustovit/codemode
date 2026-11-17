@@ -1,0 +1,80 @@
+import asyncio
+import json
+ToolError = RuntimeError
+
+class _Tool:
+    def __init__(self, path, aliases, full, pagination):
+        self.path = path
+        self.aliases = aliases
+        self.full = full
+        self.pagination = pagination
+        if pagination is not None:
+            self.all = self._all
+
+    async def __call__(self, _fields=None, **kwargs):
+        _check_fields(_fields)
+        args = {self.aliases.get(k, k): v for k, v in kwargs.items()}
+        return _project(json.loads(await _call(self.path, json.dumps(args))), _fields)
+
+    async def _all(self, max_pages=20, _fields=None, **kwargs):
+        if self.pagination is None:
+            raise ToolError('tool does not have cursor pagination')
+        if type(max_pages) != int or max_pages < 1 or max_pages > 100:
+            raise ToolError('max_pages must be an integer from 1 to 100')
+        _check_fields(_fields)
+        rows = []
+        seen = []
+        if kwargs.get('cursor') is not None:
+            seen.append(kwargs['cursor'])
+        for _ in range(max_pages):
+            page = await self(**kwargs)
+            items = page
+            for key in self.pagination[0]:
+                if not isinstance(items, dict) or key not in items:
+                    raise ToolError('pagination response is missing its items path')
+                items = items[key]
+            cursor = page
+            for key in self.pagination[1]:
+                if not isinstance(cursor, dict) or key not in cursor:
+                    raise ToolError('pagination response is missing its cursor path')
+                cursor = cursor[key]
+            if items is None:
+                items = []
+            if not isinstance(items, list):
+                raise ToolError('pagination items must be a list')
+            rows.extend(_project(items, _fields))
+            if cursor is None or cursor == '':
+                return rows
+            if not isinstance(cursor, str):
+                raise ToolError('pagination cursor must be a string or None')
+            if cursor in seen:
+                raise ToolError('pagination cursor repeated; stopped to avoid a loop')
+            seen.append(cursor)
+            kwargs['cursor'] = cursor
+        raise ToolError('pagination max_pages reached; narrow filters or increase max_pages')
+
+def help(tool):
+    return tool.full
+
+
+def _check_fields(fields):
+    if fields is not None and (not isinstance(fields, list) or any([not isinstance(k, str) for k in fields])):
+        raise ToolError('_fields must be a list of field names')
+
+def _project(value, fields):
+    if fields is None:
+        return value
+    if isinstance(value, list):
+        return [{k: row[k] for k in fields if k in row} if isinstance(row, dict) else row for row in value]
+    if isinstance(value, dict):
+        # Preserve list envelopes and pagination keys while trimming their rows.
+        if isinstance(value.get('data'), (dict, list)):
+            return {k: _project(v, fields) if k == 'data' else v for k, v in value.items()}
+        lists = [k for k in ('items', 'results', 'entries', 'rows', 'issues') if isinstance(value.get(k), list)]
+        if lists:
+            return {k: _project(v, fields) if k in lists else v for k, v in value.items()}
+        return {k: value[k] for k in fields if k in value}
+    return value
+
+async def _search(query):
+    return json.loads(await _call('@codemode/search', json.dumps({'query': query})))

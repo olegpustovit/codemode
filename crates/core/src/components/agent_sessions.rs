@@ -78,14 +78,30 @@ impl AgentSessions {
     }
     pub(crate) async fn start(&self, principal: &Principal, code: &str) -> Result<Uuid, Error> {
         let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
-        let agent=sqlx::query!("SELECT name,oauth_grant FROM access_tokens WHERE id=$1 AND workspace_id=$2 AND resource='/mcp' AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",principal.token_id,principal.workspace_id).fetch_optional(&mut *tx).await.map_err(DbError::from)?.ok_or(Error::NotFound)?;
+        let session = self.session(principal, &mut tx).await?;
+        let execution=sqlx::query_scalar!("INSERT INTO executions(token_id,code,status,session_id,title,started_at) VALUES($1,$2,'running',$3,$4,clock_timestamp()) RETURNING id",principal.token_id,code,session,title(code,&[])).fetch_one(&mut *tx).await.map_err(DbError::from)?;
+        tx.commit().await.map_err(DbError::from)?;
+        Ok(execution)
+    }
+    pub async fn touch(&self, principal: &Principal) -> Result<Uuid, Error> {
+        let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
+        let session = self.session(principal, &mut tx).await?;
+        tx.commit().await.map_err(DbError::from)?;
+        Ok(session)
+    }
+    async fn session(
+        &self,
+        principal: &Principal,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ) -> Result<Uuid, Error> {
+        let agent=sqlx::query!("SELECT name,oauth_grant FROM access_tokens WHERE id=$1 AND workspace_id=$2 AND resource='/mcp' AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",principal.token_id,principal.workspace_id).fetch_optional(&mut **tx).await.map_err(DbError::from)?.ok_or(Error::NotFound)?;
         let identity = agent.oauth_grant.unwrap_or(principal.token_id);
         // A separate statement after the lock sees a concurrent start's committed session.
         sqlx::query!(
             "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
             format!("agent-session:{identity}:{}", principal.workspace_id)
         )
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(DbError::from)?;
         let session=sqlx::query_scalar!(r#"WITH reused AS (
@@ -97,10 +113,8 @@ impl AgentSessions {
         ), created AS (
             INSERT INTO agent_sessions(token_id,workspace_id,oauth_grant,client,started_at,last_seen_at)
             SELECT $1,$2,$3,$4,clock_timestamp(),clock_timestamp() WHERE NOT EXISTS(SELECT 1 FROM reused) RETURNING id
-        ) SELECT id AS "id!" FROM reused UNION ALL SELECT id FROM created"#,principal.token_id,principal.workspace_id,agent.oauth_grant,agent.name).fetch_one(&mut *tx).await.map_err(DbError::from)?;
-        let execution=sqlx::query_scalar!("INSERT INTO executions(token_id,code,status,session_id,title,started_at) VALUES($1,$2,'running',$3,$4,clock_timestamp()) RETURNING id",principal.token_id,code,session,title(code,&[])).fetch_one(&mut *tx).await.map_err(DbError::from)?;
-        tx.commit().await.map_err(DbError::from)?;
-        Ok(execution)
+        ) SELECT id AS "id!" FROM reused UNION ALL SELECT id FROM created"#,principal.token_id,principal.workspace_id,agent.oauth_grant,agent.name).fetch_one(&mut **tx).await.map_err(DbError::from)?;
+        Ok(session)
     }
     async fn summaries(
         &self,

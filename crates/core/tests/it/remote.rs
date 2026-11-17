@@ -16,6 +16,8 @@ pub(super) struct Upstream;
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 struct EchoArgs {
     value: String,
+    #[serde(default)]
+    prefix: String,
 }
 #[tool_router]
 impl Upstream {
@@ -27,7 +29,7 @@ impl Upstream {
     #[tool(description = "Echo a value", annotations(read_only_hint = true))]
     async fn echo(&self, Parameters(args): Parameters<EchoArgs>) -> CallToolResult {
         CallToolResult::success(vec![ContentBlock::text(
-            serde_json::to_string(&args.value).unwrap(),
+            serde_json::to_string(&format!("{}{}", args.prefix, args.value)).unwrap(),
         )])
     }
 }
@@ -151,7 +153,7 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
     let result = execution
         .execute(
             principal.clone(),
-            r#"return await tools.fixture.echo(value="hello")"#.into(),
+            r#"return await tools.fixture.echo(value="hello", prefix=None)"#.into(),
         )
         .await
         .unwrap();
@@ -164,6 +166,19 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
             .await
             .unwrap();
     assert_eq!(audit, ("fixture.echo".into(), "ok".into()));
+    let unknown = execution
+        .execute(
+            principal.clone(),
+            "try:\n    await tools.fixture.ech(value='hello')\nexcept ToolError as e:\n    return str(e)".into(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(unknown.status, "completed");
+    assert!(
+        serde_json::from_str::<String>(unknown.result.get())
+            .unwrap()
+            .contains("did you mean: fixture.echo, fixture.fail")
+    );
     for (code, status, expected) in [
         (
             r#"try:
@@ -179,7 +194,9 @@ except ToolError as e:
 except ToolError as e:
     return str(e)"#,
             "completed",
-            Some("fixture.echo: invalid argument at /value (expected string)"),
+            Some(
+                "fixture.echo: invalid argument at /value (expected string)\n  signature: async def tools.fixture.echo(*, value: str, prefix: str = None) -> Any: ...\n# ",
+            ),
         ),
         (
             r#"try:
@@ -204,7 +221,7 @@ except ToolError:
         }
     }
     let large = execution
-        .execute(principal, "return 'x' * (5 * 1024 * 1024)".into())
+        .execute(principal.clone(), "return 'x' * (5 * 1024 * 1024)".into())
         .await
         .unwrap();
     assert_eq!(large.status, "completed", "{:?}", large.error);
@@ -221,9 +238,26 @@ except ToolError:
         vec![
             ("invalid_args".into(), 1),
             ("ok".into(), 1),
-            ("tool_error".into(), 2)
+            ("tool_error".into(), 3)
         ]
     );
+    let budget = execution
+        .execute(
+            principal,
+            "for i in range(100):\n    await tools.fixture.echo(value='x')\nreturn 'completed'"
+                .into(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(budget.status, "failed");
+    assert!(
+        budget
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("suspension limit")
+    );
+    assert_eq!(budget.tool_calls, 55, "{:?}", budget.error);
     stop.cancel();
     tasks.close();
     tasks.wait().await;

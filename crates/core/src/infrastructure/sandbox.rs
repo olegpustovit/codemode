@@ -9,9 +9,13 @@ use uuid::Uuid;
 use monty_pool::{
     Checkout, Pool, PoolConfig, PoolError, ReplConfig, ResumeValue, TurnEvent, on_print_sync,
 };
-use monty_types::{ExcType, MontyException, MontyObject, ResourceLimits};
+use monty_types::{
+    ExcType, MontyException, MontyObject, MontyUuid, NameLookupResult, ResourceLimits,
+};
 use serde_json::value::RawValue;
 
+pub const CALL_CAP: usize = 100;
+const SOURCE_PROXIES: usize = 65; // The supported 64 sources plus the root namespace.
 pub const MEMORY: usize = 64 * 1024 * 1024;
 pub const OUTPUT: usize = 32 * 1024;
 const MAX_FRAME: usize = 72 * 1024 * 1024;
@@ -131,6 +135,15 @@ pub struct Run {
     pub worker: Option<Checkout>,
     output: Arc<Mutex<Capture>>,
     calls: usize,
+    pending: Vec<PendingCall>,
+    reply: ReplyMode,
+    proxies: BTreeMap<MontyUuid, String>,
+}
+#[derive(Clone, Copy)]
+enum ReplyMode {
+    Futures,
+    Sync(u32),
+    Lookup(u32),
 }
 
 impl MontySandbox {
@@ -187,8 +200,11 @@ impl MontySandbox {
         self.checkout_for(Uuid::nil()).await
     }
     async fn checkout_for(&self, caller: Uuid) -> Result<Checkout, Error> {
+        self.checkout_with(caller, &self.repl).await
+    }
+    async fn checkout_with(&self, caller: Uuid, repl: &ReplConfig) -> Result<Checkout, Error> {
         loop {
-            let worker = self.pool.checkout(&self.repl).await?;
+            let worker = self.pool.checkout(repl).await?;
             let id = worker
                 .worker_id()
                 .ok_or_else(|| Error::Invalid("worker has no process identity".into()))?;
@@ -205,7 +221,6 @@ impl MontySandbox {
     }
 
     async fn advance(&self, mut run: Run, mut event: TurnEvent) -> Result<(Run, Step), Error> {
-        let mut pending = Vec::new();
         loop {
             let mut printer = on_print_sync(|_, text| Capture::append_shared(&run.output, text));
             let worker = run
@@ -241,11 +256,45 @@ impl MontySandbox {
                     object_id,
                     ..
                 } => {
-                    run.calls += 1;
-                    if run.calls > 100 {
-                        return Err(Error::Invalid(
-                            "execution exceeds its 100 tool-call limit".into(),
-                        ));
+                    if run.pending.iter().any(|call| call.id == call_id) {
+                        return Err(Error::Invalid("duplicate callback identity".into()));
+                    }
+                    if let Some(source) = object_id.and_then(|id| run.proxies.get(&id)) {
+                        if function_name != "__call__" {
+                            if run.calls >= CALL_CAP {
+                                event = self
+                                    .turn(worker.resume(
+                                        ResumeValue::Error(MontyException::new(
+                                            ExcType::RuntimeError,
+                                            Some(format!("tool-call limit ({CALL_CAP}) reached")),
+                                        )),
+                                        &mut printer,
+                                    ))
+                                    .await?;
+                                continue;
+                            }
+                            let path = if source.is_empty() {
+                                function_name
+                            } else {
+                                format!("{source}.{function_name}")
+                            };
+                            run.calls += 1;
+                            let args =
+                                serde_json::value::to_raw_value(&serde_json::json!({"path":path}))
+                                    .map_err(|_| {
+                                        Error::Invalid("could not encode unknown tool".into())
+                                    })?;
+                            run.reply = ReplyMode::Sync(call_id);
+                            drop(printer);
+                            return Ok((
+                                run,
+                                Step::Calls(vec![PendingCall {
+                                    id: call_id,
+                                    path: "@codemode/unknown".into(),
+                                    args,
+                                }]),
+                            ));
+                        }
                     }
                     if function_name != "_call"
                         || object_id.is_some()
@@ -256,41 +305,92 @@ impl MontySandbox {
                     }
                     let path = args
                         .arg(0)
-                        .and_then(|a| a.as_str().map(str::to_owned))
+                        .and_then(|value| value.as_str().map(str::to_owned))
                         .ok_or_else(|| Error::Invalid("tool path must be text".into()))?;
                     let text = args
                         .arg(1)
-                        .and_then(|a| a.as_str().map(str::to_owned))
+                        .and_then(|value| value.as_str().map(str::to_owned))
                         .ok_or_else(|| Error::Invalid("tool arguments must be JSON text".into()))?;
-                    let args =
-                        RawValue::from_string(text).map_err(|e| Error::Invalid(e.to_string()))?;
+                    let args = RawValue::from_string(text)
+                        .map_err(|error| Error::Invalid(error.to_string()))?;
                     if !args.get().starts_with('{') {
                         return Err(Error::Invalid("arguments must be an object".into()));
                     }
-                    pending.push(PendingCall {
+                    if run.calls >= CALL_CAP {
+                        return Err(Error::Invalid(
+                            "execution exceeds its 100 tool-call limit".into(),
+                        ));
+                    }
+                    run.calls += 1;
+                    let call = PendingCall {
                         id: call_id,
                         path,
                         args,
-                    });
+                    };
+                    run.pending.push(call);
                     self.turn(worker.resume(ResumeValue::Future, &mut printer))
                         .await?
                 }
                 TurnEvent::ResolveFutures {
                     pending_call_ids, ..
                 } => {
-                    if !pending_matches(&pending, &pending_call_ids) {
+                    if !pending_matches(&run.pending, &pending_call_ids) {
                         return Err(Error::Invalid("unmatched pending calls".into()));
                     }
                     drop(printer);
+                    let pending = std::mem::take(&mut run.pending);
                     return Ok((run, Step::Calls(pending)));
                 }
                 TurnEvent::OsCall { .. } => {
                     self.turn(worker.resume(ResumeValue::NotHandled, &mut printer))
                         .await?
                 }
-                TurnEvent::NameLookup { .. } => {
-                    self.turn(worker.resume_name_lookup(None, &mut printer))
-                        .await?
+                TurnEvent::NameLookup {
+                    name, object_id, ..
+                } => {
+                    if let Some(source) = object_id.and_then(|id| run.proxies.get(&id)) {
+                        if run.calls >= CALL_CAP {
+                            self.turn(worker.resume_name_lookup(
+                                NameLookupResult::Error(MontyException::new(
+                                    ExcType::RuntimeError,
+                                    Some(format!("tool-call limit ({CALL_CAP}) reached")),
+                                )),
+                                &mut printer,
+                            ))
+                            .await?
+                        } else {
+                            let path = if source.is_empty() {
+                                name
+                            } else {
+                                format!("{source}.{name}")
+                            };
+                            run.calls += 1;
+                            let id = u32::MAX - run.calls as u32;
+                            if run.pending.iter().any(|call| call.id == id) {
+                                return Err(Error::Invalid(
+                                    "lookup identity collides with pending callback".into(),
+                                ));
+                            }
+                            let args =
+                                serde_json::value::to_raw_value(&serde_json::json!({"path":path}))
+                                    .map_err(|_| {
+                                        Error::Invalid("could not encode unknown tool".into())
+                                    })?;
+                            run.reply = ReplyMode::Lookup(id);
+                            drop(printer);
+                            return Ok((
+                                run,
+                                Step::Calls(vec![PendingCall {
+                                    id,
+                                    path: "@codemode/unknown".into(),
+                                    args,
+                                }]),
+                            ));
+                        }
+                    } else {
+                        self.turn(worker.resume_name_lookup(None, &mut printer))
+                            .await?
+                    }
                 }
             };
         }
@@ -336,16 +436,77 @@ impl Sandbox for MontySandbox {
         if code.len() > 64 * 1024 {
             return Err(Error::Source);
         }
-        let mut worker = self.checkout_for(caller).await?;
-        let prelude_event = self
+        let mut repl = self.repl.clone();
+        // Only compensate trusted namespace construction; retain the baseline user suspension budget.
+        let constructors = prelude.matches("_source_proxy(").count();
+        repl.limits = Some(
+            ResourceLimits::default()
+                .max_memory(MEMORY)
+                .max_suspensions(110 + constructors),
+        );
+        let mut worker = self.checkout_with(caller, &repl).await?;
+        let mut prelude_event = self
             .turn(worker.feed(
                 prelude.to_owned(),
-                vec![("_call".into(), MontyObject::function("_call", None))],
+                vec![
+                    ("_call".into(), MontyObject::function("_call", None)),
+                    (
+                        "_source_proxy".into(),
+                        MontyObject::function("_source_proxy", None),
+                    ),
+                ],
                 vec![],
                 false,
                 &mut on_print_sync(|_, _| {}),
             ))
             .await?;
+        let mut proxies = BTreeMap::new();
+        while let TurnEvent::FunctionCall {
+            function_name,
+            args,
+            object_id,
+            ..
+        } = prelude_event
+        {
+            if function_name != "_source_proxy"
+                || object_id.is_some()
+                || args.args().len() != 1
+                || args.kwargs().len() != 0
+                || proxies.len() >= SOURCE_PROXIES
+            {
+                return Err(Error::Invalid("invalid prelude callback".into()));
+            }
+            let alias = args
+                .arg(0)
+                .and_then(|value| value.as_str().map(str::to_owned))
+                .ok_or_else(|| Error::Invalid("source alias must be text".into()))?;
+            if alias.len() > 128
+                || !alias
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+                || proxies.values().any(|value| value == &alias)
+            {
+                return Err(Error::Invalid("invalid source alias".into()));
+            }
+            let class_id = MontyUuid::from_bytes(*Uuid::new_v4().as_bytes());
+            let id = MontyUuid::from_bytes(*Uuid::new_v4().as_bytes());
+            let class = MontyObject::class_type(
+                if alias.is_empty() {
+                    "_Tools".into()
+                } else {
+                    format!("_Source_{alias}")
+                },
+                class_id,
+                true,
+                false,
+                Vec::new(),
+            );
+            let proxy = MontyObject::class_instance(class, id, []);
+            proxies.insert(id, alias);
+            prelude_event = self
+                .turn(worker.resume(ResumeValue::Return(proxy), &mut on_print_sync(|_, _| {})))
+                .await?;
+        }
         if !matches!(prelude_event, TurnEvent::Complete(_)) {
             return Err(Error::Invalid("unexpected prelude callback".into()));
         }
@@ -374,6 +535,9 @@ impl Sandbox for MontySandbox {
                 worker: Some(worker),
                 output,
                 calls: 0,
+                pending: Vec::new(),
+                reply: ReplyMode::Futures,
+                proxies,
             },
             event,
         )
@@ -385,7 +549,7 @@ impl Sandbox for MontySandbox {
         mut run: Run,
         results: Vec<(u32, CallResult)>,
     ) -> Result<(Run, Step), Error> {
-        let answers = results
+        let mut answers: Vec<_> = results
             .into_iter()
             .map(|(id, result)| {
                 (
@@ -407,12 +571,36 @@ impl Sandbox for MontySandbox {
             .worker
             .as_mut()
             .ok_or_else(|| Error::Invalid("worker already finished".into()))?;
-        let event = self
-            .turn(worker.resume_futures(
-                answers,
-                &mut on_print_sync(|_, text| Capture::append_shared(&run.output, text)),
-            ))
-            .await?;
+        let mut printer = on_print_sync(|_, text| Capture::append_shared(&run.output, text));
+        let mode = std::mem::replace(&mut run.reply, ReplyMode::Futures);
+        let event = match mode {
+            ReplyMode::Futures => {
+                self.turn(worker.resume_futures(answers, &mut printer))
+                    .await?
+            }
+            ReplyMode::Sync(id) | ReplyMode::Lookup(id) => {
+                let Some((reply_id, answer)) = answers.pop() else {
+                    return Err(Error::Invalid("missing synchronous reply".into()));
+                };
+                if reply_id != id || !answers.is_empty() {
+                    return Err(Error::Invalid("unmatched synchronous reply".into()));
+                }
+                if matches!(mode, ReplyMode::Lookup(_)) {
+                    let ResumeValue::Error(error) = answer else {
+                        return Err(Error::Invalid(
+                            "unknown-tool lookup must return an error".into(),
+                        ));
+                    };
+                    self.turn(
+                        worker.resume_name_lookup(NameLookupResult::Error(error), &mut printer),
+                    )
+                    .await?
+                } else {
+                    self.turn(worker.resume(answer, &mut printer)).await?
+                }
+            }
+        };
+        drop(printer);
         self.advance(run, event).await
     }
 }

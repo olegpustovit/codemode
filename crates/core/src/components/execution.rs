@@ -254,6 +254,14 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                 Ok(Ok(step))=>("completed",None,Some(step)),
             }
         };
+        let error = match error {
+            Some(message) => Some(
+                self.sources
+                    .explain_error(message, principal.workspace_id)
+                    .await,
+            ),
+            None => None,
+        };
         let (result, output, output_dropped_bytes) = match done {
             Some(Step::Done {
                 result,

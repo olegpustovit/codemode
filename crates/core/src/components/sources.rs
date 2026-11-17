@@ -271,10 +271,17 @@ impl Sources {
         &self,
         execution: Uuid,
         seq: usize,
-        call: crate::infrastructure::sandbox::PendingCall,
+        mut call: crate::infrastructure::sandbox::PendingCall,
         timeout: Duration,
         workspace: Uuid,
     ) -> (u32, crate::infrastructure::sandbox::CallResult) {
+        if call.path == "@codemode/unknown" {
+            if let Ok(args) = serde_json::from_str::<Value>(call.args.get()) {
+                if let Some(path) = args.get("path").and_then(Value::as_str) {
+                    call.path = path.to_owned();
+                }
+            }
+        }
         let tool = match self.lookup(&call.path).await {
             Some(tool) => Ok(tool),
             None => Err(self.unknown(&call.path, workspace).await),
@@ -317,9 +324,15 @@ impl Sources {
                 groups.entry(source).or_default().push(tool);
             }
         }
-        let mut code = String::from("import asyncio\nimport json\nToolError = RuntimeError\n");
+        let mut code = String::from(
+            "import asyncio\nimport json\nToolError = RuntimeError\nclass _Tool:\n    def __init__(self, path, aliases):\n        self.path = path\n        self.aliases = aliases\n    async def __call__(self, **kwargs):\n        args = {self.aliases.get(k, k): v for k, v in kwargs.items()}\n        return json.loads(await _call(self.path, json.dumps(args)))\n_sources = {}\n",
+        );
         for (source, tools) in &groups {
-            code.push_str(&format!("class _Source_{source}:\n"));
+            code.push_str(&format!(
+                "_sources[{}] = _source_proxy({})\n",
+                stubs::quote(source),
+                stubs::quote(source)
+            ));
             for tool in tools {
                 let name = tool
                     .definition
@@ -339,18 +352,28 @@ impl Sources {
                     }
                 }
                 let aliases = serde_json::to_string(&aliases).unwrap_or_else(|_| "{}".into());
-                code.push_str(&format!("    async def {name}(self, **kwargs):\n        aliases = {aliases}\n        args = {{aliases.get(k, k): v for k, v in kwargs.items()}}\n        return json.loads(await _call({}, json.dumps(args)))\n",stubs::quote(&tool.definition.path)));
+                code.push_str(&format!(
+                    "_sources[{}].{name} = _Tool({}, {aliases})\n",
+                    stubs::quote(source),
+                    stubs::quote(&tool.definition.path)
+                ));
             }
         }
-        code.push_str("class _Tools:\n    def __init__(self):\n");
-        if groups.is_empty() {
-            code.push_str("        pass\n");
-        }
+        code.push_str("tools = _source_proxy('')\n");
         for source in groups.keys() {
-            code.push_str(&format!("        self.{source} = _Source_{source}()\n"));
+            code.push_str(&format!(
+                "tools.{source} = _sources[{}]\n",
+                stubs::quote(source)
+            ));
         }
-        code.push_str("tools = _Tools()\n");
         code
+    }
+
+    pub(crate) async fn explain_error(&self, message: String, workspace: Uuid) -> String {
+        if let Some(path) = missing_tool_path(&message) {
+            return format!("{message}\n{}", self.unknown(&path, workspace).await);
+        }
+        message
     }
 
     pub async fn unknown(&self, path: &str, workspace: Uuid) -> String {
@@ -376,12 +399,16 @@ impl Sources {
             .map(|(path, _)| path.clone())
             .collect();
         let source = path.split('.').next().unwrap_or_default();
-        let matches = paths
+        let mut candidates = paths
             .iter()
             .filter(|p| p.split_once('.').is_some_and(|(name, _)| name == source))
-            .take(5)
-            .cloned()
             .collect::<Vec<_>>();
+        if candidates.is_empty() {
+            candidates = paths.iter().collect();
+        }
+        candidates
+            .sort_by_cached_key(|candidate| (name_distance(path, candidate), (*candidate).clone()));
+        let matches = candidates.into_iter().take(3).cloned().collect::<Vec<_>>();
         if matches.is_empty() {
             if let Ok(Some(id)) =
                 sqlx::query_scalar!("SELECT id FROM sources WHERE python_name=$1 AND ($2::uuid[] IS NULL OR id=ANY($2))", source,allowed.as_deref())
@@ -397,7 +424,7 @@ impl Sources {
         if matches.is_empty() {
             return super::broker::unavailable(path, workspace);
         }
-        format!("unknown tool {path}; available: {}", matches.join(", "))
+        format!("unknown tool {path}; did you mean: {}", matches.join(", "))
     }
 
     pub fn with_access(mut self, access: super::access::Access, tenant: Uuid) -> Self {
@@ -537,6 +564,7 @@ impl Sources {
                     let loaded=self.load_openapi(url.clone(),Some(server.clone()),alias.clone()).await?;
                     let compiled=loaded.operations.into_iter().map(|operation| {Ok(Tool {
                         source_id:record.id,revision:record.revision,definition:operation.definition.clone(),validator:operation.validator.clone(),
+                        omit_null:Arc::new(super::broker::optional_nonnullable(&operation.definition.input_schema).map_err(|_|Error::Upstream)?),
                         target:Target::OpenApi {operation:Arc::new(operation),client:loaded.client.clone(),server:loaded.server.clone(),required:record.source.requires_account},
                     })}).collect::<Result<Vec<_>,Error>>()?;
                     return self.publish(&record,compiled).await;
@@ -545,8 +573,9 @@ impl Sources {
                     let client=super::graphql::client().map_err(|_|Error::Upstream)?;
                     let compiled=[super::graphql::Kind::Query,super::graphql::Kind::Mutation].into_iter().map(|kind| {
                         let definition=kind.definition(&alias);
+                        let omit_null=Arc::new(super::broker::optional_nonnullable(&definition.input_schema).map_err(|_|Error::Upstream)?);
                         let validator=jsonschema::validator_for(&definition.input_schema).map_err(|_|Error::Config("invalid GraphQL input schema".into()))?;
-                        Ok(Tool {source_id:record.id,revision:record.revision,definition,validator:Arc::new(validator),target:Target::Graphql {kind,client:client.clone(),url:url.clone(),required:record.source.requires_account}})
+                        Ok(Tool {source_id:record.id,revision:record.revision,definition,validator:Arc::new(validator),omit_null,target:Target::Graphql {kind,client:client.clone(),url:url.clone(),required:record.source.requires_account}})
                     }).collect::<Result<Vec<_>,Error>>()?;
                     return self.publish(&record,compiled).await;
                 }
@@ -679,11 +708,16 @@ impl Sources {
                 read_only: hints.and_then(|h| h.read_only_hint).unwrap_or(false),
                 destructive: hints.and_then(|h| h.destructive_hint).unwrap_or(false),
             };
+            let omit_null = Arc::new(
+                super::broker::optional_nonnullable(&definition.input_schema)
+                    .map_err(|_| Error::Upstream)?,
+            );
             compiled.push(Tool {
                 source_id: record.id,
                 revision: record.revision,
                 definition,
                 validator: Arc::new(validator),
+                omit_null,
                 target: Target::Mcp {
                     peer: client.client.peer().clone(),
                     replies: client.replies.clone(),
@@ -711,8 +745,57 @@ impl Sources {
     }
 }
 
+fn missing_tool_path(message: &str) -> Option<String> {
+    let rest = message.strip_prefix("AttributeError: '_Source_")?;
+    let (source, rest) = rest.split_once("' object has no attribute '")?;
+    let (name, _) = rest.split_once('\'')?;
+    if [source, name].iter().any(|part| {
+        part.is_empty() || !part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    }) {
+        return None;
+    }
+    Some(format!("{source}.{name}"))
+}
+
+fn name_distance(left: &str, right: &str) -> usize {
+    // Tool paths are ASCII identifiers; bound work even for an untrusted callback path.
+    let left = &left.as_bytes()[..left.len().min(256)];
+    let right = &right.as_bytes()[..right.len().min(256)];
+    let mut row: Vec<_> = (0..=right.len()).collect();
+    for (i, a) in left.iter().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, b) in right.iter().enumerate() {
+            let above = row[j + 1];
+            row[j + 1] = (above + 1)
+                .min(row[j] + 1)
+                .min(diagonal + usize::from(a != b));
+            diagonal = above;
+        }
+    }
+    row[right.len()]
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn closest_names_handle_insertions_deletions_and_substitutions() {
+        assert_eq!(
+            super::name_distance("nudge.list_issue", "nudge.list_issues"),
+            1
+        );
+        assert_eq!(
+            super::missing_tool_path(
+                "AttributeError: '_Source_nudge' object has no attribute 'list_issue' (execution.py line 4)"
+            ),
+            Some("nudge.list_issue".into())
+        );
+        assert_eq!(super::missing_tool_path("unrelated error"), None);
+        assert_eq!(super::name_distance("abc", "axc"), 1);
+        assert_eq!(super::name_distance("", "abc"), 3);
+        assert_eq!(super::name_distance("same", "same"), 0);
+        assert!(super::name_distance("nudge.list_issue", "nudge.get_issue") > 1);
+    }
     use super::*;
     #[test]
     fn source_json_and_toml_round_trip_and_reject_unknown_fields() {

@@ -45,6 +45,7 @@ pub struct Tool {
     pub revision: i64,
     pub definition: Definition,
     pub(crate) validator: Arc<jsonschema::Validator>,
+    pub(crate) omit_null: Arc<std::collections::BTreeSet<String>>,
     pub(crate) target: Target,
 }
 #[derive(Clone)]
@@ -132,8 +133,9 @@ impl Broker {
             );
         };
         let result = match args {
-            Ok(args) => match tool {
+            Ok(mut args) => match tool {
                 Ok(tool) => {
+                    strip_optional_nulls(&mut args, &tool.omit_null);
                     let revision = sqlx::query_scalar!(
                         "SELECT s.revision FROM sources s JOIN endpoints e ON e.id=$2 WHERE s.id=$1 AND (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.source_id=s.id AND es.endpoint_id=e.id))",
                         tool.source_id,workspace
@@ -298,6 +300,36 @@ fn prefix(value: &str, max: usize) -> &str {
     &value[..n]
 }
 
+// Compile property validators against the original root so local references keep their meaning.
+pub(crate) fn optional_nonnullable(
+    schema: &Value,
+) -> Result<std::collections::BTreeSet<String>, jsonschema::ValidationError<'static>> {
+    let validators = jsonschema::options().offline().build_map(schema)?;
+    let required = schema.get("required").and_then(Value::as_array);
+    Ok(schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|p| p.keys())
+        .filter(|key| !required.is_some_and(|r| r.iter().any(|v| v.as_str() == Some(key.as_str()))))
+        .filter(|key| {
+            validators
+                .get(&format!(
+                    "#/properties/{}",
+                    key.replace('~', "~0").replace('/', "~1")
+                ))
+                .is_some_and(|v| !v.is_valid(&Value::Null))
+        })
+        .cloned()
+        .collect())
+}
+
+fn strip_optional_nulls(args: &mut Value, omit: &std::collections::BTreeSet<String>) {
+    if let Some(args) = args.as_object_mut() {
+        args.retain(|key, value| !value.is_null() || !omit.contains(key));
+    }
+}
+
 impl Tool {
     pub(crate) fn validate(&self, args: &Value) -> Result<(), String> {
         if let Some(error) = self.validator.iter_errors(args).next() {
@@ -320,9 +352,16 @@ impl Tool {
                 _ => format!("constraint {}", error.schema_path()),
             };
             return Err(format!(
-                "{}: invalid argument at {} ({expected})",
+                "{}: invalid argument at {} ({expected})\n  signature: {}",
                 self.definition.path,
-                error.instance_path()
+                error.instance_path(),
+                super::catalogue::stubs::generate(
+                    &self.definition.path,
+                    "",
+                    &self.definition.input_schema,
+                    None
+                )
+                .brief
             ));
         }
         if let Target::Graphql { kind, .. } = &self.target {
@@ -487,6 +526,26 @@ impl Tool {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn optional_nulls_preserve_required_nullable_nested_and_referenced_values() {
+        let schema = json!({"type":"object", "$defs":{"text":{"type":"string"}},
+            "required":["required"], "properties":{
+                "cursor":{"$ref":"#/$defs/text"}, "required":{"type":"string"},
+                "nullable":{"anyOf":[{"type":"string"},{"type":"null"}]},
+                "nested":{"type":"object"}, "a/b~c":{"type":"integer"}}});
+        let omit = optional_nonnullable(&schema).unwrap();
+        let mut args = json!({"cursor":null,"required":null,"nullable":null,
+            "nested":{"cursor":null},"unknown":null,"a/b~c":null});
+        strip_optional_nulls(&mut args, &omit);
+        assert_eq!(
+            args,
+            json!({"required":null,"nullable":null,"nested":{"cursor":null},"unknown":null})
+        );
+        assert!(!jsonschema::validator_for(&schema).unwrap().is_valid(&args));
+        args["required"] = json!("present");
+        assert!(jsonschema::validator_for(&schema).unwrap().is_valid(&args));
+    }
+
     #[test]
     fn redacts_nested_secrets_in_arguments_and_error_messages() {
         let args = json!({"nested":[{"api-key":"sekret","name":"fine"}],"long":"é".repeat(2000)});

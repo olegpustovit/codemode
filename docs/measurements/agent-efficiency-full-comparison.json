@@ -1,0 +1,69 @@
+{
+  "scope": "Full default-client comparison; not release acceptance: gates fail",
+  "source_commit": "4e77bb7 (application corrections; optimized candidate built from the same source before documentation commit)",
+  "client": "codex-cli 0.169.0, isolated auth-only CODEX_HOME, apps/plugins disabled",
+  "candidate": "disposable local PostgreSQL18 with canonical-host loopback proxy, identity disabled only on candidate; three eval upstream accounts",
+  "repeats": 3,
+  "jobs": 8,
+  "runs": 234,
+  "passed": 233,
+  "http_429": 0,
+  "contaminated": 0,
+  "metrics": {
+    "pass": false,
+    "runs": 234,
+    "metrics": {
+      "mcp_calls": 5.0,
+      "pre_execute_calls": 1.5,
+      "execute_error_rate": 0.1206896551724138,
+      "input_tokens": 96095.5,
+      "uncached_input_tokens": 10656.5,
+      "wall_s": 26.4,
+      "search_median_bytes": 1463,
+      "search_max_bytes": 9657
+    },
+    "problems": [
+      "mcp_calls: 5.0 exceeds 3",
+      "pre_execute_calls: 1.5 exceeds 1",
+      "execute_error_rate: 0.1206896551724138 exceeds 0.03",
+      "input_tokens: 96095.5 exceeds 80000",
+      "wall_s: 26.4 exceeds 18",
+      "unclean or failed run: mb-create-account codemode r0",
+      "unclean or failed run: mb-create-account codemode r1",
+      "unclean or failed run: mb-create-account codemode r2",
+      "unclean or failed run: mb-create-account direct r0",
+      "unclean or failed run: mb-create-account direct r1",
+      "unclean or failed run: mb-create-account direct r2",
+      "unclean or failed run: nudge-team-by-name direct r2"
+    ]
+  },
+  "counter_correction": {
+    "source": "agent-efficiency-all-features.json",
+    "source_sha256": "679220ce439f3d4de29a26fe380dc4c3f39ca9707e30cd642904de95e94ee212",
+    "reason": "Codex event result drops MCP isError; count gateway execution status"
+  },
+  "fixture_cleanup": "Six eval-run account closes retried successfully after fixing harness close argument from date to true; original teardown failures remain in receipts",
+  "native": {
+    "normal_cases": 153,
+    "failed": 0,
+    "build_s": 4.03,
+    "total_s": 20.11,
+    "slow_cases": 161,
+    "slow_total_s": 89.18
+  },
+  "hardened_oracle": {
+    "normal_cases": 153,
+    "failed": 0,
+    "build_staging_s": 255.98,
+    "total_s": 292.77,
+    "slow_cases": 161,
+    "slow_build_staging_s": 90.96,
+    "slow_total_s": 166.75
+  },
+  "optimized_browser": {
+    "passed": 11,
+    "total": 12,
+    "remaining": "pane click-to-paint p95: initial56.4 ms; quieter focused rerun52.9 ms; unchanged gate <50 ms"
+  },
+  "delivery": "not merged or deployed"
+}

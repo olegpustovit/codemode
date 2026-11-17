@@ -309,3 +309,44 @@ acceptance, final checks, merge, gated deployment and public verification. The
 application is not declared delivered; production remains schema 22. Builds
 still exceed the historical incremental latency targets (optimized rebuild
 186 s, initial optimized build 330 s); no build-budget pass is claimed.
+
+## Full comparison: failed acceptance, with corrected error accounting
+
+Final strict hardened Oracle qualification passes **153/153** under normal hard
+deadlines (292.77 s total, 255.98 s build/staging). The optimized browser pane
+check was repeated after the full model run: p95 **52.9 ms**, still above the
+unchanged <50 ms gate. The other eleven workflows pass; the pane gate remains
+unresolved and is not waived.
+
+The full default-client comparison finished: **234 runs**, three repeats, eight
+jobs, 233/234 task successes, zero HTTP 429s and zero contaminated runs. The one
+task failure is direct MCP's third `nudge-team-by-name` run, which declined to
+use a listed team. Six account-cleanup calls also failed because the old harness
+passed a date to Moneybag's boolean `close` argument. The harness now uses true;
+all six specifically identified eval-run accounts were subsequently closed.
+Original task/teardown receipts are preserved, not rewritten as successes.
+
+A critical measurement correction: Codex JSONL's result omits MCP isError even
+when the gateway reports a failed execution. The old harness therefore counted
+zero execute errors incorrectly. It now reads the explicit execution status,
+with four unit checks covering dropped flags, payload fields and call/byte
+accounting. Saved transcripts were recounted into a new receipt without
+rerunning models or graders. The early eight-run result still has zero errors;
+the full comparison has **42/348 failed executes (12.1%)**.
+
+Full corrected medians: **5 MCP calls**, **1.5 pre-execute calls**, **96,095.5 total
+input tokens**, **10,656.5 uncached input tokens**, **26.4 seconds**. Search median
+is **1463 B**, maximum **9657 B**, so removing duplicate brief descriptions fixes
+the measured search-size gate. The call, pre-execute, execute-error, total-input
+and time gates still fail. Errors include storing oversized memo datasets,
+artifact ID lookup mistakes, `next(list)` misuse, provider help-topic mistakes
+and unsupported arguments. No delivery or performance success is claimed.
+
+E5 investigation: codex-cli 0.169.0 lists the old tool_search switches as removed.
+The current documented omit_tools_from control was probed for initial-only and
+deferred-only exposure. Initial-only finds Codemode; deferred-only exposes no
+usable tool search in this client, including a separate suggestion-enabled
+probe. These are explicitly failed compatibility probes, not a completed valid
+40-task E5 experiment. E1, E4, E6, E7 and full E2/E3 measurements also remain.
+See `docs/measurements/agent-efficiency-full-comparison.json`; the application
+remains unmerged and undeployed.

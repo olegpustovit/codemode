@@ -6,7 +6,7 @@ Implementation plan: https://artifacts.microapps.space/a/saqdh2xm7jcd (revision 
 
 ## Active replacement proposal
 
-The owner requested full implementation of https://artifacts.microapps.space/a/7m9atvt6k7xa. W1 and W2 are deployed. The working evidence and remaining W3 measurements are in `docs/next-iteration/implementation.md`. Use Codex only for current model evals at the owner's direction.
+The owner requested full implementation of https://artifacts.microapps.space/a/7m9atvt6k7xa. W1 and W2 are deployed. The full W3 measurements, report and archive links are in `docs/next-iteration/implementation.md`. Use Codex only for current model evals at the owner's direction.
 
 The earlier agent-efficiency proposal at https://artifacts.microapps.space/a/npta97dqvf6a shipped in PR #4, including schema 23 for session memo and schema 24 for source recipe receipts. Its ledger is `docs/agent-efficiency/implementation.md`.
 

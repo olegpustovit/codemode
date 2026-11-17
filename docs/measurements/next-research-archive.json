@@ -1,0 +1,18 @@
+{
+  "files": 10,
+  "members": 10396,
+  "transcripts": 564,
+  "receipts": 13,
+  "rows": 684,
+  "redactions": 554,
+  "cutoff": "2026-11-17T21:52:52.677525+00:00",
+  "url": "https://artifacts.microapps.space/a/zp96zbshmq4s",
+  "version": 1,
+  "prior_archive": "https://artifacts.microapps.space/a/favtgv57hd8n",
+  "prior_version": 3,
+  "report": "https://artifacts.microapps.space/a/ny3vep8ck2c7",
+  "report_version": 3,
+  "earlier_cutoff": "2026-11-17T18:57:53.020031+00:00",
+  "api_readback_verified": true,
+  "native_save_prompt_exercised": false
+}

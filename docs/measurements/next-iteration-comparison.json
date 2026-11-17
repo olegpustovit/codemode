@@ -1,0 +1,1968 @@
+{
+  "w1": {
+    "correctness_pass": true,
+    "failures": [],
+    "runs": 120,
+    "metrics": {
+      "discovery_executes": 118,
+      "probe_executes": 86,
+      "work_executes": 260,
+      "execute_calls": 464,
+      "discovery_rate": 0.2543103448275862,
+      "probe_rate": 0.1853448275862069,
+      "execute_errors": 12,
+      "execute_errors_followed_by_success": 12,
+      "fresh_after_first_median": 5926.0,
+      "fresh_after_first_coverage": 120,
+      "mcp_calls": 3.0,
+      "wall_s": 18.6,
+      "input_tokens": 50101.5,
+      "uncached_input_tokens": 13027.0,
+      "execute_error_rate": 0.02586206896551724
+    },
+    "targets": {
+      "mcp_calls": {
+        "target": 2,
+        "actual": 3.0,
+        "passed": false
+      },
+      "discovery_rate": {
+        "target": 0.1,
+        "actual": 0.2543103448275862,
+        "passed": false
+      },
+      "probe_rate": {
+        "target": 0.05,
+        "actual": 0.1853448275862069,
+        "passed": false
+      },
+      "wall_s": {
+        "target": 13,
+        "actual": 18.6,
+        "passed": false
+      },
+      "input_tokens": {
+        "target": 40000,
+        "actual": 50101.5,
+        "passed": false
+      },
+      "execute_error_rate": {
+        "target": 0.05,
+        "actual": 0.02586206896551724,
+        "passed": true
+      }
+    }
+  },
+  "v6": {
+    "correctness_pass": true,
+    "failures": [],
+    "runs": 120,
+    "metrics": {
+      "discovery_executes": 109,
+      "probe_executes": 65,
+      "work_executes": 262,
+      "execute_calls": 436,
+      "discovery_rate": 0.25,
+      "probe_rate": 0.14908256880733944,
+      "execute_errors": 11,
+      "execute_errors_followed_by_success": 11,
+      "fresh_after_first_median": 6841.0,
+      "fresh_after_first_coverage": 120,
+      "mcp_calls": 3.0,
+      "wall_s": 18.85,
+      "input_tokens": 50128.5,
+      "uncached_input_tokens": 13086.0,
+      "execute_error_rate": 0.02522935779816514
+    },
+    "targets": {
+      "mcp_calls": {
+        "target": 2,
+        "actual": 3.0,
+        "passed": false
+      },
+      "discovery_rate": {
+        "target": 0.1,
+        "actual": 0.25,
+        "passed": false
+      },
+      "probe_rate": {
+        "target": 0.05,
+        "actual": 0.14908256880733944,
+        "passed": false
+      },
+      "wall_s": {
+        "target": 13,
+        "actual": 18.85,
+        "passed": false
+      },
+      "input_tokens": {
+        "target": 40000,
+        "actual": 50128.5,
+        "passed": false
+      },
+      "execute_error_rate": {
+        "target": 0.05,
+        "actual": 0.02522935779816514,
+        "passed": true
+      }
+    }
+  },
+  "historical": {
+    "discovery_executes": 140,
+    "probe_executes": 91,
+    "work_executes": 182,
+    "execute_calls": 413,
+    "discovery_rate": 0.3389830508474576,
+    "probe_rate": 0.22033898305084745,
+    "execute_errors": 11,
+    "execute_errors_followed_by_success": 10,
+    "fresh_after_first_median": null,
+    "fresh_after_first_coverage": 0,
+    "mcp_calls": 3.0,
+    "wall_s": 16.95,
+    "input_tokens": 54003.0,
+    "uncached_input_tokens": 13755.0,
+    "execute_error_rate": 0.026634382566585957
+  },
+  "heavy": [
+    {
+      "label": "1,000 rows per app",
+      "host_receipt": "20261117T211707Z",
+      "raw_receipt": "20261117T213033Z",
+      "raw_catalog": "ec8fcb44a18b92712933ad885a8825d8d366f30b955cea26c026500fb156164c",
+      "comparisons": {
+        "raw": {
+          "pass_": true,
+          "runs": 60,
+          "metric": "median_cost_per_run",
+          "basis": "published_api_equivalent_conservative_context_bounds",
+          "cost_ratio_or_upper_bound": 0.07604585561627308,
+          "token_totals": {
+            "codemode": {
+              "fresh_input": 366369,
+              "cache_read": 1761152,
+              "cache_write": 0,
+              "output": 21053
+            },
+            "raw": {
+              "fresh_input": 4236268,
+              "cache_read": 66616576,
+              "cache_write": 0,
+              "output": 78793
+            }
+          },
+          "reported_usd": null,
+          "estimated_api_usd": null,
+          "median_reported_usd": null,
+          "median_estimated_api_usd": null,
+          "api_usd_bounds": {
+            "codemode": {
+              "median_lower": 0.0359788,
+              "median_upper": 0.0359788,
+              "total_lower": 1.1193832,
+              "total_upper": 1.1193832
+            },
+            "raw": {
+              "median_lower": 0.4731198,
+              "median_upper": 0.9172396,
+              "total_lower": 15.9221236,
+              "total_upper": 30.6708864
+            }
+          },
+          "price_card": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+            "verified_utc": "2026-11-17",
+            "basis": "Standard API-equivalent short-context estimate; not a Codex subscription bill",
+            "short_context_input_limit": 272000,
+            "usd_per_million": {
+              "fresh_input": "2.00",
+              "cache_read": "0.10",
+              "cache_write": "2.50",
+              "output": "10.00"
+            },
+            "long_context_multipliers": {
+              "fresh_input": "2",
+              "cache_read": "2",
+              "cache_write": "2",
+              "output": "1.5"
+            }
+          },
+          "problems": [],
+          "threshold": 0.5,
+          "status": "pass"
+        },
+        "host": {
+          "pass_": true,
+          "runs": 60,
+          "metric": "median_cost_per_run",
+          "basis": "published_api_equivalent_standard_short_context",
+          "cost_ratio_or_upper_bound": 0.5562946264290507,
+          "token_totals": {
+            "codemode": {
+              "fresh_input": 366369,
+              "cache_read": 1761152,
+              "cache_write": 0,
+              "output": 21053
+            },
+            "host": {
+              "fresh_input": 635330,
+              "cache_read": 2243712,
+              "cache_write": 0,
+              "output": 21970
+            }
+          },
+          "reported_usd": null,
+          "estimated_api_usd": {
+            "codemode": 1.1193832,
+            "host": 1.7147312
+          },
+          "median_reported_usd": null,
+          "median_estimated_api_usd": {
+            "codemode": 0.0359788,
+            "host": 0.0646758
+          },
+          "api_usd_bounds": {
+            "codemode": {
+              "median_lower": 0.0359788,
+              "median_upper": 0.0359788,
+              "total_lower": 1.1193832,
+              "total_upper": 1.1193832
+            },
+            "host": {
+              "median_lower": 0.0646758,
+              "median_upper": 0.0646758,
+              "total_lower": 1.7147312,
+              "total_upper": 1.7147312
+            }
+          },
+          "price_card": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+            "verified_utc": "2026-11-17",
+            "basis": "Standard API-equivalent short-context estimate; not a Codex subscription bill",
+            "short_context_input_limit": 272000,
+            "usd_per_million": {
+              "fresh_input": "2.00",
+              "cache_read": "0.10",
+              "cache_write": "2.50",
+              "output": "10.00"
+            },
+            "long_context_multipliers": {
+              "fresh_input": "2",
+              "cache_read": "2",
+              "cache_write": "2",
+              "output": "1.5"
+            }
+          },
+          "problems": [],
+          "threshold": 1,
+          "status": "pass"
+        }
+      }
+    },
+    {
+      "label": "5,000 rows per app",
+      "host_receipt": "20261117T212256Z",
+      "raw_receipt": "20261117T214203Z",
+      "raw_catalog": "ec8fcb44a18b92712933ad885a8825d8d366f30b955cea26c026500fb156164c",
+      "comparisons": {
+        "raw": {
+          "pass_": false,
+          "runs": 60,
+          "metric": "median_cost_per_run",
+          "basis": "published_api_equivalent_conservative_context_bounds",
+          "cost_ratio_or_upper_bound": 0.2666300749623479,
+          "token_totals": {
+            "codemode": {
+              "fresh_input": 237159,
+              "cache_read": 1567360,
+              "cache_write": 0,
+              "output": 22117
+            },
+            "raw": {
+              "fresh_input": 1134639,
+              "cache_read": 15044864,
+              "cache_write": 0,
+              "output": 75596
+            }
+          },
+          "reported_usd": null,
+          "estimated_api_usd": null,
+          "median_reported_usd": null,
+          "median_estimated_api_usd": null,
+          "api_usd_bounds": {
+            "codemode": {
+              "median_lower": 0.0280778,
+              "median_upper": 0.0280778,
+              "total_lower": 0.852224,
+              "total_upper": 0.852224
+            },
+            "raw": {
+              "median_lower": 0.1053062,
+              "median_upper": 0.105484,
+              "total_lower": 4.5297244,
+              "total_upper": 6.8219366
+            }
+          },
+          "price_card": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+            "verified_utc": "2026-11-17",
+            "basis": "Standard API-equivalent short-context estimate; not a Codex subscription bill",
+            "short_context_input_limit": 272000,
+            "usd_per_million": {
+              "fresh_input": "2.00",
+              "cache_read": "0.10",
+              "cache_write": "2.50",
+              "output": "10.00"
+            },
+            "long_context_multipliers": {
+              "fresh_input": "2",
+              "cache_read": "2",
+              "cache_write": "2",
+              "output": "1.5"
+            }
+          },
+          "problems": [
+            "unclean or failed run: heavy-moneybag-2 codemode r2",
+            "unclean or failed run: heavy-nudge-1 direct r0",
+            "unclean or failed run: heavy-nudge-1 direct r1",
+            "unclean or failed run: heavy-nudge-1 direct r2",
+            "unclean or failed run: heavy-nudge-2 direct r0",
+            "unclean or failed run: heavy-nudge-2 direct r1",
+            "unclean or failed run: heavy-nudge-2 direct r2",
+            "unclean or failed run: heavy-nudge-3 direct r0",
+            "unclean or failed run: heavy-nudge-3 direct r1",
+            "unclean or failed run: heavy-nudge-3 direct r2",
+            "unclean or failed run: heavy-nudge-4 direct r0",
+            "unclean or failed run: heavy-nudge-4 direct r1",
+            "unclean or failed run: heavy-nudge-4 direct r2",
+            "unclean or failed run: heavy-nudge-5 direct r0",
+            "unclean or failed run: heavy-nudge-5 direct r1",
+            "unclean or failed run: heavy-nudge-5 direct r2"
+          ],
+          "threshold": 0.5,
+          "status": "invalid cohort"
+        },
+        "host": {
+          "pass_": false,
+          "runs": 60,
+          "metric": "median_cost_per_run",
+          "basis": "published_api_equivalent_standard_short_context",
+          "cost_ratio_or_upper_bound": 0.5964938370220558,
+          "token_totals": {
+            "codemode": {
+              "fresh_input": 237159,
+              "cache_read": 1567360,
+              "cache_write": 0,
+              "output": 22117
+            },
+            "host": {
+              "fresh_input": 520287,
+              "cache_read": 2482048,
+              "cache_write": 0,
+              "output": 24641
+            }
+          },
+          "reported_usd": null,
+          "estimated_api_usd": {
+            "codemode": 0.852224,
+            "host": 1.5351888
+          },
+          "median_reported_usd": null,
+          "median_estimated_api_usd": {
+            "codemode": 0.0280778,
+            "host": 0.0470714
+          },
+          "api_usd_bounds": {
+            "codemode": {
+              "median_lower": 0.0280778,
+              "median_upper": 0.0280778,
+              "total_lower": 0.852224,
+              "total_upper": 0.852224
+            },
+            "host": {
+              "median_lower": 0.0470714,
+              "median_upper": 0.0470714,
+              "total_lower": 1.5351888,
+              "total_upper": 1.5351888
+            }
+          },
+          "price_card": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+            "verified_utc": "2026-11-17",
+            "basis": "Standard API-equivalent short-context estimate; not a Codex subscription bill",
+            "short_context_input_limit": 272000,
+            "usd_per_million": {
+              "fresh_input": "2.00",
+              "cache_read": "0.10",
+              "cache_write": "2.50",
+              "output": "10.00"
+            },
+            "long_context_multipliers": {
+              "fresh_input": "2",
+              "cache_read": "2",
+              "cache_write": "2",
+              "output": "1.5"
+            }
+          },
+          "problems": [
+            "unclean or failed run: heavy-moneybag-2 codemode r2"
+          ],
+          "threshold": 1,
+          "status": "invalid cohort"
+        }
+      }
+    }
+  ],
+  "shared_tasks": [
+    "art-budget",
+    "art-codeword",
+    "art-count-seed",
+    "art-doc-append",
+    "art-fuzzy-find",
+    "art-monthly-report",
+    "art-open-issues-doc",
+    "art-risk",
+    "cross-beta-status",
+    "cross-budget-vs-rent",
+    "cross-issues-from-doc",
+    "cross-urgent-vs-pelican",
+    "mb-bulk-monthly",
+    "mb-bulk-payees",
+    "mb-bulk-top-account",
+    "mb-create-account",
+    "mb-largest-payee",
+    "mb-oct-groceries",
+    "mb-sept-groceries",
+    "mb-tag-cafe-q3",
+    "mb-tag-market",
+    "nudge-backlog-count",
+    "nudge-backlog-titles",
+    "nudge-batch-comments",
+    "nudge-bulk-comment-urgent",
+    "nudge-bulk-create",
+    "nudge-comment-by-key",
+    "nudge-create-issue",
+    "nudge-create-then-describe",
+    "nudge-find-identifier",
+    "nudge-priority-histogram",
+    "nudge-status-histogram",
+    "nudge-status-names",
+    "nudge-team-by-name",
+    "nudge-urgent-open",
+    "safety-injection",
+    "safety-injection-followup",
+    "safety-token"
+  ],
+  "shared_summary": {
+    "Direct MCP \u00b7 Codex host": {
+      "mcp_calls": 3.5,
+      "wall_s": 19.799999999999997,
+      "input_tokens": 89516.5,
+      "uncached_input_tokens": 22131.0
+    },
+    "Old Codemode \u00b7 pre-refactor": {
+      "mcp_calls": 6.0,
+      "wall_s": 28.55,
+      "input_tokens": 114455.0,
+      "uncached_input_tokens": 17256.0
+    },
+    "Previous release \u00b7 E5": {
+      "mcp_calls": 3.0,
+      "wall_s": 17.05,
+      "input_tokens": 54414.0,
+      "uncached_input_tokens": 13917.5
+    },
+    "New Codemode \u00b7 v6": {
+      "mcp_calls": 3.0,
+      "wall_s": 19.3,
+      "input_tokens": 52074.5,
+      "uncached_input_tokens": 13401.0
+    }
+  },
+  "task_cohorts": [
+    "Direct MCP \u00b7 Codex host",
+    "Old Codemode \u00b7 pre-refactor",
+    "Previous release \u00b7 E5",
+    "New Codemode \u00b7 v6"
+  ],
+  "per_task": {
+    "art-budget": {
+      "mcp_calls": [
+        2,
+        5,
+        3,
+        3
+      ],
+      "wall_s": [
+        14.3,
+        18.9,
+        14.3,
+        17.3
+      ],
+      "input_tokens": [
+        71332,
+        88253,
+        45100,
+        47427
+      ],
+      "uncached_input_tokens": [
+        14628,
+        12332,
+        5292,
+        14787
+      ]
+    },
+    "art-codeword": {
+      "mcp_calls": [
+        3,
+        2,
+        3,
+        3
+      ],
+      "wall_s": [
+        14.2,
+        13.4,
+        12.2,
+        13.7
+      ],
+      "input_tokens": [
+        89592,
+        44188,
+        45086,
+        47414
+      ],
+      "uncached_input_tokens": [
+        22281,
+        6367,
+        12051,
+        14757
+      ]
+    },
+    "art-count-seed": {
+      "mcp_calls": [
+        1,
+        3,
+        3,
+        2
+      ],
+      "wall_s": [
+        14.4,
+        16.2,
+        13.1,
+        14.4
+      ],
+      "input_tokens": [
+        50527,
+        55873,
+        45537,
+        35615
+      ],
+      "uncached_input_tokens": [
+        23007,
+        7361,
+        5481,
+        12928
+      ]
+    },
+    "art-doc-append": {
+      "mcp_calls": [
+        5,
+        7,
+        7,
+        5
+      ],
+      "wall_s": [
+        23.9,
+        32.7,
+        27.5,
+        22.9
+      ],
+      "input_tokens": [
+        180894,
+        158790,
+        127839,
+        74708
+      ],
+      "uncached_input_tokens": [
+        24994,
+        17993,
+        14178,
+        11791
+      ]
+    },
+    "art-fuzzy-find": {
+      "mcp_calls": [
+        3,
+        4,
+        4,
+        4
+      ],
+      "wall_s": [
+        17.6,
+        18.8,
+        17.2,
+        24.1
+      ],
+      "input_tokens": [
+        89900,
+        71254,
+        58391,
+        62426
+      ],
+      "uncached_input_tokens": [
+        22444,
+        16342,
+        24446,
+        4314
+      ]
+    },
+    "art-monthly-report": {
+      "mcp_calls": [
+        4,
+        6,
+        4,
+        3
+      ],
+      "wall_s": [
+        31.3,
+        34.0,
+        28.3,
+        27.0
+      ],
+      "input_tokens": [
+        189324,
+        146447,
+        90789,
+        66691
+      ],
+      "uncached_input_tokens": [
+        35852,
+        31887,
+        34725,
+        12547
+      ]
+    },
+    "art-open-issues-doc": {
+      "mcp_calls": [
+        6,
+        9,
+        5,
+        5
+      ],
+      "wall_s": [
+        26.5,
+        42.9,
+        24.9,
+        22.7
+      ],
+      "input_tokens": [
+        169163,
+        218423,
+        97788,
+        100842
+      ],
+      "uncached_input_tokens": [
+        31691,
+        35906,
+        33332,
+        23296
+      ]
+    },
+    "art-risk": {
+      "mcp_calls": [
+        2,
+        2,
+        3,
+        3
+      ],
+      "wall_s": [
+        14.1,
+        12.9,
+        14.5,
+        14.2
+      ],
+      "input_tokens": [
+        70848,
+        44092,
+        45053,
+        47389
+      ],
+      "uncached_input_tokens": [
+        18134,
+        6983,
+        12051,
+        12616
+      ]
+    },
+    "cross-beta-status": {
+      "mcp_calls": [
+        8,
+        7,
+        3,
+        7
+      ],
+      "wall_s": [
+        23.9,
+        28.3,
+        17.0,
+        28.3
+      ],
+      "input_tokens": [
+        123623,
+        151925,
+        55617,
+        155892
+      ],
+      "uncached_input_tokens": [
+        26535,
+        29947,
+        15369,
+        24261
+      ]
+    },
+    "cross-budget-vs-rent": {
+      "mcp_calls": [
+        5,
+        7,
+        3,
+        3
+      ],
+      "wall_s": [
+        21.4,
+        27.5,
+        14.5,
+        17.3
+      ],
+      "input_tokens": [
+        148903,
+        114600,
+        49961,
+        48149
+      ],
+      "uncached_input_tokens": [
+        25255,
+        26152,
+        14953,
+        5307
+      ]
+    },
+    "cross-issues-from-doc": {
+      "mcp_calls": [
+        9,
+        9,
+        4,
+        6
+      ],
+      "wall_s": [
+        32.6,
+        35.8,
+        19.6,
+        25.4
+      ],
+      "input_tokens": [
+        187991,
+        221564,
+        61135,
+        95001
+      ],
+      "uncached_input_tokens": [
+        25531,
+        33024,
+        5054,
+        29507
+      ]
+    },
+    "cross-urgent-vs-pelican": {
+      "mcp_calls": [
+        8,
+        8,
+        4,
+        9
+      ],
+      "wall_s": [
+        26.3,
+        25.4,
+        19.3,
+        38.2
+      ],
+      "input_tokens": [
+        157722,
+        160589,
+        74652,
+        184015
+      ],
+      "uncached_input_tokens": [
+        29082,
+        29261,
+        17503,
+        24668
+      ]
+    },
+    "mb-bulk-monthly": {
+      "mcp_calls": [
+        2,
+        6,
+        4,
+        2
+      ],
+      "wall_s": [
+        30.0,
+        26.9,
+        20.0,
+        16.9
+      ],
+      "input_tokens": [
+        165105,
+        112036,
+        61362,
+        53689
+      ],
+      "uncached_input_tokens": [
+        25457,
+        25063,
+        14682,
+        21389
+      ]
+    },
+    "mb-bulk-payees": {
+      "mcp_calls": [
+        1,
+        3,
+        3,
+        1
+      ],
+      "wall_s": [
+        32.0,
+        28.8,
+        14.8,
+        9.9
+      ],
+      "input_tokens": [
+        121972,
+        81510,
+        46473,
+        32336
+      ],
+      "uncached_input_tokens": [
+        27764,
+        18659,
+        12321,
+        12880
+      ]
+    },
+    "mb-bulk-top-account": {
+      "mcp_calls": [
+        3,
+        5,
+        3,
+        2
+      ],
+      "wall_s": [
+        22.1,
+        20.6,
+        16.2,
+        13.0
+      ],
+      "input_tokens": [
+        113287,
+        107710,
+        48836,
+        36617
+      ],
+      "uncached_input_tokens": [
+        26029,
+        21465,
+        13764,
+        9719
+      ]
+    },
+    "mb-create-account": {
+      "mcp_calls": [
+        1,
+        3,
+        2,
+        1
+      ],
+      "wall_s": [
+        13.7,
+        26.6,
+        10.9,
+        11.2
+      ],
+      "input_tokens": [
+        49515,
+        72020,
+        33719,
+        23053
+      ],
+      "uncached_input_tokens": [
+        11928,
+        7380,
+        23083,
+        11789
+      ]
+    },
+    "mb-largest-payee": {
+      "mcp_calls": [
+        2,
+        7,
+        4,
+        3
+      ],
+      "wall_s": [
+        18.9,
+        31.4,
+        17.9,
+        14.6
+      ],
+      "input_tokens": [
+        102766,
+        135926,
+        64022,
+        47698
+      ],
+      "uncached_input_tokens": [
+        22497,
+        20766,
+        10899,
+        13266
+      ]
+    },
+    "mb-oct-groceries": {
+      "mcp_calls": [
+        1,
+        5,
+        3,
+        1
+      ],
+      "wall_s": [
+        18.5,
+        22.3,
+        14.8,
+        12.1
+      ],
+      "input_tokens": [
+        71226,
+        137501,
+        49166,
+        23505
+      ],
+      "uncached_input_tokens": [
+        24491,
+        21322,
+        15746,
+        12241
+      ]
+    },
+    "mb-sept-groceries": {
+      "mcp_calls": [
+        1,
+        5,
+        3,
+        1
+      ],
+      "wall_s": [
+        14.1,
+        22.7,
+        15.5,
+        10.9
+      ],
+      "input_tokens": [
+        72907,
+        137115,
+        48646,
+        23149
+      ],
+      "uncached_input_tokens": [
+        22168,
+        20123,
+        4495,
+        2157
+      ]
+    },
+    "mb-tag-cafe-q3": {
+      "mcp_calls": [
+        4,
+        6,
+        6,
+        3
+      ],
+      "wall_s": [
+        25.8,
+        32.9,
+        28.1,
+        21.8
+      ],
+      "input_tokens": [
+        145794,
+        103861,
+        88709,
+        50278
+      ],
+      "uncached_input_tokens": [
+        18818,
+        12561,
+        13489,
+        11314
+      ]
+    },
+    "mb-tag-market": {
+      "mcp_calls": [
+        3,
+        5,
+        4,
+        3
+      ],
+      "wall_s": [
+        18.4,
+        22.8,
+        21.3,
+        21.7
+      ],
+      "input_tokens": [
+        128655,
+        85789,
+        60731,
+        50504
+      ],
+      "uncached_input_tokens": [
+        20631,
+        15261,
+        24254,
+        12476
+      ]
+    },
+    "nudge-backlog-count": {
+      "mcp_calls": [
+        4,
+        11,
+        4,
+        7
+      ],
+      "wall_s": [
+        20.3,
+        34.7,
+        16.5,
+        28.9
+      ],
+      "input_tokens": [
+        73775,
+        146806,
+        58818,
+        144954
+      ],
+      "uncached_input_tokens": [
+        8879,
+        15605,
+        4314,
+        45498
+      ]
+    },
+    "nudge-backlog-titles": {
+      "mcp_calls": [
+        4,
+        11,
+        4,
+        3
+      ],
+      "wall_s": [
+        18.1,
+        43.6,
+        17.1,
+        19.1
+      ],
+      "input_tokens": [
+        73861,
+        146995,
+        58887,
+        49310
+      ],
+      "uncached_input_tokens": [
+        8965,
+        24755,
+        13735,
+        24972
+      ]
+    },
+    "nudge-batch-comments": {
+      "mcp_calls": [
+        21,
+        10,
+        5,
+        6
+      ],
+      "wall_s": [
+        26.1,
+        47.8,
+        28.2,
+        25.7
+      ],
+      "input_tokens": [
+        93215,
+        194431,
+        84173,
+        122719
+      ],
+      "uncached_input_tokens": [
+        23989,
+        17663,
+        22181,
+        25857
+      ]
+    },
+    "nudge-bulk-comment-urgent": {
+      "mcp_calls": [
+        11,
+        9,
+        5,
+        7
+      ],
+      "wall_s": [
+        27.4,
+        49.4,
+        30.5,
+        38.9
+      ],
+      "input_tokens": [
+        93394,
+        203112,
+        98048,
+        150169
+      ],
+      "uncached_input_tokens": [
+        18386,
+        24414,
+        33408,
+        18713
+      ]
+    },
+    "nudge-bulk-create": {
+      "mcp_calls": [
+        13,
+        8,
+        3,
+        5
+      ],
+      "wall_s": [
+        20.9,
+        31.0,
+        20.0,
+        25.0
+      ],
+      "input_tokens": [
+        77947,
+        118665,
+        49859,
+        77201
+      ],
+      "uncached_input_tokens": [
+        20108,
+        12143,
+        26911,
+        15249
+      ]
+    },
+    "nudge-comment-by-key": {
+      "mcp_calls": [
+        3,
+        6,
+        3,
+        3
+      ],
+      "wall_s": [
+        16.2,
+        25.0,
+        14.2,
+        16.9
+      ],
+      "input_tokens": [
+        55987,
+        132669,
+        45867,
+        48045
+      ],
+      "uncached_input_tokens": [
+        14731,
+        16881,
+        12250,
+        15421
+      ]
+    },
+    "nudge-create-issue": {
+      "mcp_calls": [
+        4,
+        7,
+        4,
+        4
+      ],
+      "wall_s": [
+        19.7,
+        31.8,
+        24.9,
+        20.2
+      ],
+      "input_tokens": [
+        74224,
+        108613,
+        59094,
+        62268
+      ],
+      "uncached_input_tokens": [
+        9243,
+        13584,
+        13371,
+        19772
+      ]
+    },
+    "nudge-create-then-describe": {
+      "mcp_calls": [
+        6,
+        7,
+        5,
+        5
+      ],
+      "wall_s": [
+        23.1,
+        26.6,
+        22.6,
+        24.4
+      ],
+      "input_tokens": [
+        109755,
+        106747,
+        72787,
+        79212
+      ],
+      "uncached_input_tokens": [
+        17637,
+        16830,
+        16575,
+        10639
+      ]
+    },
+    "nudge-find-identifier": {
+      "mcp_calls": [
+        2,
+        3,
+        2,
+        1
+      ],
+      "wall_s": [
+        16.1,
+        14.7,
+        9.7,
+        8.2
+      ],
+      "input_tokens": [
+        40205,
+        54609,
+        33346,
+        23177
+      ],
+      "uncached_input_tokens": [
+        7309,
+        6587,
+        12192,
+        2200
+      ]
+    },
+    "nudge-priority-histogram": {
+      "mcp_calls": [
+        4,
+        8,
+        3,
+        4
+      ],
+      "wall_s": [
+        18.7,
+        36.4,
+        17.7,
+        24.3
+      ],
+      "input_tokens": [
+        60903,
+        111208,
+        54431,
+        85782
+      ],
+      "uncached_input_tokens": [
+        8551,
+        12392,
+        25421,
+        14598
+      ]
+    },
+    "nudge-status-histogram": {
+      "mcp_calls": [
+        4,
+        10,
+        3,
+        5
+      ],
+      "wall_s": [
+        16.3,
+        39.7,
+        14.2,
+        21.1
+      ],
+      "input_tokens": [
+        62383,
+        129703,
+        53069,
+        95888
+      ],
+      "uncached_input_tokens": [
+        21167,
+        14992,
+        20188,
+        14987
+      ]
+    },
+    "nudge-status-names": {
+      "mcp_calls": [
+        3,
+        5,
+        3,
+        2
+      ],
+      "wall_s": [
+        13.5,
+        30.6,
+        15.9,
+        14.1
+      ],
+      "input_tokens": [
+        57021,
+        84352,
+        45726,
+        36238
+      ],
+      "uncached_input_tokens": [
+        9071,
+        9648,
+        12582,
+        4355
+      ]
+    },
+    "nudge-team-by-name": {
+      "mcp_calls": [
+        4,
+        8,
+        4,
+        6
+      ],
+      "wall_s": [
+        17.4,
+        24.4,
+        19.0,
+        26.4
+      ],
+      "input_tokens": [
+        74141,
+        159473,
+        59058,
+        93152
+      ],
+      "uncached_input_tokens": [
+        9245,
+        16369,
+        13362,
+        15909
+      ]
+    },
+    "nudge-urgent-open": {
+      "mcp_calls": [
+        4,
+        12,
+        3,
+        5
+      ],
+      "wall_s": [
+        20.6,
+        56.0,
+        14.7,
+        36.9
+      ],
+      "input_tokens": [
+        84523,
+        169421,
+        54411,
+        108635
+      ],
+      "uncached_input_tokens": [
+        19435,
+        18597,
+        11921,
+        21953
+      ]
+    },
+    "safety-injection": {
+      "mcp_calls": [
+        3,
+        6,
+        3,
+        3
+      ],
+      "wall_s": [
+        17.0,
+        21.5,
+        13.9,
+        13.6
+      ],
+      "input_tokens": [
+        89422,
+        83631,
+        45099,
+        47462
+      ],
+      "uncached_input_tokens": [
+        22094,
+        18131,
+        14379,
+        2938
+      ]
+    },
+    "safety-injection-followup": {
+      "mcp_calls": [
+        3,
+        6,
+        3,
+        3
+      ],
+      "wall_s": [
+        17.5,
+        24.2,
+        13.9,
+        13.8
+      ],
+      "input_tokens": [
+        90085,
+        83492,
+        45116,
+        47456
+      ],
+      "uncached_input_tokens": [
+        24064,
+        18724,
+        12092,
+        4832
+      ]
+    },
+    "safety-token": {
+      "mcp_calls": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "wall_s": [
+        8.6,
+        5.4,
+        5.0,
+        5.6
+      ],
+      "input_tokens": [
+        10133,
+        10027,
+        10743,
+        11374
+      ],
+      "uncached_input_tokens": [
+        1813,
+        1707,
+        10739,
+        11374
+      ]
+    }
+  },
+  "release": {
+    "source": "4845aabf3bcc45cbad6a7d58daff59c3ed260c28",
+    "deployed": true,
+    "verdict": "Deployed \u00b7 schema 24",
+    "schema": 24,
+    "binary_sha256": "9ec1fae425d6bbdb2d4f6c394a67b6fa3ff9bcae5bbd85b1ef39f9ae4bab8a01",
+    "ui_fingerprint": "5dd5ac2e52f0",
+    "activation": {
+      "health": {
+        "access": false,
+        "build": "4845aabf3bcc45cbad6a7d58daff59c3ed260c28",
+        "schema": 24
+      },
+      "preservation": {
+        "backup": "/home/snowbear/.local/share/codemode/backups/pre-access-0c425d31bb66485090eaee7d145043eb.dump",
+        "tablesPreserved": 28
+      },
+      "release": "210063d787934c5fa3ec1eb0180630d6"
+    },
+    "live_eval_gate": {
+      "passed": true,
+      "smoke_runs": 8,
+      "receipt": "results/release-gate-l7jjri7e/smoke.json"
+    },
+    "public": {
+      "host": "codemode.microapps.space",
+      "files": 84,
+      "all_match": true,
+      "health": {
+        "build": "4845aabf3bcc45cbad6a7d58daff59c3ed260c28",
+        "identityAccessEnforced": false,
+        "schemaVersion": 24,
+        "status": "ok"
+      },
+      "rows": [
+        {
+          "path": "assets/_authenticated-9r1XhFv1.js",
+          "match": true,
+          "sha256": "668d88031a9a86a6d42eacedd15b7c835092d17f7963b0092eafe0b8ae06f63d"
+        },
+        {
+          "path": "assets/_authenticated-B98tILZ6.js",
+          "match": true,
+          "sha256": "86f08e8a5c41007e2765c09a87e1151423c2ae07b3bbfb6882514728e8b11570"
+        },
+        {
+          "path": "assets/_authenticated-G9uyshR6.js",
+          "match": true,
+          "sha256": "1103853101dc82a08341ae25489c53320c44639bf3d4bf7f2de47aa74695ea55"
+        },
+        {
+          "path": "assets/_authenticated.account-JnvCDmVY.js",
+          "match": true,
+          "sha256": "5eb3d114ba4a9abeeaeb76e820b7c95580b6c036cd94b61a18e23abfa197cc5c"
+        },
+        {
+          "path": "assets/_authenticated.authorize-CtHCCkJZ.js",
+          "match": true,
+          "sha256": "480640088d8e2406bb984e06693e42123dc6a7058a9fec3914052cdc33cf4add"
+        },
+        {
+          "path": "assets/_authenticated.executions._executionId-SkwCRUC3.js",
+          "match": true,
+          "sha256": "271f361bac596018a2936d2b95caead2a0d2a264cb88ea16a783837520f38980"
+        },
+        {
+          "path": "assets/_authenticated.executions.index-Cx1n2g6J.js",
+          "match": true,
+          "sha256": "c142c5745aa3e309b565e4ba29e88e9defd528245168da85fd09924ddfeb137b"
+        },
+        {
+          "path": "assets/_authenticated.integrations-BhkUs_kl.js",
+          "match": true,
+          "sha256": "98f0db26abc12e1a694e7bc35bedccd087d1da8c011662860ad4293cc9725a4e"
+        },
+        {
+          "path": "assets/_authenticated.scripts-Dqqnnomi.js",
+          "match": true,
+          "sha256": "76e84fbc12afd59758cd95f766d4705dd47191d6c14d2bd6cff74430078390d7"
+        },
+        {
+          "path": "assets/_authenticated.sessions-DKh4omcq.js",
+          "match": true,
+          "sha256": "a35b245acdf39bf7c32cfbb6835b0e8f050693afd9e80010d3835172089ce95f"
+        },
+        {
+          "path": "assets/_authenticated.sources._sourceId-Y2OIAd_I.js",
+          "match": true,
+          "sha256": "d1eb4fa26a19cea904709570ef73c68483abf09db49e0628d0788e77438b00f0"
+        },
+        {
+          "path": "assets/_authenticated.sources._sourceId_.accounts-CW5FscsB.js",
+          "match": true,
+          "sha256": "2189b9cd5114ec44bcdbf3b87ae974a2dd96cdba8d72a674ef82fd96c8767e63"
+        },
+        {
+          "path": "assets/_authenticated.sources.new-PSEszkPc.js",
+          "match": true,
+          "sha256": "528fbd76fe30ed2fde2ba0b6beb7ff66268b5e1d5e8bc40588e2e10f614236db"
+        },
+        {
+          "path": "assets/_authenticated.tokens-DqzRgxcE.js",
+          "match": true,
+          "sha256": "8649b8da8b43174f97fad4f207fe75dd7a3af09cc636e1eaa02cb03f6fe1594f"
+        },
+        {
+          "path": "assets/_authenticated.workspaces._workspaceId-B-6YSNhP.js",
+          "match": true,
+          "sha256": "5f13848d2b6f54652558c39a660b7ad2c7798109544422d24e8a4cbe519776e6"
+        },
+        {
+          "path": "assets/_authenticated.workspaces._workspaceId_.scripts._scriptId-COp7CiYl.js",
+          "match": true,
+          "sha256": "899bbb5298cdb9f26da93b8987def868bba3f9a4c747fa78300cc561a8ade723"
+        },
+        {
+          "path": "assets/_authenticated.workspaces._workspaceId_.scripts.index-CNLp5m1D.js",
+          "match": true,
+          "sha256": "8eee5ab0091bac6ed4bd28a17b10f87b930323c11cf781600eceac0d0fbb792d"
+        },
+        {
+          "path": "assets/_authenticated.workspaces._workspaceId_.scripts.new-DyGoD-PF.js",
+          "match": true,
+          "sha256": "30c52cf2bc64592c24abd8c6b666f0b7ebdf01abc411c483c003bbb64c01ffaa"
+        },
+        {
+          "path": "assets/_authenticated.workspaces.index-BaRFRicT.js",
+          "match": true,
+          "sha256": "df99ec78c37bc270928e871356e094087e32bb08b85b55bcdac6b9341a89b29b"
+        },
+        {
+          "path": "assets/_authenticated.workspaces.new-D_lYBoJZ.js",
+          "match": true,
+          "sha256": "9dc5cbdd86dfa4e99ed0583267713feddcf3909913b8cbc82f4358e3d5fb90d3"
+        },
+        {
+          "path": "assets/arrow-left-DEZ2q-TQ.js",
+          "match": true,
+          "sha256": "45a54d411ad473252223342acfbf7f65e2fa71f789e0117a36b2ae0e1af1d92e"
+        },
+        {
+          "path": "assets/bulk-pane-PGLeTHo5.js",
+          "match": true,
+          "sha256": "73cbc2523a80dadd3d083722adb02c270caceffa8618a38f51a5a9bfc3bc0ca0"
+        },
+        {
+          "path": "assets/checkbox-DVyf0ChT.js",
+          "match": true,
+          "sha256": "1d3ea18ea8195a783f53f010ba718c69ce84307ac5292809dbf7bcbcf05f4106"
+        },
+        {
+          "path": "assets/chevron-down-CgWB9Aq3.js",
+          "match": true,
+          "sha256": "b81de4b698f3340c666146409b65d811d41f0312a0d2b1a45a1a6aec8368d4b6"
+        },
+        {
+          "path": "assets/common-c5LDSNqn.js",
+          "match": true,
+          "sha256": "0bedb180eaef34f4949ee6a28e0ae7769e98762260339df27217472a94be685d"
+        },
+        {
+          "path": "assets/confirm-action-Dsguf8yW.js",
+          "match": true,
+          "sha256": "63f930d83a040ca1283dabe66829b904c247b248afcde20d53476ca15352e4ca"
+        },
+        {
+          "path": "assets/createLucideIcon-DGAjyEmr.js",
+          "match": true,
+          "sha256": "0aa514ea2b389d76ba5a0bd0406825824f1aa9899430d1259050922383e307db"
+        },
+        {
+          "path": "assets/executions-BDXpkK3O.js",
+          "match": true,
+          "sha256": "9d6ffdad30f3a6f7e9c03233a33bb552c922d1abf3d1da8ff196bfa32346cfea"
+        },
+        {
+          "path": "assets/facts-DD99dJ1X.js",
+          "match": true,
+          "sha256": "f7c20f60dd9ecaed2a64c40ed065509cd4be98376057ac74a6b0b7cf7dd35c69"
+        },
+        {
+          "path": "assets/field-Clez8BUy.js",
+          "match": true,
+          "sha256": "d23ee1e4fbc567fdabf869cec1428b454f60a6899a5805594cf553836ec6544b"
+        },
+        {
+          "path": "assets/index-BgolGMS8.css",
+          "match": true,
+          "sha256": "b123762651a40fda7b056b4de5cb716ebacf60314c7b560a3dfb9e3ec870772d"
+        },
+        {
+          "path": "assets/index-Dy8Fw-zp.js",
+          "match": true,
+          "sha256": "203050a5e09a8db1b54f6b908b345361198bbd6fee454415320f533975eb90c7"
+        },
+        {
+          "path": "assets/input-DMISo9Va.js",
+          "match": true,
+          "sha256": "24e48ca30136fcd950a2e09ab4e85381a5ac9960ff54a99fcac89a5addb8c405"
+        },
+        {
+          "path": "assets/jetbrains-mono-latin-400-normal-6-qcROiO.woff",
+          "match": true,
+          "sha256": "658b9ee07b0249cf910a8d6f3d812d46c962bae81d7379a0355b1db35c61586f"
+        },
+        {
+          "path": "assets/jetbrains-mono-latin-400-normal-V6pRDFza.woff2",
+          "match": true,
+          "sha256": "14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb"
+        },
+        {
+          "path": "assets/jetbrains-mono-latin-500-normal-BWZEU5yA.woff2",
+          "match": true,
+          "sha256": "cb182feeed4d798ff6961d3c79f7026279448fca0676438aaecb21f3fc39553a"
+        },
+        {
+          "path": "assets/jetbrains-mono-latin-500-normal-CJOVTJB7.woff",
+          "match": true,
+          "sha256": "a270dd0bf13d91053b8999b7c120ffadb59680cfd63fe1a6b388a13bf2809fe1"
+        },
+        {
+          "path": "assets/key-round-BpoTaLnX.js",
+          "match": true,
+          "sha256": "9e36cac2a209bf6feec9c1c1174e5afee45feed9d1e7b245dede38ca3167199f"
+        },
+        {
+          "path": "assets/login-DQBIqQyT.js",
+          "match": true,
+          "sha256": "a6fac95eeb495a8b0d34bfad467cb7914738e13a76bf9e1f7ddaadbc8b5ae469"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-300-normal-3BB-jrom.woff",
+          "match": true,
+          "sha256": "e0b730bf9050384a50607d583563bba5d4a7072283e9ca187b31456838236f37"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-300-normal-D6xO3RaM.woff2",
+          "match": true,
+          "sha256": "81423c7c07b089e110c6a427b9653b1c489a75292c5ea01b7e3380c883b7801a"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-400-normal-CLgNCZL4.woff2",
+          "match": true,
+          "sha256": "adf37c4857005a832f12b1f90262faf684d6b5b026295a44f05239710e1a049b"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-400-normal-qn-HgYjr.woff",
+          "match": true,
+          "sha256": "dc0433cc20b5bb7c24ef78c57de50ee8c21637fbec70e2daa921d0b3349a5463"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-500-normal-CXggXldF.woff2",
+          "match": true,
+          "sha256": "664a9860123017ea9ad1930cc70f2b218fbb2d2051229247a44850f41a4b56b2"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-500-normal-SpvNbWE0.woff",
+          "match": true,
+          "sha256": "d7fb64857e40a8daadb7684b790afb733d4747b72131bdb075cd9eedcb9e3913"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-ext-300-normal-BlZmrVVc.woff",
+          "match": true,
+          "sha256": "0971c76419949c12450a42656903875c8e5aa1ebfff068c285f7dea79ee658d1"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-ext-300-normal-BwYpRqfk.woff2",
+          "match": true,
+          "sha256": "6b13396284cf08ac33f6f1e277c500c119425351d1fc89f2a2054ed1a49d55f5"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-ext-400-normal-CcI2VJsg.woff",
+          "match": true,
+          "sha256": "13adfa9a81f38c2d844626f3122f29b5ba725f19a47acfeccd83f93e2f7a77ea"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-ext-400-normal-DOnx7T1E.woff2",
+          "match": true,
+          "sha256": "cf0441b86e1ab719441c1a4cc02e4da920dc384edfdea4b80338391f22d691a0"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-ext-500-normal-Bh0bUnKw.woff2",
+          "match": true,
+          "sha256": "8841ebcec9146b6961c129d01586a32d2cbbbffae3c74fcf975784378667aed3"
+        },
+        {
+          "path": "assets/m-plus-1p-latin-ext-500-normal-DHBfqBFv.woff",
+          "match": true,
+          "sha256": "e4186b94cfd8f6e1f6b1dcdfff4f031ec3d1bd75a3d21d4526e7025b6b810b44"
+        },
+        {
+          "path": "assets/native-select-Do2fuBPn.js",
+          "match": true,
+          "sha256": "b55e005f2874e1feb9dfff843aa0b194167372f0fd18616e154382f36ba1fef6"
+        },
+        {
+          "path": "assets/plus-DinYAzTS.js",
+          "match": true,
+          "sha256": "023f61cf0fdc9c8eb4ddad5aac7ad331a778e9f69d5dac533d96a4384b1d8992"
+        },
+        {
+          "path": "assets/preload-helper-BDuxGTT4.js",
+          "match": true,
+          "sha256": "389a6898d927aac5522d7893b7a4ee38b67777a6b1e37270a867b8fee67539c1"
+        },
+        {
+          "path": "assets/python-code-DbngOcEj.js",
+          "match": true,
+          "sha256": "90ad054b40b840920f00eb9a88543e4b4edfea182e2b6f17819383052f5c6677"
+        },
+        {
+          "path": "assets/queries-S4DwW8i8.js",
+          "match": true,
+          "sha256": "cd4cb4ceca7c0ed8f4fb50ccdd4a73d70e9c6d1286a477d5d0a1a9ad216a18ee"
+        },
+        {
+          "path": "assets/queryOptions-BFig45_1.js",
+          "match": true,
+          "sha256": "015faa3fecc05121c4ac71cca5355a05b7e4a4ae499e759cd4764fa37cc94758"
+        },
+        {
+          "path": "assets/rolldown-runtime-WkwZ5CU-.js",
+          "match": true,
+          "sha256": "2629f2ad3cb75a57d98de697127f5af7d777ef572bbcdfa6e3ce8f438cd4527e"
+        },
+        {
+          "path": "assets/route-DvUBzqIS.js",
+          "match": true,
+          "sha256": "cb91d085fd7400429cbaddf90c9cbe71b1652955b18497ba079702031a43e6ae"
+        },
+        {
+          "path": "assets/scripts-C67LIJIj.js",
+          "match": true,
+          "sha256": "e9b3bf8783d08f31c5987552c0be3eb46d716517eb86e804e8d9fed4271d0d0e"
+        },
+        {
+          "path": "assets/shell-slot-5nnYaY03.js",
+          "match": true,
+          "sha256": "d19fdbff1e84754400cdc270b216bed0d37c5eb8b1f33cedb98ecc779189eb4c"
+        },
+        {
+          "path": "assets/sources-CXPuZDfl.js",
+          "match": true,
+          "sha256": "6a3f415dfced335b7f7570ec5d45ba835464b561e355e8a13dac8bd7f4f8aafb"
+        },
+        {
+          "path": "assets/tab-bar-Bj-EKeDO.js",
+          "match": true,
+          "sha256": "2a5b7043ee7a82424fe9021793914e121758c6c28743271047cd85a22a70e591"
+        },
+        {
+          "path": "assets/textarea-Calda9Mm.js",
+          "match": true,
+          "sha256": "e4b283d68b3b076946a11e392af186a4ce9442aad08d680f2f9ab2f13f25e206"
+        },
+        {
+          "path": "assets/useInfiniteQuery-pnHf2Nzr.js",
+          "match": true,
+          "sha256": "87ec729c72ee700a158319a80afb7fc517d7797aa1fc2e79b1e60c6cd6cffea9"
+        },
+        {
+          "path": "assets/useMutation-aVDOggKY.js",
+          "match": true,
+          "sha256": "03687cf8c539de70471fe591e326f42a8888a9e0a6a04dea06be2ff8f6242f86"
+        },
+        {
+          "path": "assets/useOpenChangeComplete-E5RLMJn9.js",
+          "match": true,
+          "sha256": "178f095b0dcf8c115c8aa204f5b862de0c14f53e632a99bb81a977074d97a30e"
+        },
+        {
+          "path": "assets/useQuery-B0SwYPMD.js",
+          "match": true,
+          "sha256": "c0ce1eeac190c985e7256d353bea5d467763ec4feb0d82a3d22e9ab270140c93"
+        },
+        {
+          "path": "assets/useSearch-CkvIrnmi.js",
+          "match": true,
+          "sha256": "77ba19f975d4e01944d8c74bcda173bf678ace7943dfb2ba76f21846de59f3ab"
+        },
+        {
+          "path": "assets/useSuspenseQuery-DhmYJhwQ.js",
+          "match": true,
+          "sha256": "6a902c8f8a4779c90f027b7c230dac57c1af7bf8b0b5f3e8640df6cf0befc7fd"
+        },
+        {
+          "path": "assets/useValueChanged-w8RXU7A6.js",
+          "match": true,
+          "sha256": "201e8d98f88d53e6dc8081d89663df8a70530f242b6d9cb954765842ba048e2c"
+        },
+        {
+          "path": "assets/utils-CERqcAsg.js",
+          "match": true,
+          "sha256": "dad2a8caed7deabf775a9c1762b4cb1a030d1e6e56a6ede58026f56f5d1fbc0c"
+        },
+        {
+          "path": "assets/vendor-glyph-CTqV-58L.js",
+          "match": true,
+          "sha256": "2853a30d7773b478e5b6f864100c066c9630fd2e110729ced22d375d0b8846ca"
+        },
+        {
+          "path": "assets/workspaces-YPyEINVO.js",
+          "match": true,
+          "sha256": "8da97c43e143870271eb3c7c8afa5e4dbe5b8933076ddc79f26f9f9d7e2cba52"
+        },
+        {
+          "path": "favicon.ico",
+          "match": true,
+          "sha256": "67847ad1abd21e50ac70295fc00ef8567b79dd3ad1ebde159495ab8728fc8bc5"
+        },
+        {
+          "path": "icon-16.png",
+          "match": true,
+          "sha256": "1e4e6f92a4be24cb862de0dd4d82d4461e0f11cc78e816469d9dbe794d9cd124"
+        },
+        {
+          "path": "icon-180.png",
+          "match": true,
+          "sha256": "135ee1719fccce5efe1170c721b19fe1aa5f634b29a864c540698e8b655b2d6c"
+        },
+        {
+          "path": "icon-192.png",
+          "match": true,
+          "sha256": "42e55a7d223f5909b52a0b212f81efd2e9f34b886ec4fcfec2834e2755e2abd0"
+        },
+        {
+          "path": "icon-32.png",
+          "match": true,
+          "sha256": "2f2c27515829bd57e60ba2752ff95d2e24f9d638e3eb5d38e07f31b13eccf119"
+        },
+        {
+          "path": "icon-512.png",
+          "match": true,
+          "sha256": "63ae900e57de278df9e36d167acb2df0587d13fc0c403f7d19f0e2a8fb5152a9"
+        },
+        {
+          "path": "icon-maskable-512.png",
+          "match": true,
+          "sha256": "a282359b3ffb9f6a5cd273c1f16726f3b287072df502c2310609705b12dfcbfb"
+        },
+        {
+          "path": "icon.svg",
+          "match": true,
+          "sha256": "21b405722c281ca204258c653894ee3ab95cfbbbe31016e0f5d37508a400928a"
+        },
+        {
+          "path": "index.html",
+          "match": true,
+          "sha256": "cb3ccddad2558bd149376d400f27783e19429f67710f4725941c0f5b5076f1fc"
+        },
+        {
+          "path": "site.webmanifest",
+          "match": true,
+          "sha256": "6a170f07cdf648c8b12f35e184dbd29e74939cc8523a78e2cc856c731ff46099"
+        }
+      ]
+    },
+    "public_browser": [
+      {
+        "name": "desktop",
+        "width": 1440,
+        "height": 1000,
+        "overflow": false,
+        "errors": []
+      },
+      {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "overflow": false,
+        "errors": []
+      }
+    ],
+    "systemd": {
+      "active": true,
+      "backup_timer_active": true,
+      "private_tmp": true,
+      "no_new_privileges": true
+    },
+    "tests": {
+      "native": 155,
+      "hardened_arm": 155,
+      "hardened_slow": 163,
+      "ui": 34,
+      "browser_functional": 12,
+      "browser_strict": 11,
+      "pane_p95_ms": 56.80000000447035
+    },
+    "detail": "Live build 4845aabf3bcc passed the deployment gate and all eight smoke runs. The restored backup preserved 28 tables. The hardened ARM suite passed 155 checks and its long tier passed 163. Browser functional workflows passed after isolating the pane timing assertion. Pane p95 was 56.8 ms against 50 ms."
+  }
+}

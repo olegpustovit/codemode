@@ -134,3 +134,21 @@ summary after Monty returned all 23 correct payee medians. Raw Nudge agents
 reported truncation and did not return verified aggregates. See
 `docs/measurements/next-e8-verdicts.json` and
 `docs/measurements/next-heavy-answer-check.json`.
+
+
+## Publication and reproducibility
+
+The [v6 visual report](https://artifacts.microapps.space/a/ny3vep8ck2c7)
+version 3 compares Direct MCP through the Codex host, pre-refactor Codemode,
+the previous E5 release, and v6 across 38 shared tasks. It shows all six
+standard efficiency targets, both heavy scales, model request counts, the
+per-task tables, and the observed misses. Its HTML and comparison JSON
+match the published files byte for byte.
+
+The [v6 research supplement](https://artifacts.microapps.space/a/zp96zbshmq4s)
+version 1 extends the [earlier archive](https://artifacts.microapps.space/a/favtgv57hd8n)
+through 2026-11-17T21:52:52.677525+00:00. It contains 564 captured
+transcripts and 13 receipt files with 684 rows, including overlapping
+recounts and discarded warm-ups. All 10,396 members passed SHA-256
+verification after publication and readback, including Git modes for the
+source snapshots. The native save confirmation was not exercised.

@@ -341,5 +341,6 @@ async fn identity_discovery_failure_exits_before_workers_and_source_import(pool:
 
 /// The Oracle runner stages the gateway remotely; the compile-time path exists only on the build host.
 fn gateway_bin() -> std::ffi::OsString {
-    std::env::var_os("CODEMODE_GATEWAY_BIN").unwrap_or_else(|| env!("CARGO_BIN_EXE_codemode").into())
+    std::env::var_os("CODEMODE_GATEWAY_BIN")
+        .unwrap_or_else(|| env!("CARGO_BIN_EXE_codemode").into())
 }

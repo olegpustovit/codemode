@@ -1,11 +1,13 @@
 {
   "url": "https://artifacts.microapps.space/a/favtgv57hd8n",
-  "version": 2,
+  "version": 3,
   "visibility": "private",
-  "snapshot_utc": "2026-11-17T18:38:33.659990+00:00",
-  "transcript_files": 2638,
-  "receipt_files": 51,
-  "receipt_rows": 3218,
-  "verified_members": 11513,
-  "download_prompt_exercised": false
+  "snapshot_utc": "2026-11-17T18:57:53.020031+00:00",
+  "transcript_files": 2707,
+  "receipt_files": 55,
+  "receipt_rows": 3287,
+  "verified_members": 12862,
+  "download_prompt_exercised": false,
+  "release_report": "https://artifacts.microapps.space/a/ymj65gs0sx03",
+  "release_report_readback_matches": true
 }

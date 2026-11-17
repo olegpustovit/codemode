@@ -639,3 +639,6 @@ with NoNewPrivileges and PrivateTmp. No provider consent was granted.
 The final minimal-profile research cohort is 60/60 correct but still fails the
 2x heavy-cost target (median ratio 0.6145, about 1.627x saving). It does not change
 the released profile. Original negative results remain available.
+
+Final report: https://artifacts.microapps.space/a/ymj65gs0sx03 (Markdown readback matches).
+Research archive version 3 includes 2707 transcript files, 55 receipts and 12862 verified archived members, including all captured release smoke attempts. Receipt rows overlap; no unique-run count is inferred.

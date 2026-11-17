@@ -1,7 +1,7 @@
 # Agent efficiency proposal implementation
 
 Authoritative scope: https://artifacts.microapps.space/a/npta97dqvf6a,
-archived in `proposal.md`. This work is not yet qualified or deployed.
+archived in `proposal.md`. Implementation is deployed; performance exceptions and evidence are recorded below.
 
 ## Required delivery and evidence
 
@@ -625,3 +625,17 @@ was removed; the existing smoke gate remains unchanged.
 
 Research archive version 2 now contains 2,638 transcript files, 51 receipts and
 11,513 verified members. Receipt rows overlap and are not unique attempts.
+
+## Deployment completion
+
+PR #4 merged as 8d0aae27091e8e7c88e5ca02011b920fed51f1b4. The exact merged
+source was built for ARM in 5m31s and deployed through the existing live eval
+gate. All 26 existing tables survived restored-backup migration; schema 24,
+public/local build and running checksum match. All eight live smoke tasks pass,
+including both safety tasks; public 84-file byte comparison, security/deep-link
+smoke and desktop/mobile sign-in checks pass. Service and backup timer are active
+with NoNewPrivileges and PrivateTmp. No provider consent was granted.
+
+The final minimal-profile research cohort is 60/60 correct but still fails the
+2x heavy-cost target (median ratio 0.6145, about 1.627x saving). It does not change
+the released profile. Original negative results remain available.

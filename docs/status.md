@@ -1,6 +1,12 @@
 # Implementation status
 
-## Current release — Microapps ID sign-in, open registration, schema 22
+## Current release — agent efficiency, schema 24
+
+Deployed on 2026-11-17 at https://codemode.microapps.space from merged [PR #4](https://github.com/olegpustovit/codemode/pull/4), source **8d0aae27091e8e7c88e5ca02011b920fed51f1b4**, ARM SHA-256 **8e997b61da8239bc3074de51762b09b4a3d244c3c79be226f1749ef866396011**, UI **5dd5ac2e52f0**. Restored-backup migration preserved all **26 existing tables**. Live deployment gate passes L1/L2 regression comparison and **8/8 smoke tasks**, including both safety tasks. Public HTTPS serves all **84 UI files** byte-identically; public desktop/mobile checks and active service/backup timer checks pass.
+
+Qualification: **154 native**, **154 hardened Oracle**, **162 long-tier hardened** checks; **34 UI tests**, **11/12 optimized browser workflows**. Standard Codex cohort **120/120** and final Claude cohort **234/234** pass applicable efficiency targets. Owner requested shipping with disclosed limits: heavy median API-equivalent cost savings **1.985x** (1k) and **1.225x** (5k), below 2x; pane p95 **54.2 ms**, above 50 ms; incremental build budgets exceeded. No shader changes. Provider consent and owner external-client acceptance remain unperformed. See [release evidence](measurements/agent-efficiency-release.json), [implementation ledger](agent-efficiency/implementation.md), and [research archive](https://artifacts.microapps.space/a/favtgv57hd8n).
+
+## Previous release — Microapps ID sign-in, open registration, schema 22
 
 Deployed at https://codemode.microapps.space through the eval gate on 2026-11-17: source build **2f23413f18af**, schema **22**, running ARM SHA-256 **6da96ab2ab4f7039fc2662c44cad1c83c9ea78578960af225c1ef3a46612c001**. Production sign-in is Microapps ID only; the email allow-list was removed (`e9a23bb`), so Microapps ID invites are the gate.
 

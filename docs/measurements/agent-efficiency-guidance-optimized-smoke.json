@@ -1,0 +1,33 @@
+{
+  "scope": "Eight-task optimized smoke, source bcc3736, no overlapping model cohort; not full L4 acceptance",
+  "tasks_passed": 8,
+  "tasks": 8,
+  "native_cases_passed": 154,
+  "metrics": {
+    "pass": false,
+    "runs": 8,
+    "metrics": {
+      "mcp_calls": 3.0,
+      "pre_execute_calls": 0.0,
+      "execute_error_rate": 0.0,
+      "input_tokens": 59584.5,
+      "uncached_input_tokens": 9377.0,
+      "wall_s": 19.450000000000003,
+      "search_median_bytes": 0,
+      "search_max_bytes": 0
+    },
+    "problems": [
+      "wall_s: 19.450000000000003 exceeds 18"
+    ]
+  },
+  "remaining": [
+    "Full corrected 234-run comparison",
+    "E1",
+    "Valid E5",
+    "E6 heavy pack and cost gate",
+    "Claude E7",
+    "Pane timing",
+    "Final hardened/UI checks",
+    "Merge and gated deployment"
+  ]
+}

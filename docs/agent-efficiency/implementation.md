@@ -427,3 +427,10 @@ do the full optimized comparison and pane timing gate.
 
 Latest native verification after restoring the memo API wording: **154/154 pass**,
 15.52 s total including 3.62 s build. The application remains unmerged/undeployed.
+
+Optimized follow-up smoke (source bcc3736, build 217 s, no overlapping model
+cohort): **8/8 pass**, zero execute errors, median **3 calls**, **0 pre-execute**,
+**59,584.5 input**, **9377 uncached input**, **19.45 s**. Only time exceeds its
+18 s gate in this small sample. The full updated 234-run comparison is now
+running, with the eval dataset held unchanged. Receipt:
+`docs/measurements/agent-efficiency-guidance-optimized-smoke.json`.

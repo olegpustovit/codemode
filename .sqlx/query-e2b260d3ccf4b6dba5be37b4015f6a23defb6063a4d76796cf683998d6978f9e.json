@@ -1,0 +1,49 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id,COALESCE(s.python_name,s.slug) AS \"alias!\",s.config->>'url' AS url,\n            jsonb_object_agg(t.upstream_name,jsonb_build_object('input',t.input_schema,'output',t.output_schema)) AS \"schemas!\"\n            FROM sources s JOIN endpoints e ON e.id=$1 AND e.tenant_id=s.tenant_id\n            JOIN tools t ON t.source_id=s.id AND (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=s.id AND scope.upstream_name=t.upstream_name))\n            WHERE s.config->>'kind'='mcp_http' AND rtrim(s.config->>'url','/') IN ('https://nudge.microapps.space/mcp','https://moneybag.microapps.space/mcp')\n            AND (e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=s.id))\n            AND t.upstream_name IN ('list_teams','list_issue_statuses','create_issue','entries_list')\n            GROUP BY s.id ORDER BY s.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "sources",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "alias!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "url",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "schemas!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "e2b260d3ccf4b6dba5be37b4015f6a23defb6063a4d76796cf683998d6978f9e"
+}

@@ -25,19 +25,25 @@ class _Tool:
         rows = []
         seen = []
         if kwargs.get('cursor') is not None:
-            seen.append(kwargs['cursor'])
+            seen.append([kwargs['cursor']] + [kwargs.get(pair[0]) for pair in self.pagination['extras']])
         for _ in range(max_pages):
             page = await self(**kwargs)
             items = page
-            for key in self.pagination[0]:
+            for key in self.pagination['items']:
                 if not isinstance(items, dict) or key not in items:
                     raise ToolError('pagination response is missing its items path')
                 items = items[key]
-            cursor = page
-            for key in self.pagination[1]:
-                if not isinstance(cursor, dict) or key not in cursor:
+            container = page
+            for key in self.pagination['cursor'][:-1]:
+                if not isinstance(container, dict) or key not in container:
                     raise ToolError('pagination response is missing its cursor path')
-                cursor = cursor[key]
+                container = container[key]
+            cursor_key = self.pagination['cursor'][-1]
+            if not isinstance(container, dict):
+                raise ToolError('pagination cursor container must be an object')
+            if cursor_key not in container and not self.pagination['optional']:
+                raise ToolError('pagination response is missing its cursor path')
+            cursor = container.get(cursor_key)
             if items is None:
                 items = []
             if not isinstance(items, list):
@@ -45,12 +51,18 @@ class _Tool:
             rows.extend(_project(items, _fields))
             if cursor is None or cursor == '':
                 return rows
-            if not isinstance(cursor, str):
-                raise ToolError('pagination cursor must be a string or None')
-            if cursor in seen:
+            if type(cursor) not in (str, int):
+                raise ToolError('pagination cursor must be a string, integer or None')
+            state = [cursor] + [container.get(pair[1]) for pair in self.pagination['extras']]
+            if state in seen:
                 raise ToolError('pagination cursor repeated; stopped to avoid a loop')
-            seen.append(cursor)
+            seen.append(state)
             kwargs['cursor'] = cursor
+            for pair in self.pagination['extras']:
+                if pair[1] in container:
+                    kwargs[pair[0]] = container[pair[1]]
+                else:
+                    kwargs.pop(pair[0], None)
         raise ToolError('pagination max_pages reached; narrow filters or increase max_pages')
 
 def help(tool):

@@ -126,8 +126,16 @@ pub fn generate(path: &str, description: &str, input: &Value, output: Option<&Va
     Stubs { brief, full }
 }
 
+#[derive(Debug, PartialEq, serde::Serialize)]
+pub struct Pagination {
+    pub items: Vec<String>,
+    pub cursor: Vec<String>,
+    pub optional: bool,
+    pub extras: Vec<[String; 2]>,
+}
+
 /// Item and cursor paths for an unambiguous cursor-paginated output envelope.
-pub fn pagination(input: &Value, output: Option<&Value>) -> Option<[Vec<String>; 2]> {
+pub fn pagination(input: &Value, output: Option<&Value>) -> Option<Pagination> {
     fn resolve<'a>(mut schema: &'a Value, root: &'a Value) -> Option<&'a Value> {
         for _ in 0..16 {
             let Some(reference) = schema.get("$ref").and_then(Value::as_str) else {
@@ -142,11 +150,13 @@ pub fn pagination(input: &Value, output: Option<&Value>) -> Option<[Vec<String>;
         root: &Value,
         path: &mut Vec<String>,
         depth: usize,
-    ) -> Option<[Vec<String>; 2]> {
+        inputs: &serde_json::Map<String, Value>,
+    ) -> Option<Pagination> {
         if depth > 8 {
             return None;
         }
-        let properties = resolve(schema, root)?.get("properties")?.as_object()?;
+        let schema = resolve(schema, root)?;
+        let properties = schema.get("properties")?.as_object()?;
         if let Some(cursor) = ["nextCursor", "next_cursor"]
             .into_iter()
             .find(|k| properties.contains_key(*k))
@@ -160,12 +170,31 @@ pub fn pagination(input: &Value, output: Option<&Value>) -> Option<[Vec<String>;
                 item_path.push((*items).clone());
                 let mut cursor_path = path.clone();
                 cursor_path.push(cursor.into());
-                return Some([item_path, cursor_path]);
+                let optional = !schema
+                    .get("required")
+                    .and_then(Value::as_array)
+                    .is_some_and(|keys| keys.iter().any(|key| key.as_str() == Some(cursor)));
+                let extras = inputs
+                    .keys()
+                    .filter(|key| key.starts_with("cursor_"))
+                    .filter_map(|key| {
+                        let output = format!("next_{key}");
+                        properties
+                            .contains_key(&output)
+                            .then(|| [key.clone(), output])
+                    })
+                    .collect();
+                return Some(Pagination {
+                    items: item_path,
+                    cursor: cursor_path,
+                    optional,
+                    extras,
+                });
             }
         }
         for (name, child) in properties {
             path.push(name.clone());
-            let found = find(child, root, path, depth + 1);
+            let found = find(child, root, path, depth + 1, inputs);
             path.pop();
             if found.is_some() {
                 return found;
@@ -173,9 +202,10 @@ pub fn pagination(input: &Value, output: Option<&Value>) -> Option<[Vec<String>;
         }
         None
     }
-    resolve(input, input)?.get("properties")?.get("cursor")?;
+    let inputs = resolve(input, input)?.get("properties")?.as_object()?;
+    inputs.get("cursor")?;
     let output = output?;
-    find(output, output, &mut Vec::new(), 0)
+    find(output, output, &mut Vec::new(), 0, inputs)
 }
 
 struct Generator<'a> {
@@ -350,10 +380,12 @@ mod tests {
             "$defs":{"Page":{"type":"object","properties":{"items":{"type":["array","null"],"items":{"type":"object"}},"nextCursor":{"type":["string","null"]}}}}});
         assert_eq!(
             pagination(&input, Some(&output)),
-            Some([
-                vec!["data".into(), "items".into()],
-                vec!["data".into(), "nextCursor".into()]
-            ])
+            Some(Pagination {
+                items: vec!["data".into(), "items".into()],
+                cursor: vec!["data".into(), "nextCursor".into()],
+                optional: true,
+                extras: vec![]
+            })
         );
         assert!(pagination(&json!({}), Some(&output)).is_none());
         assert!(pagination(&input, None).is_none());
@@ -363,7 +395,12 @@ mod tests {
         let snake = json!({"properties":{"entries":{"items":{}},"next_cursor":{}}});
         assert_eq!(
             pagination(&input, Some(&snake)),
-            Some([vec!["entries".into()], vec!["next_cursor".into()]])
+            Some(Pagination {
+                items: vec!["entries".into()],
+                cursor: vec!["next_cursor".into()],
+                optional: true,
+                extras: vec![]
+            })
         );
     }
 

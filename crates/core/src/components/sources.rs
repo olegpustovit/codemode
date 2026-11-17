@@ -275,16 +275,30 @@ impl Sources {
         timeout: Duration,
         workspace: Uuid,
     ) -> (u32, crate::infrastructure::sandbox::CallResult) {
-        let tool = match self.lookup(&call.path).await {
-            Some(tool) => Ok(tool),
-            None if matches!(
-                call.path.as_str(),
-                super::broker::SEARCH_PATH | super::broker::MEMO_PATH
-            ) =>
-            {
-                Err(String::new())
+        let tool = if call.path == super::broker::UNKNOWN_PATH {
+            #[derive(serde::Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct Lookup {
+                path: String,
             }
-            None => Err(self.unknown(&call.path, workspace).await),
+            match serde_json::from_str::<Lookup>(call.args.get()) {
+                Ok(input) if !input.path.is_empty() && input.path.len() <= 1024 => {
+                    Err(self.unknown(&input.path, workspace).await)
+                }
+                _ => Err("unknown-tool lookup requires a path of 1–1024 bytes".into()),
+            }
+        } else {
+            match self.lookup(&call.path).await {
+                Some(tool) => Ok(tool),
+                None if matches!(
+                    call.path.as_str(),
+                    super::broker::SEARCH_PATH | super::broker::MEMO_PATH
+                ) =>
+                {
+                    Err(String::new())
+                }
+                None => Err(self.unknown(&call.path, workspace).await),
+            }
         };
         self.broker
             .dispatch(execution, seq, call, tool, timeout, workspace)
@@ -330,9 +344,12 @@ impl Sources {
             }
         }
         let mut code = String::from(include_str!("sources/prelude.py"));
+        code.push_str("\n_sources = {}\n");
         for (source, tools) in &groups {
             code.push_str(&format!(
-                "class _Source_{source}:\n    def __init__(self):\n"
+                "_sources[{}] = _source_proxy({})\n",
+                stubs::quote(source),
+                stubs::quote(source)
             ));
             for tool in tools {
                 let name = tool
@@ -371,36 +388,29 @@ impl Sources {
                     &tool.definition.input_schema,
                     tool.definition.output_schema.as_ref(),
                 )
-                .map(|paths| serde_json::to_string(&paths).unwrap_or_else(|_| "None".into()))
+                .map(|paths| {
+                    format!(
+                        "json.loads({})",
+                        stubs::quote(&serde_json::to_string(&paths).unwrap_or_default())
+                    )
+                })
                 .unwrap_or_else(|| "None".into());
                 code.push_str(&format!(
-                    "        self.{name} = _Tool({}, {aliases}, {}, {pagination})\n",
+                    "_sources[{}].{name} = _Tool({}, {aliases}, {}, {pagination})\n",
+                    stubs::quote(source),
                     stubs::quote(&tool.definition.path),
                     stubs::quote(&full)
                 ));
             }
-            if *source == "search" {
-                code.push_str(
-                    "    async def __call__(self, query):\n        return await _search(query)\n",
-                );
-            }
         }
-        code.push_str("class _Tools:\n    async def search(self, query):\n        return await _search(query)\n    def __init__(self):\n");
-        if groups.is_empty() {
-            code.push_str("        pass\n");
-        }
+        code.push_str("tools = _source_proxy('')\ntools.search = _search\n");
         for source in groups.keys() {
-            code.push_str(&format!("        self.{source} = _Source_{source}()\n"));
+            code.push_str(&format!(
+                "tools.{source} = _sources[{}]\n",
+                stubs::quote(source)
+            ));
         }
-        code.push_str("tools = _Tools()\n");
         Ok(code)
-    }
-
-    pub(crate) async fn explain_error(&self, message: String, workspace: Uuid) -> String {
-        if let Some(path) = missing_tool_path(&message) {
-            return format!("{message}\n{}", self.unknown(&path, workspace).await);
-        }
-        message
     }
 
     pub async fn unknown(&self, path: &str, workspace: Uuid) -> String {
@@ -430,6 +440,9 @@ impl Sources {
             .iter()
             .filter(|p| p.split_once('.').is_some_and(|(name, _)| name == source))
             .collect::<Vec<_>>();
+        if candidates.is_empty() {
+            candidates = paths.iter().collect();
+        }
         candidates
             .sort_by_cached_key(|candidate| (name_distance(path, candidate), (*candidate).clone()));
         let matches = candidates.into_iter().take(3).cloned().collect::<Vec<_>>();
@@ -769,18 +782,6 @@ impl Sources {
     }
 }
 
-fn missing_tool_path(message: &str) -> Option<String> {
-    let rest = message.strip_prefix("AttributeError: '_Source_")?;
-    let (source, rest) = rest.split_once("' object has no attribute '")?;
-    let (name, _) = rest.split_once('\'')?;
-    if [source, name].iter().any(|part| {
-        part.is_empty() || !part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
-    }) {
-        return None;
-    }
-    Some(format!("{source}.{name}"))
-}
-
 fn name_distance(left: &str, right: &str) -> usize {
     // Tool paths are ASCII identifiers; bound work even for an untrusted callback path.
     let left = &left.as_bytes()[..left.len().min(256)];
@@ -808,13 +809,6 @@ mod tests {
             super::name_distance("nudge.list_issue", "nudge.list_issues"),
             1
         );
-        assert_eq!(
-            super::missing_tool_path(
-                "AttributeError: '_Source_nudge' object has no attribute 'list_issue' (execution.py line 4)"
-            ),
-            Some("nudge.list_issue".into())
-        );
-        assert_eq!(super::missing_tool_path("unrelated error"), None);
         assert_eq!(super::name_distance("abc", "axc"), 1);
         assert_eq!(super::name_distance("", "abc"), 3);
         assert_eq!(super::name_distance("same", "same"), 0);

@@ -25,6 +25,8 @@ export function TokenForm({ onDone }: { onDone: () => void }) {
   const [administration, setAdministration] = useState(false)
   const workspaces = useSuspenseQuery(workspacesQuery).data
   const cache = useQueryClient()
+  const serverName = administration ? "codemode-admin" : "codemode"
+  const resource = administration ? "/mcp-admin" : "/mcp"
   const create = useMutation({
     mutationFn: (form: FormData) =>
       write(
@@ -80,6 +82,25 @@ export function TokenForm({ onDone }: { onDone: () => void }) {
                 I saved it
               </Button>
             </div>
+            <p>
+              Set CODEMODE_TOKEN in your agent's secret environment to the token
+              above, then connect Codex:
+            </p>
+            <pre className="code-panel">
+              <code>{`codex mcp add ${serverName} --url https://codemode.microapps.space${resource} --bearer-token-env-var CODEMODE_TOKEN`}</code>
+            </pre>
+            <p>
+              In the existing <code>{`[mcp_servers.${serverName}]`}</code>{" "}
+              section of <code>~/.codex/config.toml</code>, add:
+            </p>
+            <pre className="code-panel">
+              <code>{'default_tools_approval_mode = "approve"'}</code>
+            </pre>
+            <p>
+              If ChatGPT connectors cover the same apps, set{" "}
+              <code>apps = false</code> in the existing <code>[features]</code>{" "}
+              section, or disconnect duplicate connectors.
+            </p>
           </AlertDescription>
         </Alert>
       ) : (
@@ -106,6 +127,7 @@ export function TokenForm({ onDone }: { onDone: () => void }) {
               <FieldLabel htmlFor="token-access">Access</FieldLabel>
               <NativeSelect
                 id="token-access"
+                disabled={create.isPending}
                 value={administration ? "admin" : "mcp"}
                 onChange={(event) =>
                   setAdministration(event.target.value === "admin")

@@ -1,6 +1,7 @@
 mod http;
 pub(crate) const SEARCH_PATH: &str = "@codemode/search";
 pub(crate) const MEMO_PATH: &str = "@codemode/memo";
+pub(crate) const UNKNOWN_PATH: &str = "@codemode/unknown";
 use super::{
     accounts::Accounts,
     catalogue::Definition,
@@ -178,6 +179,11 @@ impl Broker {
             );
         };
         let result = match args {
+            Ok(_) if call.path == UNKNOWN_PATH => {
+                Err(CallError::Invalid(tool.err().unwrap_or_else(|| {
+                    "unknown-tool lookup unavailable".into()
+                })))
+            }
             Ok(args) if call.path == SEARCH_PATH => self.search(args, workspace).await,
             Ok(args) if call.path == MEMO_PATH => {
                 match serde_json::from_value::<super::agent_sessions::memo::Request>(args) {

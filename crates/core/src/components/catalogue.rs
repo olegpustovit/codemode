@@ -76,7 +76,11 @@ impl Catalogue {
         let rows = sqlx::query_as!(ManifestTool, r#"WITH visible AS (
             SELECT COALESCE(s.python_name,s.slug) AS source,t.path,
             count(t.path) OVER(PARTITION BY s.id) AS total,
-            row_number() OVER(PARTITION BY s.id ORDER BY t.path) AS position,
+            row_number() OVER(PARTITION BY s.id ORDER BY CASE
+                WHEN t.upstream_name IN ('artifact_list','entries_list','list_issues') THEN 0
+                WHEN t.upstream_name IN ('artifact_read','doc_create','list_teams','accounts_list','get_issue') THEN 1
+                WHEN t.upstream_name IN ('list_issue_statuses','entry_post','tags_set','create_issue') THEN 2
+                ELSE 3 END,t.path) AS position,
             EXISTS(SELECT 1 FROM tool_policies p WHERE p.endpoint_id=e.id AND p.source_id=s.id AND p.upstream_name=t.upstream_name AND p.action='block') AS blocked
             FROM sources s JOIN endpoints e ON e.id=$1 AND e.tenant_id=s.tenant_id
             LEFT JOIN tools t ON t.source_id=s.id AND (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=s.id AND scope.upstream_name=t.upstream_name))

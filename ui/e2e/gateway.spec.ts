@@ -545,6 +545,19 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await page.getByRole("button", { name: "Create token", exact: true }).click()
   const token = await page.getByLabel("New access token").inputValue()
   expect(token).toMatch(/^cm_/)
+  await expect(
+    page
+      .locator(".code-panel")
+      .filter({ hasText: "codex mcp add codemode --url" })
+  ).toContainText(
+    "https://codemode.microapps.space/mcp --bearer-token-env-var CODEMODE_TOKEN"
+  )
+  await expect(
+    page.getByText('default_tools_approval_mode = "approve"', { exact: true })
+  ).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
   await page.getByRole("button", { name: "I saved it" }).click()
   await expect(page.getByLabel("New access token")).toHaveCount(0)
   await page.reload()
@@ -970,7 +983,9 @@ test("OpenAPI: add YAML document, pin the server, link a header key and execute 
     await page.reload()
     await expect(readSwitch).toHaveAttribute("aria-checked", "false")
     const blocked = await invoke("search", { query: "listItems" })
-    expect(JSON.parse(blocked.content[0].text).tools).toHaveLength(0)
+    const blockedTools = JSON.parse(blocked.content[0].text).tools
+    expect(blockedTools).toHaveLength(1)
+    expect(blockedTools[0].blocked).toBe(true)
     await capture(page, "tool-policies.png")
     await readRow.click()
     const reset = page
@@ -1659,6 +1674,13 @@ test("workspace bookmarks, preset connection and separate administration authori
     .fill("Management browser check")
   await page.getByRole("button", { name: "Create token", exact: true }).click()
   const token = await page.getByLabel("New access token").inputValue()
+  await expect(
+    page
+      .locator(".code-panel")
+      .filter({ hasText: "codex mcp add codemode-admin" })
+  ).toContainText(
+    "https://codemode.microapps.space/mcp-admin --bearer-token-env-var CODEMODE_TOKEN"
+  )
   const rpc = async (resource: string, method: string, params: object) => {
     const response = await page.request.post(`${loopback}${resource}`, {
       headers: {

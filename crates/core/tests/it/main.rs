@@ -54,7 +54,7 @@ async fn database(pool: &sqlx::PgPool) -> Database {
     let db = Database::connect(pool.connect_options().to_url_lossy().as_str())
         .await
         .unwrap();
-    assert_eq!(db.schema_version(), 23);
+    assert_eq!(db.schema_version(), 24);
     db
 }
 
@@ -362,3 +362,44 @@ mod remote;
 mod stdio;
 
 mod pool;
+
+#[sqlx::test(migrations = "./migrations")]
+async fn discovery_manifest_prioritizes_useful_entry_points_over_alphabetical_noise(
+    pool: sqlx::PgPool,
+) {
+    let db = database(&pool).await;
+    let workspaces =
+        codemode_core::components::workspaces::Workspaces::new(db.clone(), "test.example".into())
+            .unwrap();
+    workspaces.initialize().await.unwrap();
+    let workspace = workspaces.default_id().await.unwrap();
+    let source: Uuid = sqlx::query_scalar("INSERT INTO sources(slug,python_name,kind,config) VALUES('nudge','nudge','mcp_http','{}') RETURNING id").fetch_one(&pool).await.unwrap();
+    let names = [
+        "aaa0",
+        "aaa1",
+        "aaa2",
+        "aaa3",
+        "aaa4",
+        "aaa5",
+        "list_issues",
+    ];
+    let definitions: Vec<_> = names
+        .into_iter()
+        .map(|name| Definition {
+            upstream_name: name.into(),
+            path: format!("nudge.{name}"),
+            description: name.into(),
+            input_schema: serde_json::json!({"type":"object"}),
+            output_schema: None,
+            read_only: true,
+            destructive: false,
+        })
+        .collect();
+    let catalogue = Catalogue::new(db);
+    catalogue.replace(source, &definitions, 0).await.unwrap();
+    let manifest = catalogue.manifest(workspace).await.unwrap();
+    assert!(manifest.contains("list_issues"));
+    assert!(manifest.contains("7 tools"));
+    assert!(!manifest.contains("aaa5"));
+    assert!(manifest.len() <= 1536);
+}

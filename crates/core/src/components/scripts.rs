@@ -1,3 +1,4 @@
+mod recipes;
 use crate::infrastructure::postgres::{Database, Error as DbError};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -56,6 +57,7 @@ impl Scripts {
         Self { db }
     }
     pub async fn list(&self, endpoint: Uuid) -> Result<Vec<Summary>, Error> {
+        self.install_recipes(endpoint).await?;
         Ok(sqlx::query_as!(Summary,r#"SELECT id,name,description,revision,to_char(updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "updated_at!" FROM saved_scripts WHERE endpoint_id=$1 ORDER BY name,id"#,endpoint).fetch_all(&self.db.0).await.map_err(DbError::from)?)
     }
     pub async fn get(&self, endpoint: Uuid, id: Uuid) -> Result<Script, Error> {
@@ -75,6 +77,7 @@ impl Scripts {
         if query.len() > 1024 {
             return Err(Error::Invalid);
         }
+        self.install_recipes(workspace).await?;
         Ok(sqlx::query_as!(Match,"SELECT s.id,s.name,s.description FROM saved_scripts s JOIN endpoints e ON e.id=s.endpoint_id WHERE e.id=$1 AND ($2='' OR s.search @@ websearch_to_tsquery('simple',$2)) ORDER BY ts_rank(s.search,websearch_to_tsquery('simple',$2)) DESC,s.name,s.id LIMIT 20",workspace,query).fetch_all(&self.db.0).await.map_err(DbError::from)?)
     }
     pub async fn code_for(&self, workspace: Uuid, id: Uuid) -> Result<String, Error> {

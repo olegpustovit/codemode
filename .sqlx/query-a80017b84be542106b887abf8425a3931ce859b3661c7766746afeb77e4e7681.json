@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO saved_scripts(endpoint_id,name,description,code) VALUES($1,$2,$3,$4) ON CONFLICT(endpoint_id,name) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a80017b84be542106b887abf8425a3931ce859b3661c7766746afeb77e4e7681"
+}

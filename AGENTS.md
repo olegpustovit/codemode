@@ -6,7 +6,7 @@ Implementation plan: https://artifacts.microapps.space/a/saqdh2xm7jcd (revision 
 
 ## Active replacement proposal
 
-The owner requested full implementation of https://artifacts.microapps.space/a/npta97dqvf6a. This work is active on `codex/agent-efficiency`; its scope, native checkpoints and remaining requirements are in `docs/agent-efficiency/implementation.md`. The feature branch adds schema 23 for a session-scoped memo. It is not yet merged, release-qualified or deployed; the production Status below remains historical deployment evidence.
+The owner requested full implementation of https://artifacts.microapps.space/a/npta97dqvf6a. This work is active on `codex/agent-efficiency`; its scope, native checkpoints and remaining requirements are in `docs/agent-efficiency/implementation.md`. The feature branch adds schema 23 for session memo and schema 24 for source-recipe installation receipts. It is not yet merged, release-qualified or deployed; the production Status below remains historical deployment evidence.
 
 The owner also requested full implementation of https://artifacts.microapps.space/a/jqm3ze7az66e. All twelve schema-20 fixes are implemented, qualified and deployed; exact scope and evidence are in `docs/control-plane-fixes/implementation.md`, the saved `proposal.html` and `docs/measurements/control-plane-fixes-qualification.json`.
 

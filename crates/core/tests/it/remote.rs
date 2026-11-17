@@ -161,7 +161,7 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
         stop.clone(),
         Default::default(),
     ));
-    let discovered = execution.execute(principal.clone(), "hits = await tools.search('echo')\nprint(help(tools.fixture.echo))\nreturn [hits[0]['path'], await tools.fixture.echo(value='inline'), await tools.search.echo(value='collision')]".into()).await.unwrap();
+    let discovered = execution.execute(principal.clone(), "hits = await tools.search(query='echo')\nprint(help(tools.fixture.echo))\nreturn [hits[0]['path'], await tools.fixture.echo(value='inline'), await tools.search.echo(value='collision')]".into()).await.unwrap();
     assert_eq!(discovered.status, "completed", "{:?}", discovered.error);
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(discovered.result.get()).unwrap(),
@@ -239,8 +239,44 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
             .error
             .as_deref()
             .unwrap()
-            .contains("did you mean: fixture.echo, fixture.fail")
+            .contains("did you mean: fixture.echo, fixture.fail"),
+        "{:?}",
+        unknown.error
     );
+    for code in [
+        "try:\n    await tools.fixture.ech(value='hello')\nexcept ToolError as e:\n    return str(e)",
+        "try:\n    missing = tools.fixture.ech\nexcept ToolError as e:\n    return str(e)",
+        "try:\n    await tools.search.ech(value='hello')\nexcept ToolError as e:\n    return str(e)",
+        "try:\n    await tools.typo.echo()\nexcept ToolError as e:\n    return str(e)",
+    ] {
+        let caught = execution
+            .execute(principal.clone(), code.into())
+            .await
+            .unwrap();
+        assert_eq!(caught.status, "completed", "{:?}", caught.error);
+        let message = serde_json::from_str::<String>(caught.result.get()).unwrap();
+        assert!(message.contains("did you mean:"), "{message}");
+        assert!(
+            message
+                .split("did you mean: ")
+                .nth(1)
+                .unwrap()
+                .split(", ")
+                .count()
+                <= 3
+        );
+        assert_eq!(caught.tool_calls, 1);
+    }
+    let namespace = execution
+        .execute(
+            principal.clone(),
+            "try:\n    await tools.fixture()\nexcept TypeError as e:\n    return str(e)".into(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(namespace.status, "completed", "{:?}", namespace.error);
+    assert!(namespace.result.get().contains("namespace"));
+    assert_eq!(namespace.tool_calls, 0);
     for (code, status, expected) in [
         (
             r#"try:
@@ -298,7 +334,7 @@ except ToolError:
     assert_eq!(
         outcomes,
         vec![
-            ("invalid_args".into(), 1),
+            ("invalid_args".into(), 6),
             ("ok".into(), 105),
             ("tool_error".into(), 2)
         ]

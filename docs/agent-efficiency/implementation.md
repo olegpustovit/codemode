@@ -197,3 +197,66 @@ existing test-unwrap warning policy; formatting and diff-whitespace checks pass.
 The SDK probe also established that host class types do not permit adding a new
 `__call__` class attribute from Python. A2 must use a supported host callable
 mechanism for the source named `search`, not that unsupported assignment.
+
+## Recipes, setup guidance and complete unknown-tool errors checkpoint
+
+- A2: source namespaces now use supported host-backed SDK objects. Both missing
+  method calls and bare attribute lookups become scoped, audited broker errors
+  with up to three nearest reachable tool names; Python can catch them as
+  `ToolError`. Root namespace typos and a source literally named `search` are
+  covered. Native source-call routing validates the host object UUID and query
+  shape. Only the inline-search result uses native JSON conversion; ordinary
+  upstream results keep their raw JSON pass-through path. The previous uncaught
+  AttributeError text adapter is removed.
+- A3: the suspension allowance includes initialization of all 64 supported
+  sources plus the root namespace, without reducing the 100-call budget. Worker
+  callback identities, pending futures and synchronous/name-lookup replies stay
+  validated. A real-worker regression exercises all 65 namespace objects followed
+  by 100 successful sequential calls.
+- B5: live eval-only provider metadata exposed integer Moneybag cursors, declared
+  date/amount sort companions and optional terminal cursors. Pagination now
+  follows those contracts and retains strict errors for missing required cursor
+  fields. The real-worker regression checks an integer cursor, its sort companion
+  and an omitted final cursor. The schema reads were read-only.
+- B2: manifest samples prioritize the proposal's useful discovery entry points
+  (such as list_issues and entries_list), rather than allowing alphabetical create
+  methods to crowd them out. A database regression verifies this within the
+  unchanged 1536-byte manifest budget.
+- C3: supported canonical Nudge and Moneybag sources receive workspace-scoped
+  starter scripts on script discovery/listing. Installation requires the expected
+  tool/schema contracts and honors tool scope and the existing 128-script quota.
+  Migration 0024 records installation, so edits remain edited, deletions remain
+  deleted, and matching custom scripts are never overwritten. New receipts are
+  RLS-protected and cascade with source/workspace removal.
+- The Nudge recipe resolves a team key and ordinary status name, validates its
+  arguments, then makes exactly one create call. The Moneybag recipe groups
+  matching-account postings by month and currency with exact integer/scale decimal
+  arithmetic, excluding balancing and similarly prefixed unrelated accounts.
+  Both use ordinary paginated broker calls and the existing execution limits.
+- D1: the one-time token receipt includes a verified `codex mcp add` command using
+  CODEMODE_TOKEN, the matching /mcp or /mcp-admin URL and server name, approval
+  configuration instructions, and duplicate-connector guidance. Token values are
+  not inserted into commands. Existing UI components and code-panel styles are
+  reused; access selection is disabled while creation is pending.
+
+The **152-case native workspace suite passes**, 45.81 s including 33.68 s build;
+slowest case 2.342 s. The subsequent manifest-priority regression also passes
+(0.192 s). The four focused recipe cases pass, including worker execution and
+PostgreSQL idempotence, edit/deletion preservation, quota and tenant/RLS checks.
+Current Clippy completes in 8.47 s with the repository warning set; formatting and
+whitespace checks pass. Offline SQL metadata was regenerated on disposable
+PostgreSQL through ordinary startup migrations.
+
+Frontend typecheck and lint pass (existing three shared-component warnings),
+**34/34 Vitest tests pass**, and two focused actual-binary Chromium workflows pass
+in 42.0 s, including token receipt setup, mobile overflow and separate management
+resource authorization. The staged UI fingerprint is **4fe138fb8eae**, with initial
+JS 160473 B and CSS 15757 B gzip, lazy chunks within 100 KB. These browser checks
+preceded the final source-namespace adapter; they are a UI checkpoint, not final
+combined-artifact acceptance.
+
+All named application features now have local implementation and regression
+coverage. Still required before claiming delivery: the requested E1–E7 experiments
+and metric gates; final native/slow/Oracle/hardened/UI/optimized-browser checks;
+merge; gated deployment and public runtime verification. Production remains
+unchanged. Functional tests do not prove the token/time targets.

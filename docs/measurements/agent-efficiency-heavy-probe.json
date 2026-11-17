@@ -1,0 +1,162 @@
+{
+  "stamp": "20261117T163315Z",
+  "model": "codex default",
+  "repeats": 1,
+  "jobs": 2,
+  "client": "codex",
+  "client_version": "codex-cli 0.169.0",
+  "harness_commit": "ef6ddb06aeb9d58c22c5259f70272d465045cdbf",
+  "harness_dirty": false,
+  "candidate_binary_sha256": "22b904d0c2ec0c1bc204e9c877133ffc8803cdb3bdeec3ec61629675466e6152",
+  "arms": [
+    "codemode",
+    "direct"
+  ],
+  "manifest_placement": "both",
+  "playbook": "on",
+  "tool_deferral": "default",
+  "inline_search": "on",
+  "pack": "heavy",
+  "rows": [
+    {
+      "task": "heavy-moneybag-1",
+      "tags": [
+        "read",
+        "heavy"
+      ],
+      "arm": "codemode",
+      "repeat": 0,
+      "run": "0c7e0c",
+      "pass": true,
+      "detail": "live 1000-row moneybag aggregate matches=True",
+      "exit": 0,
+      "wall_s": 17.7,
+      "usage": {
+        "input_tokens": 47004,
+        "cached_input_tokens": 42240,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 427,
+        "reasoning_output_tokens": 0
+      },
+      "mcp_calls": 2,
+      "execute_calls": 2,
+      "execute_errors": 0,
+      "pre_execute_calls": 0,
+      "search_result_bytes": [],
+      "found_mcp": true,
+      "search_calls": 0,
+      "tool_errors": 0,
+      "result_bytes": 3820,
+      "shell_commands": 0,
+      "answer": "{\"groups\":91,\"extra_entries\":182}",
+      "teardown_error": null,
+      "contaminated": [],
+      "http_429": 0
+    },
+    {
+      "task": "heavy-moneybag-1",
+      "tags": [
+        "read",
+        "heavy"
+      ],
+      "arm": "direct",
+      "repeat": 0,
+      "run": "538771",
+      "pass": true,
+      "detail": "live 1000-row moneybag aggregate matches=True",
+      "exit": 0,
+      "wall_s": 21.4,
+      "usage": {
+        "input_tokens": 97544,
+        "cached_input_tokens": 46592,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 570,
+        "reasoning_output_tokens": 0
+      },
+      "mcp_calls": 2,
+      "execute_calls": 0,
+      "execute_errors": 0,
+      "pre_execute_calls": 2,
+      "search_result_bytes": [],
+      "found_mcp": true,
+      "search_calls": 0,
+      "tool_errors": 0,
+      "result_bytes": 1118806,
+      "shell_commands": 0,
+      "answer": "{\"groups\":91,\"extra_entries\":182}",
+      "teardown_error": null,
+      "contaminated": [],
+      "http_429": 0
+    },
+    {
+      "task": "heavy-nudge-1",
+      "tags": [
+        "read",
+        "heavy"
+      ],
+      "arm": "codemode",
+      "repeat": 0,
+      "run": "6163db",
+      "pass": true,
+      "detail": "live 1000-row nudge aggregate matches=True",
+      "exit": 0,
+      "wall_s": 26.0,
+      "usage": {
+        "input_tokens": 78651,
+        "cached_input_tokens": 65408,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 538,
+        "reasoning_output_tokens": 0
+      },
+      "mcp_calls": 4,
+      "execute_calls": 4,
+      "execute_errors": 0,
+      "pre_execute_calls": 0,
+      "search_result_bytes": [],
+      "found_mcp": true,
+      "search_calls": 0,
+      "tool_errors": 0,
+      "result_bytes": 5762,
+      "shell_commands": 0,
+      "answer": "{\"R0\":3709,\"R1\":3905,\"R2\":3804,\"R3\":3911,\"R4\":3842,\"R5\":3810,\"R6\":4004}",
+      "teardown_error": null,
+      "contaminated": [],
+      "http_429": 0
+    },
+    {
+      "task": "heavy-nudge-1",
+      "tags": [
+        "read",
+        "heavy"
+      ],
+      "arm": "direct",
+      "repeat": 0,
+      "run": "77d4e3",
+      "pass": true,
+      "detail": "live 1000-row nudge aggregate matches=True",
+      "exit": 0,
+      "wall_s": 27.7,
+      "usage": {
+        "input_tokens": 59949,
+        "cached_input_tokens": 51840,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 589,
+        "reasoning_output_tokens": 0
+      },
+      "mcp_calls": 13,
+      "execute_calls": 0,
+      "execute_errors": 0,
+      "pre_execute_calls": 13,
+      "search_result_bytes": [],
+      "found_mcp": true,
+      "search_calls": 0,
+      "tool_errors": 0,
+      "result_bytes": 1404819,
+      "shell_commands": 0,
+      "answer": "{\"R0\":3709,\"R1\":3905,\"R2\":3804,\"R3\":3911,\"R4\":3842,\"R5\":3810,\"R6\":4004}",
+      "teardown_error": null,
+      "contaminated": [],
+      "http_429": 0
+    }
+  ]
+}

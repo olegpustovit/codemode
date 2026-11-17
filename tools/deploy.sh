@@ -171,3 +171,23 @@ fi
 echo 'Deployment failed its health check' >&2
 exit 1
 REMOTE
+# Opt-in eval gate (proposal step 9): CODEMODE_EVAL_GATE=../codemode-evals tools/deploy.sh
+# The evals run against the live build; a failure restores the .prev bundle kept by the remote step.
+if [[ -n "${CODEMODE_EVAL_GATE:-}" ]]; then
+  if python3 "$CODEMODE_EVAL_GATE/evals/gate.py"; then
+    echo '{"evalGate": "passed"}'
+  else
+    ssh oracle-vm bash -s <<'ROLLBACK'
+set -euo pipefail
+cd /home/snowbear/.local/share/codemode
+for f in codemode monty worker.sh worker.bpf worker-guard.py; do
+  if [[ -f bin/$f.prev ]]; then cp "bin/$f.prev" "bin/$f"; fi
+done
+smdctl restart codemode
+sleep 3
+curl --fail --silent http://127.0.0.1:2093/healthz
+ROLLBACK
+    echo 'Eval gate failed; previous release restored' >&2
+    exit 1
+  fi
+fi

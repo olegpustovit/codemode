@@ -22,7 +22,7 @@ impl Sessions {
         self.resolve_identity_account(subject, email, false).await
     }
 
-    /// Accept only SDK-verified claims; new accounts retain the local signup allowlist.
+    /// Accept only SDK-verified claims; new identities receive private nonadmin tenants.
     pub async fn resolve_identity(
         &self,
         subject: &str,

@@ -101,10 +101,18 @@ fn build_configuration(
 
 pub struct App {
     sessions: Sessions,
+    access: codemode_core::components::access::Access,
 }
 impl App {
     pub fn new(sessions: Sessions) -> Self {
-        Self { sessions }
+        Self {
+            sessions,
+            access: Default::default(),
+        }
+    }
+    pub fn with_access(mut self, access: codemode_core::components::access::Access) -> Self {
+        self.access = access;
+        self
     }
 }
 impl Application for App {
@@ -113,6 +121,10 @@ impl Application for App {
         if !claims.email_verified {
             return Err(AppError::Denied);
         }
+        self.access
+            .subject_fresh(&claims.subject)
+            .await
+            .map_err(access_error)?;
         self.sessions
             .resolve_identity(&claims.subject, &claims.email)
             .await
@@ -124,6 +136,10 @@ impl Application for App {
         subject: String,
         request: Parts,
     ) -> Result<Vec<HeaderValue>, AppError> {
+        self.access
+            .subject_fresh(&subject)
+            .await
+            .map_err(access_error)?;
         let previous = crate::admin::cookie(&request.headers, true);
         let token = self
             .sessions
@@ -152,6 +168,12 @@ impl Application for App {
         )])
     }
 }
+fn access_error(error: codemode_core::components::access::Error) -> AppError {
+    match error {
+        codemode_core::components::access::Error::Denied => AppError::Denied,
+        codemode_core::components::access::Error::Unavailable => AppError::Unavailable,
+    }
+}
 fn resolve_error(error: IdentityError) -> AppError {
     match error {
         IdentityError::Database(error) => {
@@ -171,8 +193,9 @@ pub async fn router(
     config: idclient::Config,
     sessions: Sessions,
     hostname: String,
+    access: codemode_core::components::access::Access,
 ) -> anyhow::Result<Router> {
-    let client = idclient::Client::new(config, App::new(sessions)).await?;
+    let client = idclient::Client::new(config, App::new(sessions).with_access(access)).await?;
     Ok(client.routes().layer(middleware::from_fn_with_state(
         Boundary {
             hostname,

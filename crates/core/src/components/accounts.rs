@@ -17,6 +17,8 @@ pub use rest::HttpCredential;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    Access(#[from] super::access::Error),
     #[error("credential encryption is not configured")]
     Disabled,
     #[error("invalid credential or encryption key identifier")]
@@ -43,6 +45,7 @@ pub enum Error {
 
 #[derive(Clone)]
 pub struct Accounts {
+    access: super::access::Access,
     db: Database,
     key: Option<std::sync::Arc<SecretBox<[u8; 32]>>>,
     key_id: String,
@@ -60,6 +63,13 @@ pub struct Account {
 }
 
 impl Accounts {
+    pub fn with_access(mut self, access: super::access::Access) -> Self {
+        self.access = access;
+        self
+    }
+    pub(crate) async fn source_access(&self, source: Uuid) -> Result<super::access::Watch, Error> {
+        self.access.source_watch(source).await.map_err(Error::from)
+    }
     pub fn with_database(&self, db: Database) -> Self {
         Self { db, ..self.clone() }
     }
@@ -74,6 +84,7 @@ impl Accounts {
             return Err(Error::Invalid);
         }
         Ok(Self {
+            access: Default::default(),
             db,
             key: key.map(|k| std::sync::Arc::new(SecretBox::new(Box::new(k)))),
             key_id,

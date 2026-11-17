@@ -37,6 +37,7 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
         .await
         .unwrap();
     let state = State {
+        access: Default::default(),
         agent_sessions: codemode_core::components::agent_sessions::AgentSessions::new(db.clone()),
         scripts: codemode_core::components::scripts::Scripts::new(db.clone()),
         oauth: Arc::new(codemode_core::components::auth::oauth::OAuth::new(
@@ -626,6 +627,7 @@ async fn identity_browser_mode_closes_password_routes_and_isolates_cookies_and_l
         .await
         .unwrap();
     let state = State {
+        access: Default::default(),
         agent_sessions: codemode_core::components::agent_sessions::AgentSessions::new(db.clone()),
         scripts: codemode_core::components::scripts::Scripts::new(db.clone()),
         oauth: Arc::new(codemode_core::components::auth::oauth::OAuth::new(
@@ -683,6 +685,7 @@ async fn identity_browser_mode_closes_password_routes_and_isolates_cookies_and_l
         );
     }
     let rollback = router(State {
+        access: Default::default(),
         identity_enabled: false,
         ..state
     });

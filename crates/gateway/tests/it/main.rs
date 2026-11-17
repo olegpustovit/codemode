@@ -1,3 +1,6 @@
+#[path = "../../src/access.rs"]
+mod access;
+mod access_enforcement;
 #[path = "../../src/admin.rs"]
 mod admin;
 mod authorization;

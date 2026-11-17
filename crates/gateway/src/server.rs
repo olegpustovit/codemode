@@ -33,6 +33,7 @@ use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct State {
+    pub access: codemode_core::components::access::Access,
     pub mcp_tasks: Tasks,
     pub db: Database,
     pub rate_limit: Arc<codemode_core::components::auth::rate_limit::RateLimiter>,
@@ -212,25 +213,32 @@ impl ServerHandler for Gateway {
                 .is_some_and(|caps| caps.supports_tasks());
         if capable && request.name.as_ref() == "execute" {
             let principal = principal(&context)?;
+            let tenant = principal.tenant_id;
             // A task outlives its originating HTTP request; its SDK cancellation still drops the execution future.
             context.ct = self.state.stop.child_token();
             let gateway = self.clone();
             let task = self.state.mcp_tasks.spawn(&principal, move |task| Box::pin(async move {
                 let router = Self::tool_router();
-                tokio::select! {
+                gateway.state.access.run(tenant, async { tokio::select! {
                     biased;
                     _ = task.cancelled() => Err(TaskExit::Cancelled),
                     result = router.call(ToolCallContext::new(&gateway, request, context)) => match result? {
                         CallToolResponse::Complete(result) => Ok(result),
                         _ => Err(rmcp::ErrorData::internal_error("unexpected nested tool response", None).into()),
                     }
-                }
+                }}).await.unwrap_or_else(|error| Err(rmcp::ErrorData::internal_error(error.to_string(), None).into()))
             }))?;
             Ok(CallToolResponse::Task(CreateTaskResult::new(task)))
         } else {
-            Self::tool_router()
-                .call(ToolCallContext::new(self, request, context))
+            let tenant = principal(&context)?.tenant_id;
+            self.state
+                .access
+                .run(
+                    tenant,
+                    Self::tool_router().call(ToolCallContext::new(self, request, context)),
+                )
                 .await
+                .map_err(|error| rmcp::ErrorData::internal_error(error.to_string(), None))?
         }
     }
     async fn get_task(
@@ -347,6 +355,7 @@ fn routes(state: State) -> Router {
             auth: state.auth.clone(),
             sessions: state.sessions.clone(),
             identity_enabled: state.identity_enabled,
+            access: state.access.clone(),
             accounts: state.accounts.clone(),
             sources: state.sources.clone(),
             hostname: state.hostname.clone(),
@@ -385,6 +394,7 @@ async fn health(AxumState(state): AxumState<State>) -> Response {
             "status":"ok",
             "build":option_env!("CODEMODE_BUILD_ID").unwrap_or("development"),
             "schemaVersion":state.db.schema_version(),
+            "identityAccessEnforced":state.access.enforced(),
         }))
         .into_response()
     } else {
@@ -458,6 +468,9 @@ pub(crate) async fn authenticate(
                 return next.run(request).await;
             }
             Err(error) => {
+                if let codemode_core::components::auth::Error::Access(error) = error {
+                    return crate::access::response(error);
+                }
                 tracing::error!(error=%error,"token authentication failed");
                 return (
                     StatusCode::SERVICE_UNAVAILABLE,

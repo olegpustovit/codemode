@@ -28,6 +28,7 @@ const CLEAR_COOKIE: &str =
 
 #[derive(Clone)]
 pub struct State {
+    pub access: codemode_core::components::access::Access,
     pub scripts: Scripts,
     pub log: log::Log,
     pub agent_sessions: AgentSessions,
@@ -173,10 +174,9 @@ impl From<sessions::Error> for ApiError {
                 StatusCode::TOO_MANY_REQUESTS,
                 "too many sign-in attempts; try again in one minute",
             ),
-            sessions::Error::NotAllowed => Self::Message(
-                StatusCode::FORBIDDEN,
-                "enter a valid email address",
-            ),
+            sessions::Error::NotAllowed => {
+                Self::Message(StatusCode::FORBIDDEN, "enter a valid email address")
+            }
             sessions::Error::Exists => Self::Message(
                 StatusCode::CONFLICT,
                 "email is already registered; sign in instead",
@@ -189,9 +189,31 @@ impl From<sessions::Error> for ApiError {
         }
     }
 }
+impl From<codemode_core::components::access::Error> for ApiError {
+    fn from(error: codemode_core::components::access::Error) -> Self {
+        match error {
+            codemode_core::components::access::Error::Denied => {
+                Self::Message(StatusCode::FORBIDDEN, "Microapps ID access denied")
+            }
+            codemode_core::components::access::Error::Unavailable => Self::Message(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Microapps ID access unavailable",
+            ),
+        }
+    }
+}
+impl From<codemode_core::components::auth::Error> for ApiError {
+    fn from(error: codemode_core::components::auth::Error) -> Self {
+        match error {
+            codemode_core::components::auth::Error::Access(error) => error.into(),
+            codemode_core::components::auth::Error::Database(error) => unavailable(error),
+        }
+    }
+}
 impl From<accounts::Error> for ApiError {
     fn from(error: accounts::Error) -> Self {
         match error {
+            accounts::Error::Access(error) => error.into(),
             accounts::Error::Invalid => {
                 Self::Message(StatusCode::BAD_REQUEST, "invalid credential")
             }
@@ -281,6 +303,7 @@ impl From<codemode_core::components::auth::oauth::Error> for ApiError {
     fn from(error: codemode_core::components::auth::oauth::Error) -> Self {
         use codemode_core::components::auth::oauth::Error;
         match error {
+            Error::Access(error) => error.into(),
             Error::Database(error) => unavailable(error),
             Error::Busy => Self::Message(
                 StatusCode::TOO_MANY_REQUESTS,
@@ -549,7 +572,9 @@ async fn require_session(
         return ApiError::Message(StatusCode::UNAUTHORIZED, "sign in required").into_response();
     };
     match browser_user(&state.sessions, state.identity_enabled, token).await {
-        Ok(Some(_)) => next.run(request).await,
+        Ok(Some(user)) => {
+            crate::access::request(&state.access, user.tenant_id, next.run(request)).await
+        }
         Ok(None) => ApiError::Message(StatusCode::UNAUTHORIZED, "sign in required").into_response(),
         Err(error) => unavailable(error).into_response(),
     }
@@ -570,6 +595,9 @@ async fn session(
             .map_err(unavailable)?,
         None => None,
     };
+    if let Some(user) = &user {
+        state.access.tenant(user.tenant_id, true).await?;
+    }
     Ok(Json(
         serde_json::json!({"authenticated":user.is_some(),"user":user,"firstUser":!state.identity_enabled && state.sessions.first_user().await?}),
     ))
@@ -706,7 +734,7 @@ async fn create_token(
             },
         )
         .await
-        .map_err(unavailable)?
+        .map_err(ApiError::from)?
         .ok_or(ApiError::Message(
             StatusCode::NOT_FOUND,
             "workspace not found",

@@ -42,6 +42,7 @@ async fn browser_upstream_linking_requires_its_session_and_exposes_only_account_
         .await
         .unwrap();
     let state = admin::State {
+        access: Default::default(),
         agent_sessions: codemode_core::components::agent_sessions::AgentSessions::new(db.clone()),
         scripts: codemode_core::components::scripts::Scripts::new(db.clone()),
         log: Log::new(db.clone()),

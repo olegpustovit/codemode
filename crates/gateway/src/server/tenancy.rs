@@ -38,7 +38,8 @@ impl Tenants {
             catalogue.clone(),
             accounts.clone(),
             endpoints.clone(),
-        );
+        )
+        .with_access(base.access.clone(), tenant);
         let stop = base.stop.child_token();
         let guard = stop.clone().drop_guard();
         let execution = Arc::new(
@@ -49,7 +50,7 @@ impl Tenants {
         tokio::time::timeout(std::time::Duration::from_secs(35), sources.ready()).await?;
         let state = State {
             db: db.clone(),
-            auth: Auth::new(db.clone()),
+            auth: Auth::new(db.clone()).with_access(base.access.clone()),
             catalogue,
             execution,
             accounts: Arc::new(accounts),
@@ -109,18 +110,28 @@ async fn select(
         Ok(None)
     };
     match tenant {
-        Ok(Some(tenant)) => match tenants.get(tenant).await {
-            Ok(router) => router
-                .oneshot(request)
-                .await
-                .unwrap_or_else(|never| match never {}),
-            Err(error) => {
-                tracing::error!(error=?error,"tenant initialization failed");
-                (StatusCode::SERVICE_UNAVAILABLE, "tenant unavailable").into_response()
-            }
-        },
+        Ok(Some(tenant)) => {
+            crate::access::request(&base.access, tenant, async {
+                match tenants.get(tenant).await {
+                    Ok(router) => router
+                        .oneshot(request)
+                        .await
+                        .unwrap_or_else(|never| match never {}),
+                    Err(error) => {
+                        tracing::error!(error=?error,"tenant initialization failed");
+                        (StatusCode::SERVICE_UNAVAILABLE, "tenant unavailable").into_response()
+                    }
+                }
+            })
+            .await
+        }
         Ok(None) => next.run(request).await,
         Err(error) => {
+            if let Some(codemode_core::components::auth::Error::Access(error)) =
+                error.downcast_ref::<codemode_core::components::auth::Error>()
+            {
+                return crate::access::response(*error);
+            }
             tracing::error!(error=?error,"tenant authentication failed");
             (
                 StatusCode::SERVICE_UNAVAILABLE,

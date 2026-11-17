@@ -68,9 +68,7 @@ async fn browser_login_attempts_are_bounded(pool: sqlx::PgPool) {
     let sessions = Sessions::new(database(&pool).await);
     for _ in 0..30 {
         assert!(matches!(
-            sessions
-                .register("not-an-email", "anything".into())
-                .await,
+            sessions.register("not-an-email", "anything".into()).await,
             Err(Error::NotAllowed)
         ));
     }

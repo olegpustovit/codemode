@@ -66,6 +66,10 @@ impl Administration {
         let Some(principal) = principal.filter(|p| p.resource == "/mcp-admin") else {
             return failure("administration authorization required");
         };
+        let mut lease = match self.state.access.watch(principal.tenant_id).await {
+            Ok(lease) => lease,
+            Err(error) => return failure(error.to_string()),
+        };
         let id = match self
             .log
             .start_administration(principal.token_id, name, args)
@@ -77,7 +81,11 @@ impl Administration {
                 return failure("audit unavailable; operation was not performed");
             }
         };
-        let result = operation.await;
+        let result = tokio::select! { biased;
+            error=lease.stopped()=>Err(format!("{error}; operations already sent upstream may have completed")),
+            result=operation=>result.map_err(|error| error.to_string()),
+        };
+        lease.close().await;
         if let Err(error) = self.log.finish_administration(id, result.is_ok()).await {
             tracing::error!(error=?error,"administration audit finalization failed");
             return failure(

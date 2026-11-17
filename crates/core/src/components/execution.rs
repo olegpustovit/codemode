@@ -15,6 +15,8 @@ use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    Access(#[from] super::access::Error),
     #[error("gateway busy: all execution slots are in use; try again later")]
     Busy,
     #[error("Python source exceeds 64 KB")]
@@ -63,6 +65,7 @@ impl Default for Limits {
 }
 
 pub struct Execution<S: Sandbox> {
+    access: super::access::Access,
     db: Database,
     sources: Sources,
     sandbox: Arc<S>,
@@ -82,6 +85,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         limits: Limits,
     ) -> Self {
         Self {
+            access: Default::default(),
             db,
             sources,
             sandbox,
@@ -93,6 +97,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
     }
     pub fn with_database(&self, db: Database, sources: Sources, stop: CancellationToken) -> Self {
         Self {
+            access: self.access.clone(),
             db,
             sources,
             sandbox: self.sandbox.clone(),
@@ -101,6 +106,10 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
             stop,
             limits: self.limits,
         }
+    }
+    pub fn with_access(mut self, access: super::access::Access) -> Self {
+        self.access = access;
+        self
     }
     pub fn start_sources(&self) {
         let sources = self.sources.clone();
@@ -144,6 +153,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         principal: Principal,
         code: String,
     ) -> Result<ResultValue, Error> {
+        let mut lease = self.access.watch(principal.tenant_id).await?;
         let permit = self
             .slots
             .clone()
@@ -159,9 +169,17 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                 .start(&principal, &code)
                 .await
             {
-                Ok(id) => Box::pin(this.segment(principal, id, code, cancel)).await,
+                Ok(id) => {
+                    let future = this.segment(principal, id, code, cancel.clone());
+                    tokio::pin!(future);
+                    tokio::select! { biased;
+                        _=lease.stopped()=>{ cancel.cancel(); future.await },
+                        result=&mut future=>result,
+                    }
+                }
                 Err(error) => Err(Error::Session(error)),
             };
+            lease.close().await;
             let _ = tx.send(result);
         });
         let result = rx.await.map_err(|_| Error::Stopped)?;

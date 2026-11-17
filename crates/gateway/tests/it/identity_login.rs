@@ -150,7 +150,7 @@ async fn identity_sdk_routes_discover_apply_host_origin_and_return_path_guards(p
         redirect_uri: "https://test.example/auth/callback".into(),
         cookie_key: Box::new([71; 32]).into(),
     };
-    let app = identity::router(config, sessions, "test.example".into())
+    let app = identity::router(config, sessions, "test.example".into(), Default::default())
         .await
         .unwrap();
     let send = |method: &str, path: &str, host: &str, origin: Option<&str>| {

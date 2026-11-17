@@ -17,6 +17,7 @@ path = "tests/isolation/main.rs"
 required-features = ["isolation-tests"]
 
 [dependencies]
+idclient.workspace = true
 apollo-parser.workspace = true
 argon2.workspace = true
 chacha20poly1305.workspace = true

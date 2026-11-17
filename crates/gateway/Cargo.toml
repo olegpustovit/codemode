@@ -10,7 +10,8 @@ name = "codemode"
 path = "src/main.rs"
 
 [dependencies]
-idclient.workspace = true
+futures-util.workspace = true
+idclient = { workspace = true, features = ["oidc"] }
 anyhow.workspace = true
 axum.workspace = true
 base64.workspace = true

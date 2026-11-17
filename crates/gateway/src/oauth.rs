@@ -202,6 +202,12 @@ fn decode_component(value: &str) -> Result<String, Error> {
 }
 fn failure(error: Error) -> Response {
     let (status, code) = match error {
+        Error::Access(codemode_core::components::access::Error::Denied) => {
+            (StatusCode::FORBIDDEN, "access_denied")
+        }
+        Error::Access(codemode_core::components::access::Error::Unavailable) => {
+            (StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable")
+        }
         Error::Database(error) => {
             tracing::error!(error=?error,"OAuth operation failed");
             (StatusCode::SERVICE_UNAVAILABLE, "server_error")

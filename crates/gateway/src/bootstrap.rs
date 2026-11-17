@@ -18,13 +18,35 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
     let db = Database::connect(config.database_url.expose_secret())
         .await
         .context("connect database and apply migrations")?;
-    let auth = Auth::new(db.clone());
+    let stop = CancellationToken::new();
+    let tasks = TaskTracker::new();
+    let access = if config.identity_access_enabled {
+        let identity = config
+            .identity
+            .as_ref()
+            .context("identity access requires ID configuration")?;
+        let client = idclient::AccessClient::new(
+            &identity.issuer,
+            identity.client_id.clone(),
+            identity
+                .client_secret
+                .clone()
+                .context("identity access requires confidential client")?,
+            Duration::from_secs(25),
+        )
+        .context("configure Microapps ID access")?;
+        codemode_core::components::access::Access::new(
+            db.clone(),
+            client,
+            stop.clone(),
+            tasks.clone(),
+        )
+    } else {
+        Default::default()
+    };
+    let auth = Auth::new(db.clone()).with_access(access.clone());
     let endpoints = Workspaces::new(db.clone(), config.hostname.clone())
         .context("configure workspace service")?;
-    endpoints
-        .initialize()
-        .await
-        .context("initialize main endpoint")?;
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args == ["password", "hash"] {
         let hash = tokio::task::spawn_blocking(|| {
@@ -74,6 +96,15 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         args.is_empty(),
         "usage: codemode [token create NAME | token list | token revoke UUID | password hash]"
     );
+    if !access.enforced() {
+        endpoints
+            .initialize()
+            .await
+            .context("initialize main endpoint")?;
+    }
+    // Under enforcement, a tenant's default workspace is initialized only after
+    // its owner's access check in tenancy::build. CLI listing/revocation and
+    // offline recovery never provision an ownerless workspace on their way out.
     let encryption_key = config
         .encryption_key
         .as_ref()
@@ -81,22 +112,26 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         .transpose()
         .context("CODEMODE_ENCRYPTION_KEY must contain 64 hex characters")?;
     let accounts = Accounts::new(db.clone(), encryption_key, config.encryption_key_id)
-        .context("configure linked-account encryption")?;
+        .context("configure linked-account encryption")?
+        .with_access(access.clone());
     let sessions = Sessions::new(db.clone());
     let identity_routes = match config.identity {
         Some(identity) => Some(
-            crate::identity::router(identity, sessions.clone(), config.hostname.clone())
-                .await
-                .context("configure Microapps ID login and discover issuer")?,
+            crate::identity::router(
+                identity,
+                sessions.clone(),
+                config.hostname.clone(),
+                access.clone(),
+            )
+            .await
+            .context("configure Microapps ID login and discover issuer")?,
         ),
         None => None,
     };
-    let stop = CancellationToken::new();
-    let tasks = TaskTracker::new();
-    let oauth = Arc::new(codemode_core::components::auth::oauth::OAuth::new(
-        db.clone(),
-        config.hostname.clone(),
-    ));
+    let oauth = Arc::new(
+        codemode_core::components::auth::oauth::OAuth::new(db.clone(), config.hostname.clone())
+            .with_access(access.clone()),
+    );
     let oauth_sweeper = oauth.clone();
     let session_sweeper = sessions.clone();
     let account_sweeper = accounts.clone();
@@ -134,10 +169,39 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         accounts.clone(),
         endpoints.clone(),
     );
-    sources
-        .import_file(&config.sources_file)
-        .await
-        .context("import initial sources")?;
+    if access.enforced() {
+        // Initial file imports belong to the bootstrap tenant's human owner.
+        // Retain the pending file when that owner is denied/unbound/offline;
+        // restoration retries without mutating or replacing existing sources.
+        let pending = sources.clone();
+        let path = config.sources_file.clone();
+        let eligibility = access.clone();
+        let finish = stop.clone();
+        tasks.spawn(async move {
+            loop {
+                match eligibility
+                    .run(uuid::Uuid::nil(), pending.import_file(&path))
+                    .await
+                {
+                    Ok(Ok(())) => return,
+                    Ok(Err(error)) => {
+                        tracing::error!(error=?error,"initial source import failed");
+                        return;
+                    }
+                    Err(_) => {}
+                }
+                tokio::select! { biased;
+                    _=finish.cancelled()=>return,
+                    _=tokio::time::sleep(Duration::from_secs(5))=>{},
+                }
+            }
+        });
+    } else {
+        sources
+            .import_file(&config.sources_file)
+            .await
+            .context("import initial sources")?;
+    }
     let sandbox = Arc::new(
         MontySandbox::new(
             &config.monty_bin,
@@ -147,14 +211,17 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         .await
         .context("start Monty worker pool")?,
     );
-    let execution = Arc::new(Execution::new(
-        db.clone(),
-        sources.clone(),
-        sandbox.clone(),
-        tasks.clone(),
-        stop.clone(),
-        config.execution_limits,
-    ));
+    let execution = Arc::new(
+        Execution::new(
+            db.clone(),
+            sources.clone(),
+            sandbox.clone(),
+            tasks.clone(),
+            stop.clone(),
+            config.execution_limits,
+        )
+        .with_access(access.clone()),
+    );
     execution
         .recover()
         .await
@@ -165,6 +232,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
     tracing::info!(address=%listener.local_addr()?,hostname=%config.hostname,"Codemode listening");
     let mcp_tasks = server::Tasks::default();
     let state = State {
+        access,
         mcp_tasks: mcp_tasks.clone(),
         rate_limit: Arc::new(
             codemode_core::components::auth::rate_limit::RateLimiter::new(

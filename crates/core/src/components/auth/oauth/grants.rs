@@ -94,6 +94,7 @@ impl OAuth {
         let consent = self.consent(request).await?;
         let client = self.client(&request.client_id).await?;
         let workspace = consent.workspace_id.ok_or(Error::Request)?;
+        self.access.workspace(workspace).await?;
         let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
         sqlx::query!(
             "SELECT id FROM endpoints WHERE id=$1 FOR KEY SHARE",
@@ -151,6 +152,7 @@ impl OAuth {
                 .await
                 .map_err(DbError::from)?
                 .ok_or(Error::Grant)?;
+                self.access.grant(grant).await?;
                 let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
                 let grant = lock_grant(&mut tx, grant, &auth.client_id, &request.resource).await?;
                 let code=sqlx::query!("SELECT redirect_uri,challenge,consumed_at IS NOT NULL AS \"consumed!\",expires_at>now() AS \"valid!\" FROM oauth_codes WHERE code_hash=$1",hash)
@@ -198,6 +200,7 @@ impl OAuth {
                 .await
                 .map_err(DbError::from)?
                 .ok_or(Error::Grant)?;
+                self.access.grant(grant).await?;
                 let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
                 let grant = lock_grant(&mut tx, grant, &auth.client_id, &request.resource).await?;
                 if !grant.refresh_allowed {

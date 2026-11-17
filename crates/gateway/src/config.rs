@@ -4,6 +4,7 @@ use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 pub struct Config {
     pub identity: Option<idclient::Config>,
+    pub identity_access_enabled: bool,
     pub bind: SocketAddr,
     pub hostname: String,
     pub database_url: secrecy::SecretString,
@@ -36,6 +37,10 @@ impl Config {
         }
         let config = Self {
             identity: crate::identity::configuration(&hostname)?,
+            identity_access_enabled: std::env::var("CODEMODE_ID_ACCESS_ENABLED")
+                .unwrap_or_else(|_| "false".into())
+                .parse()
+                .context("CODEMODE_ID_ACCESS_ENABLED must be true or false")?,
             bind: std::env::var("CODEMODE_BIND")
                 .unwrap_or_else(|_| "127.0.0.1:2093".into())
                 .parse()
@@ -80,6 +85,11 @@ impl Config {
         };
         if !config.bind.ip().is_loopback() {
             bail!("CODEMODE_BIND must use loopback; expose the gateway through Caddy");
+        }
+        if config.identity_access_enabled && config.identity.is_none() {
+            bail!(
+                "CODEMODE_ID_ACCESS_ENABLED requires CODEMODE_ID_ENABLED and its confidential client"
+            );
         }
         Ok(config)
     }

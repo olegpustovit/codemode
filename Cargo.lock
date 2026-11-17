@@ -475,6 +475,7 @@ dependencies = [
  "chacha20poly1305",
  "futures-util",
  "hmac 0.12.1",
+ "idclient",
  "jsonschema",
  "mimalloc",
  "monty-pool",
@@ -509,6 +510,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "codemode-core",
+ "futures-util",
  "idclient",
  "mimalloc",
  "reqwest",
@@ -1590,6 +1592,7 @@ dependencies = [
 [[package]]
 name = "idclient"
 version = "0.1.0"
+source = "git+ssh://git@github.com/olegpustovit/identity.git?rev=e6f5fc3c1bc6e00697bc517a5126a7b24983c0fe#e6f5fc3c1bc6e00697bc517a5126a7b24983c0fe"
 dependencies = [
  "arc-swap",
  "axum",

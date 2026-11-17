@@ -188,6 +188,8 @@ struct Connected {
 
 #[derive(Clone)]
 pub struct Sources {
+    access: super::access::Access,
+    tenant: Uuid,
     db: Database,
     catalogue: Catalogue,
     accounts: Accounts,
@@ -222,6 +224,8 @@ impl Sources {
     ) -> Self {
         let policies = super::policies::Policies::new(db.clone());
         Self {
+            access: Default::default(),
+            tenant: Uuid::nil(),
             broker: Broker::new(
                 db.clone(),
                 accounts.clone(),
@@ -396,7 +400,45 @@ impl Sources {
         format!("unknown tool {path}; available: {}", matches.join(", "))
     }
 
+    pub fn with_access(mut self, access: super::access::Access, tenant: Uuid) -> Self {
+        self.access = access;
+        self.tenant = tenant;
+        self
+    }
+
     pub async fn run(&self, stop: CancellationToken) {
+        if !self.access.enforced() {
+            self.run_epoch(stop).await;
+            return;
+        }
+        loop {
+            if stop.is_cancelled() {
+                return;
+            }
+            if let Ok(mut lease) = self.access.watch(self.tenant).await {
+                let epoch = stop.child_token();
+                let future = self.run_epoch(epoch.clone());
+                tokio::pin!(future);
+                tokio::select! { biased;
+                    _=stop.cancelled()=>{},
+                    _=lease.stopped()=>{},
+                    _=&mut future=>{ lease.close().await; return; },
+                }
+                epoch.cancel();
+                // Join source cleanup: close persistent HTTP/stdio transports,
+                // including clients still being synchronized, before retrying.
+                future.await;
+                lease.close().await;
+            }
+            tokio::select! { biased;
+                _=stop.cancelled()=>return,
+                _=tokio::time::sleep(Duration::from_secs(5))=>{},
+            }
+        }
+    }
+
+    async fn run_epoch(&self, stop: CancellationToken) {
+        self.ready.send_replace(false);
         let mut connections: BTreeMap<Uuid, Connected> = BTreeMap::new();
         let mut timer = tokio::time::interval(Duration::from_secs(60));
         // Coalesce the initial timer tick with source changes queued before startup.
@@ -436,7 +478,12 @@ impl Sources {
             loop {
                 tokio::select! {
                     biased;
-                    _=stop.cancelled()=>break 'running,
+                    _=stop.cancelled()=>{
+                        while let Some((_, connection)) = pending.next().await {
+                            if let Some(connection) = connection { Self::close(connection).await; }
+                        }
+                        break 'running;
+                    },
                     next=pending.next()=>match next {
                         Some((id,Some(connection)))=>{connections.insert(id,connection);},
                         Some((_,None))=>{},
@@ -447,6 +494,7 @@ impl Sources {
             self.ready.send_replace(true);
         }
         self.tools.write().await.clear();
+        self.ready.send_replace(false);
         stream::iter(connections.into_values())
             .for_each_concurrent(16, Self::close)
             .await;

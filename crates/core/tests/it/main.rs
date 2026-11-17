@@ -16,6 +16,7 @@ use sqlx::ConnectOptions;
 use std::sync::Arc;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use uuid::Uuid;
+mod access;
 mod agent_sessions;
 mod bulk;
 mod endpoints;

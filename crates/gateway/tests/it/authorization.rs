@@ -71,6 +71,7 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
         .await
         .unwrap();
     let state = server::State {
+        access: Default::default(),
         mcp_tasks: server::Tasks::default(),
         rate_limit: Arc::new(
             codemode_core::components::auth::rate_limit::RateLimiter::new(60, 600),

@@ -282,6 +282,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
         Default::default(),
     ));
     let state = server::State {
+        access: Default::default(),
         mcp_tasks: server::Tasks::default(),
         rate_limit: Arc::new(
             codemode_core::components::auth::rate_limit::RateLimiter::new(60, 600),
@@ -306,6 +307,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
     let task_state = state.clone();
     let limited_auth = state.auth.clone();
     let limited_state = server::State {
+        access: Default::default(),
         rate_limit: Arc::new(codemode_core::components::auth::rate_limit::RateLimiter::new(1, 2)),
         ..state.clone()
     };

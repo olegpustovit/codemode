@@ -18,6 +18,8 @@ use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    Access(#[from] crate::components::access::Error),
     #[error("invalid_request")]
     Request,
     #[error("unsupported_grant_type")]
@@ -39,11 +41,16 @@ pub enum Error {
 #[derive(Clone)]
 pub struct OAuth {
     db: Database,
+    access: crate::components::access::Access,
     hostname: String,
     registrations: Arc<Mutex<VecDeque<Instant>>>,
     metadata_requests: Arc<Semaphore>,
 }
 impl OAuth {
+    pub fn with_access(mut self, access: crate::components::access::Access) -> Self {
+        self.access = access;
+        self
+    }
     pub fn with_database(&self, db: Database) -> Self {
         Self { db, ..self.clone() }
     }
@@ -51,6 +58,7 @@ impl OAuth {
     pub fn new(db: Database, hostname: String) -> Self {
         Self {
             db,
+            access: Default::default(),
             hostname,
             registrations: Arc::new(Mutex::new(VecDeque::new())),
             metadata_requests: Arc::new(Semaphore::new(4)),

@@ -395,6 +395,45 @@ impl Accounts {
         source: Uuid,
         uri: &str,
     ) -> Result<Option<SecretString>, Error> {
+        let mut lease = self.source_access(source).await?;
+        let result = tokio::select! { biased;
+            error=lease.stopped()=>Err(Error::Access(error)),
+            result=self.bearer_eligible(source, uri)=>result,
+        };
+        lease.close().await;
+        result
+    }
+
+    /// Transport deletion only closes an existing provider session. No refresh,
+    /// token exchange, account write or new source work is allowed here.
+    pub(crate) async fn cleanup_bearer(
+        &self,
+        source: Uuid,
+        uri: &str,
+    ) -> Result<Option<SecretString>, Error> {
+        let Some(credential) = self.http_credential(source, uri).await? else {
+            return Ok(None);
+        };
+        if credential.kind == "bearer" {
+            return Ok(Some(credential.value));
+        }
+        if credential.kind != "oauth" {
+            return Err(Error::Authentication);
+        }
+        let linked: Linked = serde_json::from_str(credential.value.expose_secret())
+            .map_err(|_| Error::Authentication)?;
+        if linked.provider.url != uri {
+            return Err(Error::Changed);
+        }
+        validate_credentials(&linked.credentials)?;
+        access(&linked.credentials).map(Some)
+    }
+
+    async fn bearer_eligible(
+        &self,
+        source: Uuid,
+        uri: &str,
+    ) -> Result<Option<SecretString>, Error> {
         let Some(credential) = self.http_credential(source, uri).await? else {
             return Ok(None);
         };

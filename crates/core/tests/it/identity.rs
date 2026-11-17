@@ -538,9 +538,7 @@ async fn identity_onboarding_is_allowlisted_private_atomic_and_never_bootstraps_
 ) {
     let sessions = Sessions::new(database(&pool).await);
     assert!(matches!(
-        sessions
-            .resolve_identity("outsider", "not-an-email")
-            .await,
+        sessions.resolve_identity("outsider", "not-an-email").await,
         Err(IdentityError::InvalidClaims)
     ));
     assert_eq!(

@@ -1,0 +1,15 @@
+{
+  "httpReaders": 4,
+  "mode": 1,
+  "pendingHttpStopMs": 24984,
+  "responses": {
+    "allowed": 4,
+    "denied": 1920,
+    "unavailable": 0
+  },
+  "retainedSdkTaskTerminal": true,
+  "runningExecutionsRemaining": 0,
+  "sameCookieAndWorkspaceRecovered": true,
+  "scope": "Actual Axum HTTP, official MCP detached task and Monty workers; owned policy transport fixture and PostgreSQL 18",
+  "taskAndActualWorkStopMs": 24989
+}

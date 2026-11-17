@@ -17,3 +17,4 @@ multiple-versions = "warn"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+allow-git = ["ssh://git@github.com/olegpustovit/identity.git"]

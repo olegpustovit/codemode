@@ -1,4 +1,5 @@
-use crate::infrastructure::postgres::{Database, Error};
+use super::access::{self, Access};
+use crate::infrastructure::postgres::{Database, Error as DbError};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
@@ -6,9 +7,23 @@ use uuid::Uuid;
 pub mod oauth;
 pub mod rate_limit;
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Access(#[from] access::Error),
+    #[error(transparent)]
+    Database(#[from] DbError),
+}
+impl From<sqlx::Error> for Error {
+    fn from(error: sqlx::Error) -> Self {
+        Self::Database(DbError::from(error))
+    }
+}
+
 #[derive(Clone)]
 pub struct Auth {
     db: Database,
+    access: Access,
 }
 
 #[derive(Clone, Debug)]
@@ -35,10 +50,18 @@ pub struct Token {
 
 impl Auth {
     pub fn new(db: Database) -> Self {
-        Self { db }
+        Self {
+            db,
+            access: Access::default(),
+        }
+    }
+    pub fn with_access(mut self, access: Access) -> Self {
+        self.access = access;
+        self
     }
 
     pub async fn create(&self, name: &str, audience: &str) -> Result<(Uuid, String), Error> {
+        self.access.tenant(Uuid::nil(), true).await?;
         sqlx::query!("INSERT INTO endpoints(slug,hostname,all_sources) VALUES('All sources',$1,true) ON CONFLICT(tenant_id) WHERE all_sources DO NOTHING",audience).execute(&self.db.0).await?;
         let workspace=sqlx::query_scalar!("SELECT id FROM endpoints WHERE all_sources AND tenant_id=COALESCE(NULLIF(current_setting('codemode.tenant_id',true),''),'00000000-0000-0000-0000-000000000000')::uuid").fetch_one(&self.db.0).await?;
         self.create_for_workspace(name, workspace, audience, "/mcp")
@@ -53,6 +76,7 @@ impl Auth {
         audience: &str,
         resource: &str,
     ) -> Result<Option<(Uuid, String)>, Error> {
+        self.access.workspace(workspace).await?;
         let token = format!("cm_{}", URL_SAFE_NO_PAD.encode(rand::random::<[u8; 32]>()));
         let hash = Sha256::digest(token.as_bytes()).to_vec();
         let id=sqlx::query_scalar!("WITH workspace AS (SELECT id FROM endpoints WHERE id=$1 FOR KEY SHARE) INSERT INTO access_tokens(name,audience,token_hash,workspace_id,resource) SELECT $2,$3,$4,id,$5 FROM workspace RETURNING id",workspace,name,audience,hash,resource).fetch_optional(&self.db.0).await?;
@@ -78,6 +102,7 @@ impl Auth {
         if !bool::from(hash.ct_eq(&row.token_hash)) || row.audience != audience {
             return Ok(None);
         }
+        self.access.tenant(row.tenant_id, false).await?;
         sqlx::query!(
             "UPDATE access_tokens SET last_used_at=now() WHERE id=$1",
             row.id
@@ -93,7 +118,7 @@ impl Auth {
         }))
     }
 
-    pub async fn list(&self) -> Result<Vec<Token>, Error> {
+    pub async fn list(&self) -> Result<Vec<Token>, DbError> {
         let rows = sqlx::query!(r#"SELECT id,name,audience,workspace_id,resource,revoked_at IS NOT NULL AS "revoked!",oauth_grant IS NOT NULL AS "oauth!",
             to_char(last_used_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS last_used_at
             FROM access_tokens ORDER BY created_at"#).fetch_all(&self.db.0).await?;
@@ -112,7 +137,7 @@ impl Auth {
             .collect())
     }
 
-    pub async fn revoke(&self, id: Uuid) -> Result<bool, Error> {
+    pub async fn revoke(&self, id: Uuid) -> Result<bool, DbError> {
         oauth::revoke_access(&self.db, id).await
     }
 }
@@ -126,8 +151,8 @@ impl Auth {
         use super::bulk::Error as BulkError;
         selection.validate(expected)?;
         let patterns = selection.patterns();
-        let mut tx = self.db.0.begin().await.map_err(Error::from)?;
-        let selected=sqlx::query!("SELECT id,oauth_grant FROM access_tokens WHERE ($1::uuid[] IS NULL OR id=ANY($1)) AND NOT EXISTS(SELECT 1 FROM unnest($2::text[]) terms(pattern) WHERE NOT(name ILIKE pattern)) ORDER BY id",selection.ids.as_deref(),&patterns).fetch_all(&mut *tx).await.map_err(Error::from)?;
+        let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
+        let selected=sqlx::query!("SELECT id,oauth_grant FROM access_tokens WHERE ($1::uuid[] IS NULL OR id=ANY($1)) AND NOT EXISTS(SELECT 1 FROM unnest($2::text[]) terms(pattern) WHERE NOT(name ILIKE pattern)) ORDER BY id",selection.ids.as_deref(),&patterns).fetch_all(&mut *tx).await.map_err(DbError::from)?;
         if selected.len() as i64 != expected {
             return Err(BulkError::Changed);
         }
@@ -139,19 +164,17 @@ impl Auth {
             .into_iter()
             .collect();
         // Match OAuth's endpoint -> grant -> access-token lock order, including refresh siblings.
-        sqlx::query!("SELECT e.id FROM endpoints e WHERE EXISTS(SELECT 1 FROM oauth_grants g WHERE g.endpoint_id=e.id AND g.id=ANY($1)) ORDER BY e.id FOR KEY SHARE",&grants).fetch_all(&mut *tx).await.map_err(Error::from)?;
+        sqlx::query!("SELECT e.id FROM endpoints e WHERE EXISTS(SELECT 1 FROM oauth_grants g WHERE g.endpoint_id=e.id AND g.id=ANY($1)) ORDER BY e.id FOR KEY SHARE",&grants).fetch_all(&mut *tx).await.map_err(DbError::from)?;
         sqlx::query!(
             "SELECT id FROM oauth_grants WHERE id=ANY($1) ORDER BY id FOR UPDATE",
             &grants
         )
         .fetch_all(&mut *tx)
         .await
-        .map_err(Error::from)?;
-        let changed=sqlx::query!("SELECT id,workspace_id FROM access_tokens WHERE (id=ANY($1) OR oauth_grant=ANY($2)) AND revoked_at IS NULL ORDER BY id FOR UPDATE",&ids,&grants).fetch_all(&mut *tx).await.map_err(Error::from)?;
+        .map_err(DbError::from)?;
+        let changed=sqlx::query!("SELECT id,workspace_id FROM access_tokens WHERE (id=ANY($1) OR oauth_grant=ANY($2)) AND revoked_at IS NULL ORDER BY id FOR UPDATE",&ids,&grants).fetch_all(&mut *tx).await.map_err(DbError::from)?;
         for grant in grants {
-            oauth::revoke_grant(&mut tx, grant)
-                .await
-                .map_err(Error::from)?;
+            oauth::revoke_grant(&mut tx, grant).await?;
         }
         sqlx::query!(
             "UPDATE access_tokens SET revoked_at=now() WHERE id=ANY($1) AND revoked_at IS NULL",
@@ -159,12 +182,12 @@ impl Auth {
         )
         .execute(&mut *tx)
         .await
-        .map_err(Error::from)?;
+        .map_err(DbError::from)?;
         let request = Uuid::new_v4();
         for token in &changed {
-            sqlx::query!("INSERT INTO control_changes(request_id,workspace_id,kind,item,action) VALUES($1,$2,'token',$3,'revoke')",request,token.workspace_id,token.id.to_string()).execute(&mut *tx).await.map_err(Error::from)?;
+            sqlx::query!("INSERT INTO control_changes(request_id,workspace_id,kind,item,action) VALUES($1,$2,'token',$3,'revoke')",request,token.workspace_id,token.id.to_string()).execute(&mut *tx).await.map_err(DbError::from)?;
         }
-        tx.commit().await.map_err(Error::from)?;
+        tx.commit().await.map_err(DbError::from)?;
         Ok(changed.len() as u64)
     }
 }

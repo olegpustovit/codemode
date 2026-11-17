@@ -18,7 +18,7 @@ use tokio::sync::Semaphore;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("registration is limited to invited email addresses")]
+    #[error("enter a valid email address")]
     NotAllowed,
     #[error("email is already registered; sign in instead")]
     Exists,
@@ -93,7 +93,7 @@ impl Sessions {
         password: SecretString,
     ) -> Result<SecretString, Error> {
         let permit = self.attempt()?;
-        let email = allowed_email(email).ok_or(Error::NotAllowed)?;
+        let email = normalize_email(email).ok_or(Error::NotAllowed)?;
         let hash = tokio::task::spawn_blocking(move || {
             let _permit = permit;
             hash_password(password.expose_secret())
@@ -251,11 +251,6 @@ fn normalize_email(email: &str) -> Option<String> {
         return None;
     }
     Some(email)
-}
-
-fn allowed_email(email: &str) -> Option<String> {
-    let email = normalize_email(email)?;
-    (email == "ursus95@gmail.com" || email.ends_with("@olegpustovit.com")).then_some(email)
 }
 
 fn validate_hash(hash: &str) -> Result<(), Error> {

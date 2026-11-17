@@ -175,7 +175,7 @@ impl From<sessions::Error> for ApiError {
             ),
             sessions::Error::NotAllowed => Self::Message(
                 StatusCode::FORBIDDEN,
-                "registration is limited to ursus95@gmail.com and @olegpustovit.com addresses",
+                "enter a valid email address",
             ),
             sessions::Error::Exists => Self::Message(
                 StatusCode::CONFLICT,

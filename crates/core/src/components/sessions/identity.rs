@@ -1,4 +1,4 @@
-use super::{Sessions, User, allowed_email, normalize_email};
+use super::{Sessions, User, normalize_email};
 use crate::infrastructure::postgres::Error as DbError;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use secrecy::SecretString;
@@ -10,8 +10,6 @@ pub enum IdentityError {
     InvalidClaims,
     #[error("identity requires an existing local account")]
     AccountRequired,
-    #[error("registration is limited to invited email addresses")]
-    NotAllowed,
     #[error("local account is bound to another identity")]
     Conflict,
     #[error(transparent)]
@@ -72,7 +70,6 @@ impl Sessions {
                 if !provision {
                     return Err(IdentityError::AccountRequired);
                 }
-                allowed_email(&email).ok_or(IdentityError::NotAllowed)?;
                 let tenant = sqlx::query_scalar!("INSERT INTO tenants DEFAULT VALUES RETURNING id")
                     .fetch_one(&mut *tx)
                     .await

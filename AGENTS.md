@@ -29,7 +29,7 @@ The owner authorized continuing through manual gates. Live-provider consent and 
 ## User accounts and tenancy
 
 - Control-plane access uses email and password. With no users, show registration; the first registered account has `admin: true`. There is no super-admin role or tenant-isolation bypass.
-- Registration permits exactly `ursus95@gmail.com` and email addresses at `olegpustovit.com` (case-insensitive).
+- Registration accepts any valid email address (case-insensitive); Microapps ID invites are the gate in production.
 - Each user owns a private tenant: connected MCPs, linked upstream OAuth accounts and credentials, catalogue, workspaces, agent tokens, policies, scripts and execution history.
 - Agent OAuth consent grants access only to the signed-in user's tenant. A shared hostname never implies shared tools or credentials.
 - The shared administrator password is retired. Existing sessions and agent tokens are revoked when tenancy is introduced.

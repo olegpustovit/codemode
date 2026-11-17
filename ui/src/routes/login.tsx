@@ -138,12 +138,6 @@ function Login() {
             </Button>
           </FieldGroup>
         </form>
-        {creating && (
-          <p className="text-sm text-muted-foreground">
-            Registration is open to ursus95@gmail.com and @olegpustovit.com
-            addresses.
-          </p>
-        )}
         {creating && session.firstUser && (
           <p className="text-sm text-muted-foreground">
             The first account receives the admin attribute. Every account has

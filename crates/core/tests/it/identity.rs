@@ -239,13 +239,6 @@ async fn identity_rejects_invalid_claims_and_cannot_bootstrap_or_expose_tenants(
             .unwrap(),
         0
     );
-    // Existing legacy users can link even when their address is outside signup policy.
-    assert!(
-        sessions
-            .register("legacy@example.test", "fixture-browser-password".into())
-            .await
-            .is_err()
-    );
     let hash =
         codemode_core::components::sessions::hash_password("fixture-browser-password").unwrap();
     let user:Uuid=sqlx::query_scalar("INSERT INTO users(email,password_hash,tenant_id,admin) VALUES('legacy@example.test',$1,$2,false) RETURNING id").bind(&hash).bind(Uuid::nil()).fetch_one(&pool).await.unwrap();
@@ -546,9 +539,9 @@ async fn identity_onboarding_is_allowlisted_private_atomic_and_never_bootstraps_
     let sessions = Sessions::new(database(&pool).await);
     assert!(matches!(
         sessions
-            .resolve_identity("outsider", "outsider@example.com")
+            .resolve_identity("outsider", "not-an-email")
             .await,
-        Err(IdentityError::NotAllowed)
+        Err(IdentityError::InvalidClaims)
     ));
     assert_eq!(
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users")

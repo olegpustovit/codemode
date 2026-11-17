@@ -69,7 +69,7 @@ async fn browser_login_attempts_are_bounded(pool: sqlx::PgPool) {
     for _ in 0..30 {
         assert!(matches!(
             sessions
-                .register("outside@example.com", "anything".into())
+                .register("not-an-email", "anything".into())
                 .await,
             Err(Error::NotAllowed)
         ));
@@ -88,10 +88,6 @@ async fn first_registration_is_atomic_and_invites_cannot_be_spoofed(pool: sqlx::
     for email in [
         "",
         "@olegpustovit.com",
-        "alice@evilolegpustovit.com",
-        "alice@olegpustovit.com.evil",
-        "alice@sub.olegpustovit.com",
-        "ursus95+extra@gmail.com",
         "alice@evil@olegpustovit.com",
         "alice\n@olegpustovit.com",
         "a..b@olegpustovit.com",

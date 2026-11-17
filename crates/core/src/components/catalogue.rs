@@ -193,7 +193,9 @@ fn manifest(rows: Vec<ManifestTool>) -> String {
         }
     }
     let count: i64 = groups.values().map(|(count, _)| *count).sum();
-    let mut text = format!("Connected sources ({count} tools): ");
+    let mut text = format!(
+        "Connected sources ({count} tools), already loaded inside execute as tools.<source>.<tool>: "
+    );
     if groups.is_empty() {
         text.push_str("none");
     }
@@ -274,12 +276,31 @@ fn first_line(mut text: String) -> String {
     if let Some(end) = text.find(['\n', '\r']) {
         text.truncate(end);
     }
+    if text.len() > 180 {
+        let mut end = 177;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.truncate(end);
+        text.push_str("...");
+    }
     text
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn discovery_descriptions_are_compact_utf8_without_extra_allocations() {
+        assert_eq!(first_line("First line.\nMore docs.".into()), "First line.");
+        assert_eq!(first_line("x".repeat(180)).len(), 180);
+        let long = "界".repeat(100);
+        let mut compact = String::new();
+        let allocations = allocation_counter::measure(|| compact = first_line(long));
+        assert_eq!(allocations.count_total, 0);
+        assert_eq!(compact.len(), 180);
+        assert!(compact.ends_with("..."));
+    }
     #[test]
     fn manifests_name_sources_tools_blocks_and_stay_within_the_byte_budget() {
         let text = manifest(vec![

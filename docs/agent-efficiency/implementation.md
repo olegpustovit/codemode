@@ -361,3 +361,40 @@ prove a shader cause or waive the gate. Receipt:
 shader behavior was changed. E2 instructions/description and E3 playbook-off
 measurements are running sequentially, 40 tasks x3 each, with source binary
 checksums and client/harness versions recorded in new receipts.
+
+## Placement/playbook comparisons and measured corrective guidance
+
+Each variant ran 40 tasks x3 against the same frozen optimized binary:
+
+| Variant | Task passes | Median calls | Pre-execute calls | Execute errors | Input tokens | Seconds |
+|---|---:|---:|---:|---:|---:|---:|
+| E2 instructions-only manifest | 120/120 | 5 | 1.5 | 13.65% | 99,345.5 | 25.85 |
+| E2 description-only manifest | 120/120 | 5 | 0 | 5.57% | 82,881.5 | 24.7 |
+| E3 playbook off | 119/120 | 5 | 2 | 6.45% | 93,481 | 25.3 |
+
+No variant meets all release gates. The instructions-only variant exposed a
+14,791-byte full `entries` search result. Discovery descriptions now have a
+180-byte UTF-8 summary limit with an explicit ellipsis, while full stubs and
+help retain their complete docs. The actual same query now returns **11,838 B**,
+with ten hits and exactly three full stubs. The new summary regression verifies
+UTF-8 and zero additional allocations; the existing page allocation budget holds.
+
+The follow-up keeps the required manifest in both locations but explicitly says
+its Python names are already loaded inside execute. Search/playbook guidance
+clarifies single-name or OR queries, tiny non-sensitive memo values (64 KiB),
+using real returned IDs, and avoiding generators/next(list). The memo-limit error
+now suggests IDs or small summaries. These changes respond to observed failed
+transcripts; their model-performance effect has not yet been measured.
+
+**154/154 native checks pass**, 17.20 s including 5.31 s build. SQL OR/conjunction
+behavior is covered by the scoped catalogue regression. Oracle/optimized/model
+acceptance for this follow-up is still outstanding. The optimized executable
+used for E2/E3 and the running E4 comparison was deliberately left frozen.
+
+E4's first run was invalid: the proxy forwarded lowercase content-length plus a
+regenerated Content-Length. It was stopped and its HTTP-400 evidence preserved.
+The proxy now delegates framing to http.client after stripping incoming framing
+headers. A real Codex probe and lowercase-header/rewritten-UTF-8 probes pass;
+the corrected 120-run E4 comparison is running. This is a harness correction,
+not a gateway or safety failure. E5 legacy-client compatibility is still being
+probed; E1, heavy-pack E6 and Claude E7 remain unfinished. No merge/deploy.

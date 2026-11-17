@@ -98,7 +98,7 @@ fn success(value: &impl serde::Serialize) -> CallToolResult {
 #[tool_router]
 impl Gateway {
     #[tool(
-        description = "Search tools and saved scripts in the selected workspace. Run a saved script with execute(scriptId=its id, args={...}). Each page has ten tool hits; brief gives compact input signatures, full adds complete stubs for the top three. Use the cursor for more tools or refine the query for more than 20 script matches. Blocked tools are marked and cannot be dispatched.",
+        description = "Prefer execute for tool lookup and work in one step, using await tools.search('tool_name') inside Python. This search browses tools and saved scripts in the selected workspace. Query one tool name, or join alternatives with OR; other words must all match. Run a saved script with execute(scriptId=its id, args={...}). Each page has ten tool hits; brief gives compact input signatures, full adds complete stubs for the top three. Use the cursor for more tools or refine the query for more than 20 script matches. Blocked tools are marked and cannot be dispatched.",
         annotations(read_only_hint = true)
     )]
     async fn search(
@@ -159,7 +159,7 @@ impl Gateway {
     }
 
     #[tool(
-        description = "Use one execute per step; provide Python code or a saved scriptId with args.\nDiscover with await tools.search(query) inside code; print(help(tool)) for full signatures.\nUse asyncio.gather for independent calls and .all(max_pages=20) for cursor pages.\nUse memo.get/set for non-sensitive session data and _fields for rows; return only the answer.\nCatch ToolError for validation/upstream failures and PermissionError for workspace blocks.\nLimits: 60 s, 64 MB, 100 calls, 64 KB source; no inheritance, generators, files, network or secrets."
+        description = "Use one execute per step; provide Python code or a saved scriptId with args.\nDiscover with await tools.search('tool_name') only when needed; use OR between alternatives. print(help(tool)) gives full signatures.\nUse asyncio.gather for independent calls and .all(max_pages=20, _fields=[...]) for rows; compute the answer locally.\nMemo holds 64 KiB per session: cache non-sensitive IDs or small summaries, never datasets. Return only the answer, not raw rows.\nUse IDs returned by list tools, never guessed titles or IDs. Avoid generators and next(list). Catch ToolError and PermissionError.\nLimits: 60 s, 64 MB, 100 calls, 64 KB source; no inheritance, generators, files, network or secrets."
     )]
     async fn execute(
         &self,
@@ -315,7 +315,7 @@ impl ServerHandler for Gateway {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_tasks().build())
             .with_server_info(Implementation::new("codemode", option_env!("CODEMODE_BUILD_ID").unwrap_or(env!("CARGO_PKG_VERSION"))))
-            .with_instructions(format!("{}\nDiscover with await tools.search(query) inside execute; use print(help(tool)), asyncio.gather and .all(), and return only the answer. Catch ToolError and PermissionError. This /mcp resource is bound to your selected workspace. When Codemode covers the same apps as ChatGPT connectors, use features.apps=false or disconnect duplicate connectors so the client uses the intended gateway.", self.manifest))
+            .with_instructions(format!("{}\nDiscover with await tools.search('tool_name') inside execute only when needed; use OR for alternatives, print(help(tool)), asyncio.gather and .all(), and return only the answer. Memo is limited to 64 KiB: save IDs or small summaries, not datasets. Use real IDs returned by list tools; avoid generators and next(list). Catch ToolError and PermissionError. This /mcp resource is bound to your selected workspace. When Codemode covers the same apps as ChatGPT connectors, use features.apps=false or disconnect duplicate connectors so the client uses the intended gateway.", self.manifest))
     }
 }
 

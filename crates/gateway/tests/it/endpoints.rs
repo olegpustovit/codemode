@@ -415,7 +415,7 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
                 .unwrap()["description"]
                 .as_str()
                 .unwrap();
-            assert!(description.contains("await tools.search(query)"));
+            assert!(description.contains("await tools.search("));
             assert!(description.contains("Connected sources"));
             if token == work_token {
                 assert!(description.contains("alpha"));

@@ -14,7 +14,9 @@ pub enum Error {
         "session title must contain 1–160 characters without control characters; search is limited to 1024 bytes"
     )]
     Invalid,
-    #[error("memo is limited to 64 KiB of JSON per agent session")]
+    #[error(
+        "memo is limited to 64 KiB of JSON per agent session; store IDs or small summaries instead of full tool results"
+    )]
     MemoLimit,
     #[error(
         "memo accepts non-sensitive JSON only; credential keys and token values are not allowed"

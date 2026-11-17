@@ -404,6 +404,16 @@ async fn discovery_manifest_prioritizes_useful_entry_points_over_alphabetical_no
     assert!(manifest.contains("7 tools"));
     assert!(!manifest.contains("aaa5"));
     assert!(manifest.len() <= 1536);
+    let alternatives = catalogue
+        .search_scoped("list_issues OR aaa0", false, None, None, Some(workspace))
+        .await
+        .unwrap();
+    assert_eq!(alternatives.tools.len(), 2);
+    let conjunction = catalogue
+        .search_scoped("list_issues aaa0", false, None, None, Some(workspace))
+        .await
+        .unwrap();
+    assert!(conjunction.tools.is_empty());
     workspaces.set_all_tools(workspace, false).await.unwrap();
     let excluded = catalogue.manifest(workspace).await.unwrap();
     assert!(excluded.contains("nudge (0:"));

@@ -502,3 +502,27 @@ construction is compensated); its real upstream regression still fails after
 55 audited calls, rather than accidentally incorporating A3. All 104 native
 core checks pass. Its optimized experiment build is in progress and no E1
 model result is claimed yet. The counterfactual is not a release branch.
+
+## E6 full heavy cohort
+
+All 60 heavy runs completed: Codemode 29/30, direct 30/30, zero 429s. The
+Codemode failure computed integer cents correctly but its final answer converted
+them to euros despite the requested cents; its trace and failed grade remain.
+Total uncached input is 271,900 versus 685,512 (2.52x fewer), cached input
+1,635,456 versus 2,167,808, output 19,232 versus 21,233. Codex supplies no USD
+cost. The new cost checker requires exact ten-task/three-repeat/both-arm
+coverage and clean outcomes. It uses client-reported USD when available;
+otherwise it proves savings only from a conservative bound over all nonnegative
+billable token prices, without inventing a price book. Its bound here is 0.90576,
+so 2x monetary savings are unproven and the gate fails. Fifteen harness checks
+pass, including missing coverage, invalid accounting and cost cases. No raw
+receipt was regraded and no failed model task was silently retried.
+
+The E1 optimized counterfactual built in 233 s, checksum
+d2638670cb64e541ce7c084d9dcfb032b7e552d8763369c30f507dc1267107c8.
+Its actual MCP probe passes. The full 120-run E1 cohort is running at two jobs
+to respect the baseline admission limit; final release experiments still use
+the preserved source-22d4acf optimized binary (SHA-256
+95a90c44faea63892cb5b5ab47889f4bdadefa6216e58b956566489d034e4ea1).
+The E1 binary embeds the copied historical UI staging and warns it is stale;
+this is an MCP-only counterfactual, never a deployable UI release artifact.

@@ -335,7 +335,7 @@ async fn mcp_request(AxumState(state): AxumState<State>, request: Request) -> Re
     let manifest = match state.catalogue.manifest(principal.workspace_id).await {
         Ok(manifest) => manifest,
         Err(error) => {
-            tracing::error!(error=%error, "workspace manifest unavailable");
+            tracing::error!(?error, "workspace manifest unavailable");
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "workspace catalogue unavailable",

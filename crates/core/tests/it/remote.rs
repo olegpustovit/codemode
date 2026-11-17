@@ -293,7 +293,7 @@ except ToolError as e:
     return str(e)"#,
             "completed",
             Some(
-                "fixture.echo: invalid argument at /value (expected string)\n  signature: async def tools.fixture.echo(*, value: str, prefix: str = None): ...\n# ",
+                "fixture.echo: invalid argument at /value (expected string)\n  signature: async def tools.fixture.echo(*, value: str, prefix: str = None): ...",
             ),
         ),
         (

@@ -396,10 +396,16 @@ async fn discovery_manifest_prioritizes_useful_entry_points_over_alphabetical_no
         })
         .collect();
     let catalogue = Catalogue::new(db);
+    let empty = catalogue.manifest(workspace).await.unwrap();
+    assert!(empty.contains("nudge (0:"));
     catalogue.replace(source, &definitions, 0).await.unwrap();
     let manifest = catalogue.manifest(workspace).await.unwrap();
     assert!(manifest.contains("list_issues"));
     assert!(manifest.contains("7 tools"));
     assert!(!manifest.contains("aaa5"));
     assert!(manifest.len() <= 1536);
+    workspaces.set_all_tools(workspace, false).await.unwrap();
+    let excluded = catalogue.manifest(workspace).await.unwrap();
+    assert!(excluded.contains("nudge (0:"));
+    assert!(!excluded.contains("list_issues"));
 }

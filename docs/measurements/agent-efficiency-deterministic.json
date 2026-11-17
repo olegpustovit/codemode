@@ -1,0 +1,152 @@
+{
+  "checks": [
+    {
+      "id": "l2.gather",
+      "rule": "asyncio.gather of 50 calls runs concurrently",
+      "ok": true,
+      "detail": "50 calls in 495.2 ms vs 1 call 118.2 ms; toolCalls=50"
+    },
+    {
+      "id": "l2.call-cap",
+      "rule": "101st tool call fails with a precise limit error",
+      "ok": true,
+      "detail": "RuntimeError: tool-call limit (100) reached"
+    },
+    {
+      "id": "l2.call-cap-sequential",
+      "rule": "100 sequential awaited calls succeed and the 101st raises a catchable error",
+      "ok": true,
+      "detail": "[100, 'RuntimeError', 'tool-call limit (100) reached']"
+    },
+    {
+      "id": "l2.blocked",
+      "rule": "Blocked tool raises PermissionError naming tool and workspace",
+      "ok": true,
+      "detail": "tool artifacts.artifact_delete is blocked in workspace eddec96e-b96a-48ca-90d1-f89840943c5e; use search to find allowed tools"
+    },
+    {
+      "id": "l2.blocked-no-upstream",
+      "rule": "Blocked call never reached upstream (artifact survives)",
+      "ok": true,
+      "detail": "eval-seed-gamma still exists after blocked delete"
+    },
+    {
+      "id": "l2.bad-args",
+      "rule": "Schema-invalid arguments raise a catchable exception naming the field",
+      "ok": true,
+      "detail": "['RuntimeError', 'nudge.get_issue: invalid argument at /id (expected string)\\n  signature: async def tools.nudge.get_issue(*, id: str): ...']"
+    },
+    {
+      "id": "l2.unknown-tool",
+      "rule": "Unknown tool raises a catchable ToolError with a nearest allowed name",
+      "ok": true,
+      "detail": "['RuntimeError', 'unknown tool nudge.get_isssue; did you mean: nudge.get_issue, nudge.create_issue, nudge.list_issues']"
+    },
+    {
+      "id": "l2.optional-none",
+      "rule": "Optional non-nullable cursor=None is omitted before dispatch",
+      "ok": true,
+      "detail": "{'executionId': '200b4e68-0479-43dc-8842-3dbc601e3e95', 'status': 'completed', 'result': 1, 'output': '', 'resultTruncated': False, 'resultDroppedBytes': 0, 'outputTruncated': False, 'outputDroppedBytes': 0, 'toolCalls': 1, 'error': None, 'isError': False, '_ms': 86.9}"
+    },
+    {
+      "id": "l2.inline-search",
+      "rule": "Inline search returns scoped tools; help needs no broker call",
+      "ok": true,
+      "detail": "{'executionId': '24822850-5b4f-4262-9791-db800d3d5ff1', 'status': 'completed', 'result': [True, True], 'output': '', 'resultTruncated': False, 'resultDroppedBytes': 0, 'outputTruncated': False, 'outputDroppedBytes': 0, 'toolCalls': 1, 'error': None, 'isError': False, '_ms': 33.7}"
+    },
+    {
+      "id": "l2.pagination-projection",
+      "rule": "Real schema pagination follows terminal cursors and projects each row",
+      "ok": true,
+      "detail": "{'executionId': '4d002df8-82fd-456e-b4ee-2c1c2d8a579e', 'status': 'completed', 'result': [2, True], 'output': '', 'resultTruncated': False, 'resultDroppedBytes': 0, 'outputTruncated': False, 'outputDroppedBytes': 0, 'toolCalls': 2, 'error': None, 'isError': False, '_ms': 158.7}"
+    },
+    {
+      "id": "l2.memo",
+      "rule": "Session memo persists between executes and distinguishes null from a missing key",
+      "ok": true,
+      "detail": "[{'executionId': 'ff80211b-b9dd-4670-aa11-7685e4345a2a', 'status': 'completed', 'result': None, 'output': '', 'resultTruncated': False, 'resultDroppedBytes': 0, 'outputTruncated': False, 'outputDroppedBytes': 0, 'toolCalls': 3, 'error': None, 'isError': False, '_ms': 28.9}, {'executionId': '826025a4-137c-4be3-8f09-1ac18b87c40b', 'status': 'completed', 'result': [{'n': 17}, 'missing'], 'output': ''"
+    },
+    {
+      "id": "l2.memo-boundaries",
+      "rule": "Memo rejects oversized values and credential keys without storing them",
+      "ok": true,
+      "detail": "{'executionId': '3971defe-4fcb-4f95-82f8-d87e79e6d5e3', 'status': 'completed', 'result': [2, 'missing'], 'output': '', 'resultTruncated': False, 'resultDroppedBytes': 0, 'outputTruncated': False, 'outputDroppedBytes': 0, 'toolCalls': 3, 'error': None, 'isError': False, '_ms': 20.7}"
+    },
+    {
+      "id": "l2.upstream-error",
+      "rule": "Upstream error (missing ID) surfaces as a Python exception with its message",
+      "ok": true,
+      "detail": "['RuntimeError', 'nudge.get_issue: upstream tool failed: Resource not found in the credential workspace. Resolve its identifier with the corresponding list tool.']"
+    },
+    {
+      "id": "l2.toolerror",
+      "rule": "Upstream failures are catchable as the documented ToolError",
+      "ok": true,
+      "detail": "ToolError"
+    },
+    {
+      "id": "l2.no-network",
+      "rule": "Sandbox cannot import socket/urllib",
+      "ok": true,
+      "detail": "['ModuleNotFoundError', 'ModuleNotFoundError']"
+    },
+    {
+      "id": "l2.no-env",
+      "rule": "Sandbox exposes no environment or secrets",
+      "ok": true,
+      "detail": "RuntimeError"
+    },
+    {
+      "id": "l2.no-files",
+      "rule": "Sandbox cannot read host files",
+      "ok": true,
+      "detail": "PermissionError"
+    },
+    {
+      "id": "l2.truncation",
+      "rule": "Large output and result are truncated with byte counts",
+      "ok": true,
+      "detail": "{'outputTruncated': True, 'outputDroppedBytes': 167233, 'resultTruncated': True, 'resultDroppedBytes': 167251}"
+    },
+    {
+      "id": "l2.source-size",
+      "rule": "Source over 64 KB is rejected",
+      "ok": true,
+      "detail": "{\"raw\": \"Python source exceeds 64 KB\", \"isError\": true, \"_ms\": 12.4}"
+    },
+    {
+      "id": "l2.memory",
+      "rule": "Allocation past 64 MB ends the run; next run is unaffected",
+      "ok": true,
+      "detail": "failed MemoryError: memory limit exceeded: 68997351 bytes > 67108864 bytes (execution.py line 2); next run ok=True"
+    },
+    {
+      "id": "l2.deadline",
+      "rule": "while True: pass stops at the 60 s deadline",
+      "ok": true,
+      "detail": "timed_out after 60022.4 ms: execution exceeded its 60 second wall deadline; worker terminated"
+    },
+    {
+      "id": "l2.crash-isolation",
+      "rule": "Runaway recursion ends one run; the gateway keeps serving",
+      "ok": true,
+      "detail": "recursion run: failed; gateway after: alive"
+    },
+    {
+      "id": "l2.audit",
+      "rule": "Execution and each tool call are audited under the eval tenant",
+      "ok": true,
+      "detail": "['completed', '2', '89', '2', '00000000-0000-0000-0000-000000000000']"
+    }
+  ],
+  "latency_ms": {
+    "trivial_execute": {
+      "p50": 23.25,
+      "p95": 36.1
+    },
+    "one_tool_call": {
+      "p50": 96.7,
+      "p95": 102.0
+    }
+  }
+}

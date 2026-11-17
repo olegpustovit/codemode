@@ -85,7 +85,7 @@ impl Catalogue {
             FROM sources s JOIN endpoints e ON e.id=$1 AND e.tenant_id=s.tenant_id
             LEFT JOIN tools t ON t.source_id=s.id AND (e.all_tools OR EXISTS(SELECT 1 FROM endpoint_tools scope WHERE scope.endpoint_id=e.id AND scope.source_id=s.id AND scope.upstream_name=t.upstream_name))
             WHERE e.all_sources OR EXISTS(SELECT 1 FROM endpoint_sources es WHERE es.endpoint_id=e.id AND es.source_id=s.id)
-        ) SELECT source AS "source!",path,total AS "total!",blocked AS "blocked!" FROM visible WHERE position<=5 ORDER BY source,path"#, workspace)
+        ) SELECT source AS "source!",path AS "path?",total AS "total!",blocked AS "blocked!" FROM visible WHERE position<=5 ORDER BY source,path"#, workspace)
             .fetch_all(&self.db.0).await?;
         Ok(manifest(rows))
     }

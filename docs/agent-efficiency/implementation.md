@@ -260,3 +260,52 @@ coverage. Still required before claiming delivery: the requested E1–E7 experim
 and metric gates; final native/slow/Oracle/hardened/UI/optimized-browser checks;
 merge; gated deployment and public runtime verification. Production remains
 unchanged. Functional tests do not prove the token/time targets.
+
+## Release qualification and first measured model checkpoint
+
+- The 153-case native suite passes with normal hard deadlines: 20.11 s total,
+  4.03 s build, slowest case 2.361 s. The complete 161-case native slow suite
+  passes in 89.18 s including 2.96 s build.
+- The complete **161-case hardened Oracle slow suite passes**, 166.75 s including
+  90.96 s staging/build. It includes 10,000-run memory stability, worker limits,
+  access revocation, upstream stream cancellation and source removal/outage.
+  Two pre-existing test helpers ignored CODEMODE_MONTY_BIN; they now honor the
+  same isolated-worker override as the surrounding tests. An earlier strict
+  Oracle checkpoint had 152 passes and that helper-path failure; its focused
+  corrected test passes. A final strict Oracle run is still in progress.
+- The optimized browser run exposed a real empty-tool-scope failure: PostgreSQL
+  correctly returned a null path from the manifest's LEFT JOIN, but SQLx's
+  inferred nullability rejected it. The query now explicitly marks path nullable.
+  Regression coverage includes an unsynced empty source and a source whose tools
+  are all excluded. Both OpenAPI and GraphQL browser workflows now pass.
+- After this correction, **11 of 12 optimized browser workflows pass**. The
+  integration workflow's pane click-to-paint p95 measured 56.4 ms against its
+  unchanged <50 ms gate during concurrent qualification/model work. It must be
+  rechecked under quiet conditions; no timing threshold has been relaxed.
+- All **23 deterministic eval checks pass** against an optimized disposable
+  candidate, using only the three eval app accounts. This includes real optional
+  null arguments, caught signature/suggestion errors, 100 sequential calls,
+  inline search/help, pagination/projection, memo persistence/bounds, sandbox
+  isolation, audit tenancy and the 60 s deadline. Receipt:
+  `docs/measurements/agent-efficiency-deterministic.json`.
+- The harness now records pre-execute calls, execute errors and individual UTF-8
+  search response sizes. Its strict efficiency checker rejects missing data and
+  failed/unclean runs. E2 manifest-placement and E3 playbook flags are implemented
+  through a disposable proxy; JSON/SSE self-checks and all six actual MCP surface
+  combinations pass. Harness commit: `b1675b2` in ../codemode-evals (local repo).
+
+The first eight-job Codex run passes **8/8 tasks, zero execute errors, zero HTTP
+429s**. It does **not** meet every efficiency target: medians are 5 calls, 1.5
+pre-execute calls, 96,279 input tokens, 13,609 uncached input tokens and 24.7 s.
+Search median is 1508 B and maximum 12,805 B. This is an early smoke measurement,
+not the 40-task comparison. Receipt: `agent-efficiency-eight-jobs.json`. Brief
+signatures subsequently stopped duplicating the separate description field;
+complete full stubs/help and pagination notes are preserved, and the golden
+corpus/error assertions were updated. A full 234-run, three-repeat comparison
+with eight jobs and both arms is currently running on that corrected candidate.
+
+Remaining: complete E1–E7 coverage, all required metric gates, quiet pane timing
+acceptance, final checks, merge, gated deployment and public verification. The
+application is not declared delivered; production remains schema 22. Builds
+still exceed the historical incremental latency targets (optimized rebuild
+186 s, initial optimized build 330 s); no build-budget pass is claimed.

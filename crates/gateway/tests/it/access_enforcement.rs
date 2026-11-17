@@ -288,8 +288,12 @@ async fn setup_state(
         accounts.clone(),
         endpoints.clone(),
     );
-    let worker =
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.tools/monty/bin/monty");
+    let worker = std::env::var_os("CODEMODE_MONTY_BIN")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../.tools/monty/bin/monty")
+        });
     let sandbox = Arc::new(
         MontySandbox::new(&worker, Duration::from_secs(60), 32768)
             .await

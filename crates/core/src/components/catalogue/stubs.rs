@@ -103,7 +103,6 @@ pub fn generate(path: &str, description: &str, input: &Value, output: Option<&Va
         format!("*, {}", args.join(", "))
     };
     let signature = format!("async def tools.{path}({arguments}) -> {result}: ...");
-    let first_line = description.lines().next().unwrap_or_default();
     let brief_arguments = if brief_args.is_empty() {
         String::new()
     } else {
@@ -116,8 +115,7 @@ pub fn generate(path: &str, description: &str, input: &Value, output: Option<&Va
     } else {
         String::new()
     };
-    let brief =
-        format!("async def tools.{path}({brief_arguments}): ...\n# {first_line}{pagination_note}");
+    let brief = format!("async def tools.{path}({brief_arguments}): ...{pagination_note}");
     let full = format!(
         "from typing import Any, Literal, NotRequired, TypedDict\n\n{}\n{signature}\n# {}",
         generator.definitions.join("\n\n"),
@@ -427,6 +425,8 @@ mod tests {
         let stub = generate("example.run", "description", &schema, None);
         assert!(stub.brief.contains("class_: Literal[\"a\", \"b\"]"));
         assert!(stub.brief.contains("data: dict[str, Any] = None"));
+        assert!(!stub.brief.contains("description"));
+        assert!(stub.full.contains("description"));
         assert!(stub.full.contains("NotRequired[int | None]"));
         assert!(stub.full.contains("\"child\": NotRequired[Any]"));
     }

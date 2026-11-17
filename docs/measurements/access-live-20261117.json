@@ -1,0 +1,39 @@
+{
+  "scope": "Actual Monty workers, upstream MCP calls and idle SSE transports, owned PostgreSQL 18; loopback policy fixture uses the published Identity SDK. Native provider and HTTP load are separate receipts.",
+  "release": "uncommitted local implementation",
+  "production": false,
+  "buildSeconds": 0.19,
+  "wholeAccessTierSeconds": 30.58,
+  "passedAccessCases": 9,
+  "liveSourceCases": [
+    {
+      "closedBodies": 3,
+      "phases": [
+        {
+          "actualUpstreamSse": true,
+          "actualWorker": true,
+          "mode": 2,
+          "stoppedMs": 24981,
+          "streamsAfterRecovery": 1,
+          "streamsAtStop": 0
+        }
+      ],
+      "providerCalls": 1
+    },
+    {
+      "closedBodies": 3,
+      "phases": [
+        {
+          "actualUpstreamSse": true,
+          "actualWorker": true,
+          "mode": 1,
+          "stoppedMs": 24975,
+          "streamsAfterRecovery": 1,
+          "streamsAtStop": 0
+        }
+      ],
+      "providerCalls": 1
+    }
+  ],
+  "subjectBindingChangedDuringActiveWatch": "Original allowed subject remained pinned; changing to another allowed subject stopped the watch within 28 seconds."
+}

@@ -1,0 +1,47 @@
+{
+  "scope": "Actual Identity/Codemode HTTPS daemons, owned PostgreSQL 18 and Chromium-only DNS mapping",
+  "verification": "captured email invitation",
+  "policy": "reviewed protected API",
+  "actions": [
+    "block",
+    "outage",
+    "recover",
+    "restore",
+    "block",
+    "restore",
+    "outage",
+    "recover",
+    "block",
+    "restore",
+    "block",
+    "restore"
+  ],
+  "decisions": [
+    {
+      "action": "block",
+      "status": 403
+    },
+    {
+      "action": "restore",
+      "status": 200
+    },
+    {
+      "action": "outage",
+      "status": 503
+    },
+    {
+      "action": "recover",
+      "status": 200
+    }
+  ],
+  "confidential_oidc": true,
+  "cookie_pat_oauth": true,
+  "code_refresh_preserved_on_denial_outage": true,
+  "workspace_resource_scope_preserved": true,
+  "exact_two_execution_tools": true,
+  "actual_worker": true,
+  "blocked_logout_preserves_id_device": true,
+  "subject_user_tenant_role_and_data_preserved": true,
+  "explicit_default_off_and_reenable": true,
+  "leftover_id_devices": 0
+}

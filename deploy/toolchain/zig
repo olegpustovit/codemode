@@ -1,0 +1,3 @@
+#!/bin/sh
+# Pin the cross C compiler; uv caches this version between release builds.
+exec uv tool run --from ziglang==0.15.2 python-zig "$@"

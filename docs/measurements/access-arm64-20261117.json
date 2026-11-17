@@ -1,0 +1,12 @@
+{
+  "artifact": "target/aarch64-unknown-linux-gnu/release/codemode",
+  "source": "Local qualification before final CLI bootstrap fix; rebuild at the final committed SHA before deployment",
+  "buildId": "access-local-qualification",
+  "target": "aarch64-unknown-linux-gnu.2.35",
+  "sha256": "acbf1843da5a41c44a841fd2da0734dc022809ce077070367597ecea724fd335",
+  "bytes": 29033680,
+  "glibcMax": "2.34",
+  "buildSeconds": 377,
+  "deployed": false,
+  "coversFinalCliBootstrapFix": false
+}

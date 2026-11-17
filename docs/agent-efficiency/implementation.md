@@ -350,3 +350,14 @@ probe. These are explicitly failed compatibility probes, not a completed valid
 40-task E5 experiment. E1, E4, E6, E7 and full E2/E3 measurements also remain.
 See `docs/measurements/agent-efficiency-full-comparison.json`; the application
 remains unmerged and undeployed.
+
+Pane diagnostic checkpoint: the benchmark now records click-handler and
+layout-ready time separately, while retaining the original next-frame paint
+measurement and unchanged thresholds. In an instrumented optimized run during
+E2, p95 is 6.8 ms in the handler, 9.6 ms until layout is ready, and 55.7 ms until
+the following frame. This locates most of the delay after layout; it does not
+prove a shader cause or waive the gate. Receipt:
+`docs/measurements/agent-efficiency-pane-profile.json`. No application UI or
+shader behavior was changed. E2 instructions/description and E3 playbook-off
+measurements are running sequentially, 40 tasks x3 each, with source binary
+checksums and client/harness versions recorded in new receipts.

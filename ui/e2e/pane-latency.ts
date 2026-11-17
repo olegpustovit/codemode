@@ -7,21 +7,24 @@ export async function measurePaneLatency(page: Page, destination: string) {
   const client = await page.context().newCDPSession(page)
   await client.send("Performance.enable")
   const clicks: number[] = []
+  const handlers: number[] = []
+  const layouts: number[] = []
   const keys: number[] = []
   for (let sample = 0; sample < 15; sample++) {
     await page.goto("/integrations")
     await expect(
       page.getByRole("row", { name: "GitHub", exact: true })
     ).toBeVisible()
-    clicks.push(
-      await page.evaluate(
-        () =>
-          new Promise<number>((resolve, reject) => {
+    const timing = await page.evaluate(
+      () =>
+        new Promise<{ total: number; handler: number; layout: number }>(
+          (resolve, reject) => {
             const row = [
               ...document.querySelectorAll<HTMLElement>(".data-row"),
             ].find((r) => r.getAttribute("aria-label") === "GitHub")!
             const start = performance.now()
             row.click()
+            const handler = performance.now() - start
             const painted = () => {
               const stack = document.querySelector<HTMLElement>(".pane-stack")!
               const detail = stack.querySelector<HTMLElement>(".detail-pane")!
@@ -29,16 +32,22 @@ export async function measurePaneLatency(page: Page, destination: string) {
                 detail.getBoundingClientRect().width >=
                   stack.getBoundingClientRect().width * 0.53 &&
                 detail.querySelector("h2")
-              )
-                requestAnimationFrame(() => resolve(performance.now() - start))
-              else if (performance.now() - start > 2000)
+              ) {
+                const layout = performance.now() - start
+                requestAnimationFrame(() =>
+                  resolve({ total: performance.now() - start, handler, layout })
+                )
+              } else if (performance.now() - start > 2000)
                 reject(new Error("Detail did not paint"))
               else requestAnimationFrame(painted)
             }
             requestAnimationFrame(painted)
-          })
-      )
+          }
+        )
     )
+    clicks.push(timing.total)
+    handlers.push(timing.handler)
+    layouts.push(timing.layout)
     await page.getByRole("grid", { name: "Integrations", exact: true }).focus()
     const before = await client.send("Performance.getMetrics")
     await page.keyboard.press("ArrowDown")
@@ -61,6 +70,8 @@ export async function measurePaneLatency(page: Page, destination: string) {
     binary: process.env.CODEMODE_GATEWAY_BIN,
     samples: clicks.length,
     clickToPaintMs: { p95: p95(clicks), values: clicks },
+    clickHandlerMs: { p95: p95(handlers), values: handlers },
+    layoutReadyMs: { p95: p95(layouts), values: layouts },
     keyScriptMs: { p95: p95(keys), values: keys },
   }
   writeFileSync(destination, JSON.stringify(result, null, 2) + "\n")

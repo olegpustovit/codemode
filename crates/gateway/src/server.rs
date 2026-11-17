@@ -274,7 +274,7 @@ impl ServerHandler for Gateway {
     }
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_tasks().build())
-            .with_server_info(Implementation::from_build_env())
+            .with_server_info(Implementation::new("codemode", option_env!("CODEMODE_BUILD_ID").unwrap_or(env!("CARGO_PKG_VERSION"))))
             .with_instructions("Search tools, then write Python using await tools.source.tool(...). Use return for the result and print for diagnostics. Upstream failures are catchable as ToolError; workspace blocks raise PermissionError naming the tool and workspace. Authentication is bound to the selected workspace and this /mcp resource.")
     }
 }

@@ -384,7 +384,12 @@ async fn hostname_tokens_and_scopes_hold_for_both_mcp_protocol_eras(pool: sqlx::
             ("test.example", main_token.as_str()),
         ] {
             if version == "2025-11-25" {
-                rpc(&client,&url,host,token,version,"initialize",serde_json::json!({"protocolVersion":version,"capabilities":{},"clientInfo":{"name":"endpoint-test","version":"1"}})).await;
+                let initialized = rpc(&client,&url,host,token,version,"initialize",serde_json::json!({"protocolVersion":version,"capabilities":{},"clientInfo":{"name":"endpoint-test","version":"1"}})).await;
+                assert_eq!(initialized["serverInfo"]["name"], "codemode");
+                assert_eq!(
+                    initialized["serverInfo"]["version"],
+                    option_env!("CODEMODE_BUILD_ID").unwrap_or(env!("CARGO_PKG_VERSION"))
+                );
             }
             let listed = rpc(
                 &client,

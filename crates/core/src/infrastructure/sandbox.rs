@@ -12,6 +12,7 @@ use monty_pool::{
 use monty_types::{ExcType, MontyException, MontyObject, ResourceLimits};
 use serde_json::value::RawValue;
 
+pub const CALL_CAP: usize = 100;
 pub const MEMORY: usize = 64 * 1024 * 1024;
 pub const OUTPUT: usize = 32 * 1024;
 const MAX_FRAME: usize = 72 * 1024 * 1024;
@@ -153,7 +154,7 @@ impl MontySandbox {
             limits: Some(
                 ResourceLimits::default()
                     .max_memory(MEMORY)
-                    .max_suspensions(110),
+                    .max_suspensions(2 * CALL_CAP + 16),
             ),
             ..Default::default()
         };
@@ -241,12 +242,6 @@ impl MontySandbox {
                     object_id,
                     ..
                 } => {
-                    run.calls += 1;
-                    if run.calls > 100 {
-                        return Err(Error::Invalid(
-                            "execution exceeds its 100 tool-call limit".into(),
-                        ));
-                    }
                     if function_name != "_call"
                         || object_id.is_some()
                         || args.args().len() != 2
@@ -267,6 +262,19 @@ impl MontySandbox {
                     if !args.get().starts_with('{') {
                         return Err(Error::Invalid("arguments must be an object".into()));
                     }
+                    if run.calls >= CALL_CAP {
+                        event = self
+                            .turn(worker.resume(
+                                ResumeValue::Error(MontyException::new(
+                                    ExcType::RuntimeError,
+                                    Some(format!("tool-call limit ({CALL_CAP}) reached")),
+                                )),
+                                &mut printer,
+                            ))
+                            .await?;
+                        continue;
+                    }
+                    run.calls += 1;
                     pending.push(PendingCall {
                         id: call_id,
                         path,

@@ -445,3 +445,21 @@ async fn a_worker_process_never_crosses_authenticated_caller_boundaries() {
     assert!(matches!(done, Step::Done { .. }));
     sb.pool.close().await;
 }
+
+#[tokio::test]
+async fn call_cap_is_catchable_after_one_hundred_sequential_or_parallel_calls() {
+    let sb = sandbox(Duration::from_secs(1)).await;
+    for body in [
+        "for i in range(101):\n        await tools.stub.echo(value=i)",
+        "await asyncio.gather(*[tools.stub.echo(value=i) for i in range(101)])",
+    ] {
+        let code = format!(
+            "try:\n    {body}\nexcept ToolError as e:\n    return str(e)\nreturn 'limit was not enforced'"
+        );
+        let Step::Done { result, .. } = execute(&sb, &code).await.unwrap() else {
+            panic!("unfinished")
+        };
+        assert_eq!(result.get(), r#""tool-call limit (100) reached""#);
+    }
+    sb.pool.close().await;
+}

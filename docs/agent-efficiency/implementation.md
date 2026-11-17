@@ -450,3 +450,15 @@ their semantic fingerprints. The four-run heavy probe passes both arms for one
 Nudge and one Moneybag task. This is not the full E6 or its cost gate. The Claude
 adapter passed an actual isolated MCP probe and its parser/configuration checks;
 the full E7 comparison has been started. No release merge or deployment yet.
+
+Qualification continuation: the two direct-arm erroneous comments from run
+78cabb were matched by exact comment ID, issue, body and eval author, then deleted
+using current update timestamps and audited eval cleanup commands (HTTP 200).
+The eval harness now paginates comment graders and removes only current-run
+comments owned by its service account; ten parser/configuration/cleanup checks
+pass. Historical receipts are unchanged. The running Claude cohort loaded the
+previous harness at startup, so it retains its original grading and cleanup.
+
+The final help-correction commit is 22d4acf. Its optimized build and hardened
+ARM test run are in progress. A separate b779625-based E1 worktree has been
+created for the A1+A2 counterfactual; it is not qualified or part of the release.

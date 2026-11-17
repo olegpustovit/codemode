@@ -550,3 +550,32 @@ pane timing fails its unchanged 50 ms gate: click-to-paint p95 74.9 ms, handler
 hide the failure. This run overlapped E1 and small compatibility probes; it is
 not evidence of idle hardware acceptance. The structured timings are preserved
 in agent-efficiency-pane-final.json. No merge/deployment acceptance is claimed.
+
+## Passing E5 configuration and release setup guidance
+
+The full interleaved E5 cohort completes 240/240 correct. Deferral off passes
+all standard targets over its 120 runs: median 3 MCP calls, 0 pre-execute calls,
+2.6634% execute errors, 54,003 input, 13,755 uncached input and 16.95 s. Deferral
+on also passes 120/120 tasks but misses uncached input (15,181) and time (20.45 s).
+The execution-token receipt now supplies the measured Codex 0.169.0 gateway-only
+configuration: per-server deferred exposure omitted, code_mode/tool_suggest on,
+code_mode_tool_search off. Management-token guidance retains its default profile
+because E5 qualified only the two-tool execution resource. Existing duplicate
+connector advice remains. UI typecheck, 34 Vitest checks, lint and staging pass
+(three incumbent lint warnings); staged fingerprint 5dd5ac2e52f0, initial JS
+160472 B and CSS 15757 B gzip. Combined optimized-browser verification is next.
+
+Cached Chromium 156 also misses pane timing: p95 73.4 ms, handler 7.8 ms, layout
+11.1 ms. This rules out a browser-version change alone as the fix. Graphics
+metadata collection originally raced React mounting; it now waits for the canvas
+after all timing samples, so it cannot warm up or alter the measured clicks.
+No shader cause or hardware acceptance is claimed.
+
+Official GPT-6.1-Sol rates were verified from OpenAI's model documentation on
+2026-11-17. The cost checker now accepts a named-model Standard API-equivalent
+estimate, proves short-context eligibility conservatively from per-run totals,
+and refuses cache-write estimates without TTL evidence. A fresh explicit-model
+60-run heavy cohort passes all tasks but estimates $0.9921356 versus $1.7281208
+(1.74x, below the 2x gate). Original default-model receipts remain unpriced.
+A new comparison is running with the qualified gateway setup against the direct
+arm's unchanged native defaults; this distinction is explicit in metadata.

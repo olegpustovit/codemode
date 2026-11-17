@@ -94,8 +94,24 @@ export function TokenForm({ onDone }: { onDone: () => void }) {
               section of <code>~/.codex/config.toml</code>, add:
             </p>
             <pre className="code-panel">
-              <code>{'default_tools_approval_mode = "approve"'}</code>
+              <code>{`default_tools_approval_mode = "approve"${administration ? "" : '\nomit_tools_from = ["deferred"]'}`}</code>
             </pre>
+            {!administration && (
+              <>
+                <p>
+                  For Codex 0.169.0 sessions using only this gateway, merge
+                  these values into the existing <code>[features]</code>{" "}
+                  section:
+                </p>
+                <pre className="code-panel">
+                  <code>
+                    {
+                      "code_mode = true\ntool_suggest = true\ncode_mode_tool_search = false"
+                    }
+                  </code>
+                </pre>
+              </>
+            )}
             <p>
               If ChatGPT connectors cover the same apps, set{" "}
               <code>apps = false</code> in the existing <code>[features]</code>{" "}

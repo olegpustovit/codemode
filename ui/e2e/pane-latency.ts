@@ -64,10 +64,24 @@ export async function measurePaneLatency(page: Page, destination: string) {
   }
   await client.detach()
   await page.goto("/integrations")
+  await page.locator(".backdrop canvas").waitFor({ state: "attached" })
   const p95 = (values: number[]) =>
     [...values].sort((a, b) => a - b)[Math.ceil(values.length * 0.95) - 1]
   const result = {
     binary: process.env.CODEMODE_GATEWAY_BIN,
+    browser: page.context().browser()?.version(),
+    viewport: page.viewportSize(),
+    graphics: await page.evaluate(() => {
+      const gl = document.querySelector("canvas")?.getContext("webgl")
+      const debug = gl?.getExtension("WEBGL_debug_renderer_info")
+      return {
+        devicePixelRatio,
+        webgl: !!gl,
+        renderer: gl?.getParameter(
+          debug?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER
+        ),
+      }
+    }),
     samples: clicks.length,
     clickToPaintMs: { p95: p95(clicks), values: clicks },
     clickHandlerMs: { p95: p95(handlers), values: handlers },

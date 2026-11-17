@@ -1,11 +1,11 @@
 {
   "url": "https://artifacts.microapps.space/a/favtgv57hd8n",
-  "version": 1,
+  "version": 2,
   "visibility": "private",
-  "snapshot_utc": "2026-11-17T18:18:27.234548+00:00",
-  "transcript_files": 2623,
-  "receipt_files": 49,
-  "receipt_rows": 3158,
-  "verified_members": 11110,
+  "snapshot_utc": "2026-11-17T18:38:33.659990+00:00",
+  "transcript_files": 2638,
+  "receipt_files": 51,
+  "receipt_rows": 3218,
+  "verified_members": 11513,
   "download_prompt_exercised": false
 }

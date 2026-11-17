@@ -369,18 +369,34 @@ impl Sources {
                         aliases.insert(alias, original);
                     }
                 }
-                let aliases = serde_json::to_string(&aliases).unwrap_or_else(|_| "{}".into());
+                let aliases_json = serde_json::to_string(&aliases).unwrap_or_else(|_| "{}".into());
                 let in_scope = scope
                     .as_ref()
                     .is_none_or(|paths| paths.contains(&tool.definition.path));
                 let full = if in_scope {
-                    stubs::generate(
+                    let mut full = stubs::generate(
                         &tool.definition.path,
                         &tool.definition.description,
                         &tool.definition.input_schema,
                         tool.definition.output_schema.as_ref(),
                     )
-                    .full
+                    .full;
+                    for (alias, original) in &aliases {
+                        if let Some(description) = tool
+                            .definition
+                            .input_schema
+                            .get("properties")
+                            .and_then(|p| p.get(original))
+                            .and_then(|p| p.get("description"))
+                            .and_then(Value::as_str)
+                        {
+                            full.push_str(&format!(
+                                "\n# {alias}: {}",
+                                description.replace('\n', "\n# ")
+                            ));
+                        }
+                    }
+                    full
                 } else {
                     "tool is outside workspace tool scope".into()
                 };
@@ -396,7 +412,7 @@ impl Sources {
                 })
                 .unwrap_or_else(|| "None".into());
                 code.push_str(&format!(
-                    "_sources[{}].{name} = _Tool({}, {aliases}, {}, {pagination})\n",
+                    "_sources[{}].{name} = _Tool({}, {aliases_json}, {}, {pagination})\n",
                     stubs::quote(source),
                     stubs::quote(&tool.definition.path),
                     stubs::quote(&full)

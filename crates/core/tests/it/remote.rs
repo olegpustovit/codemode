@@ -17,6 +17,7 @@ pub(super) struct Upstream;
 struct EchoArgs {
     value: String,
     #[serde(default)]
+    /// Prefix text; defaults to an empty string.
     prefix: String,
 }
 #[tool_router]
@@ -169,6 +170,11 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
     );
     assert_eq!(discovered.tool_calls, 3);
     assert!(discovered.output.contains("async def tools.fixture.echo"));
+    assert!(
+        discovered
+            .output
+            .contains("# prefix: Prefix text; defaults to an empty string.")
+    );
     let discovery_audit: Vec<(String, String)> =
         sqlx::query_as("SELECT path,outcome FROM tool_calls WHERE execution_id=$1 ORDER BY seq")
             .bind(discovered.execution_id)

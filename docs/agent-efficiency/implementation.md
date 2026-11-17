@@ -434,3 +434,19 @@ cohort): **8/8 pass**, zero execute errors, median **3 calls**, **0 pre-execute*
 18 s gate in this small sample. The full updated 234-run comparison is now
 running, with the eval dataset held unchanged. Receipt:
 `docs/measurements/agent-efficiency-guidance-optimized-smoke.json`.
+
+## Full guidance comparison and heavy-data probe
+
+The optimized full comparison completed 232/234 task successes: Codemode 120/120,
+with two direct-arm failures retained in the receipt. Codemode medians are 3
+calls, 0 pre-execute calls, 68,057.5 input tokens, 10,169.5 uncached tokens and
+20.2 s. Execute errors are 13/414 (3.1401%). The error and time gates still fail.
+Parameter descriptions are now included in in-sandbox full help, and the contract
+explicitly excludes unsupported asyncio.gather keyword arguments. Native checks
+after this correction: 154/154 pass. Updated model qualification remains due.
+
+Both heavy datasets contain 1,000 verified records; repeat seeding preserved
+their semantic fingerprints. The four-run heavy probe passes both arms for one
+Nudge and one Moneybag task. This is not the full E6 or its cost gate. The Claude
+adapter passed an actual isolated MCP probe and its parser/configuration checks;
+the full E7 comparison has been started. No release merge or deployment yet.

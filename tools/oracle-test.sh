@@ -39,7 +39,7 @@ fi
 executable=$1
 shift
 case "$executable" in
-  "$PWD"/target/aarch64-unknown-linux-gnu/debug/deps/*) ;;
+  "$PWD"/target/aarch64-unknown-linux-gnu/debug/deps/*|"$PWD"/target/aarch64-unknown-linux-gnu/debug/build/*/out/*) ;;
   *) echo 'expected a locally cross-built test executable' >&2; exit 2 ;;
 esac
 name=$(basename "$executable")

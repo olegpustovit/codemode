@@ -263,7 +263,7 @@ async fn identity_sdk_routes_discover_apply_host_origin_and_return_path_guards(p
 #[tokio::test]
 async fn identity_startup_configuration_defaults_off_and_never_prints_secrets() {
     let run = |enabled: Option<&str>| {
-        let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_codemode"));
+        let mut command = tokio::process::Command::new(gateway_bin());
         command
             .env_clear()
             .env("CODEMODE_ID_CLIENT_SECRET", "credential-must-not-appear")
@@ -293,7 +293,7 @@ async fn identity_startup_configuration_defaults_off_and_never_prints_secrets() 
 
 #[sqlx::test(migrations = "../core/migrations")]
 async fn identity_discovery_failure_exits_before_workers_and_source_import(pool: sqlx::PgPool) {
-    let output = tokio::process::Command::new(env!("CARGO_BIN_EXE_codemode"))
+    let output = tokio::process::Command::new(gateway_bin())
         .env_clear()
         .env(
             "CODEMODE_DATABASE_URL",
@@ -337,4 +337,9 @@ async fn identity_discovery_failure_exits_before_workers_and_source_import(pool:
             .unwrap(),
         0
     );
+}
+
+/// The Oracle runner stages the gateway remotely; the compile-time path exists only on the build host.
+fn gateway_bin() -> std::ffi::OsString {
+    std::env::var_os("CODEMODE_GATEWAY_BIN").unwrap_or_else(|| env!("CARGO_BIN_EXE_codemode").into())
 }

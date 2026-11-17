@@ -1,10 +1,16 @@
 # Implementation status
 
-## Microapps ID preparation — not deployed
+## Current release — Microapps ID sign-in, open registration, schema 22
+
+Deployed at https://codemode.microapps.space through the eval gate on 2026-11-17: source build **2f23413f18af**, schema **22**, running ARM SHA-256 **6da96ab2ab4f7039fc2662c44cad1c83c9ea78578960af225c1ef3a46612c001**. Production sign-in is Microapps ID only; the email allow-list was removed (`e9a23bb`), so Microapps ID invites are the gate.
+
+Qualification: **123/123 native** (`cargo t --workspace`, disposable Postgres) and **123/123 hardened Oracle** (isolated worker; two identity tests now locate the staged gateway via `CODEMODE_GATEWAY_BIN`). Eval gate (`CODEMODE_EVAL_GATE=../codemode-evals tools/deploy.sh`): L1/L2 regressions none, 8/8 smoke tasks including both safety tasks. Full evals: [report](https://artifacts.microapps.space/a/bknt3w850zg4) — 40 tasks, 234/234 runs in code mode and direct arms. UI tests and browser workflows were not rerun for this release. Known bugs from the evals: sequential awaited calls stop at 55 (uncatchable), and the 60 requests/min/token limit causes hard client failures.
+
+## Microapps ID preparation (historical; now deployed above)
 
 The `identity-oidc` worktree adds private existing-user subject linking with preserved local tenants/roles/data; see [Microapps ID rollout preparation](identity-rollout.md). Schema 22 adds separate private Microapps ID browser sessions and verified allowlisted onboarding without administrator adoption; gateway cookie/session mode boundaries are also prepared locally. SDK login/callback/logout routes and validated default-off configuration are wired. UI, actual-provider and deployment qualification remain pending; production remains on the unchanged schema-20 release below.
 
-## Current release — control-plane fixes, schema 20
+## Previous release — control-plane fixes, schema 20
 
 All twelve steps of the [control-plane fixes](https://artifacts.microapps.space/a/jqm3ze7az66e) are implemented, committed, pushed and deployed at https://codemode.microapps.space. Source build **d45e6106a3a6**, schema **20**, UI **e16dc707d79d**, running ARM SHA-256 **f03d44a766ad41da3f0f1128a61eb7a26be44c14814f040a9958af4e8e7093f2**.
 

@@ -131,10 +131,7 @@ export function AppShell() {
           event.target.closest("input,textarea,select,[contenteditable=true]"))
       )
         return
-      if (
-        event.key === "\\" &&
-        !window.matchMedia("(max-width: 767px)").matches
-      ) {
+      if (event.key === "\\") {
         event.preventDefault()
         setRailCollapsed((collapsed) => !collapsed)
         return

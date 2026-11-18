@@ -801,7 +801,20 @@ mark {
   }
 }
 
-.rail-collapse, .rail-key, .workspace-initials { display: none; }
+.rail-key, .workspace-initials { display: none; }
+.rail-collapse { margin-top: auto; display: flex; align-items: center; gap: var(--s-2); min-height: 32px; padding: 0 var(--s-2); color: var(--c-text-3); font-size: var(--fs-3); }
+.rail-collapse:hover { color: var(--c-text); }
+.rail-collapse svg { width: 16px; height: 16px; transition: transform var(--t-2) var(--e-out); }
+.rail-collapse .kbd { margin-left: auto; }
+@media (max-width: 767px) {
+  .rail-collapse { padding-inline: var(--s-3); }
+  .section-label, .rail-collapse span { transition: opacity var(--t-2) linear; }
+  .app-shell[data-rail="collapsed"] :is(.section-label, .rail-collapse span) { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .section-label, .rail-collapse :is(span, svg) { transition: none; }
+  }
+}
+.app-shell[data-rail="collapsed"] .rail-collapse svg { transform: rotate(180deg); }
 @media (min-width: 768px) {
   .app-shell { transition: grid-template-columns .42s cubic-bezier(.22,1,.36,1); }
   .app-shell[data-rail="collapsed"] { --side: 56px; }
@@ -810,10 +823,6 @@ mark {
   .shell-brand i, .rail-collapse svg { flex: none; }
   .shell-brand span, .section-label, .rail-workspaces p, .workspace-label, .workspace-check, .rail-collapse span, .rail-collapse kbd { transition: opacity var(--t-2) linear; white-space: nowrap; }
   .section-label { overflow: hidden; }
-  .rail-collapse { margin-top: auto; display: flex; align-items: center; gap: var(--s-2); min-height: 32px; padding: 0 var(--s-2); color: var(--c-text-3); font-size: var(--fs-3); }
-  .rail-collapse:hover { color: var(--c-text); }
-  .rail-collapse svg { width: 16px; height: 16px; transition: transform var(--t-2) var(--e-out); }
-  .rail-collapse .kbd { margin-left: auto; }
   .rail-key { display: inline-flex; align-items: center; gap: var(--s-1); }
   .rail-workspaces button { position: relative; }
   .workspace-initials { display: block; position: absolute; inset-inline: 0; text-align: center; opacity: 0; transition: opacity var(--t-2) linear; }
@@ -824,7 +833,6 @@ mark {
   .app-shell[data-rail="collapsed"] .rail-workspaces button[aria-pressed="true"] { box-shadow: inset 2px 0 0 var(--c-accent-text); }
   .app-shell[data-rail="collapsed"] :is(.shell-brand span, .section-label, .rail-workspaces p, .workspace-label, .workspace-check, .rail-collapse span, .rail-collapse kbd) { opacity: 0; pointer-events: none; }
   .app-shell[data-rail="collapsed"] .workspace-initials { opacity: 1; transition-delay: 120ms; }
-  .app-shell[data-rail="collapsed"] .rail-collapse svg { transform: rotate(180deg); }
   @media (prefers-reduced-motion: reduce) {
     .app-shell, .app-shell :is(.shell-brand, .shell-brand span, .section-label, .rail-workspaces p, .workspace-label, .workspace-check, .rail-collapse span, .rail-collapse svg, .rail-collapse kbd, .workspace-initials) { transition: none; }
   }

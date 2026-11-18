@@ -9,8 +9,6 @@ mod endpoints;
 #[path = "../../src/identity.rs"]
 mod identity;
 mod identity_login;
-#[path = "../../src/mcp_admin.rs"]
-mod mcp_admin;
 #[path = "../../src/oauth.rs"]
 mod oauth;
 #[path = "../../src/server.rs"]

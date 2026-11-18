@@ -1,4 +1,4 @@
-import { flushSync } from "react-dom"
+import { move as transitionPane, navigationMotion } from "@/lib/motion"
 import { BulkPane } from "@/components/bulk-pane"
 import { matches } from "@/lib/match"
 import { MatchText, SearchHint } from "@/components/match-text"
@@ -152,22 +152,25 @@ export function IntegrationsPage() {
   const choose = (id: string, push = false) => {
     setCursor(id)
     if (!push) return
-    flushSync(() => setPane("open"))
-    void navigate({
-      search: {
-        ...search,
-        selected: id,
-        oauth: undefined,
-        oauthError: undefined,
-        detail: push || open ? "open" : undefined,
-      },
-      replace: !push,
+    transitionPane(open ? "swap" : "open", () => {
+      setPane("open")
+      void navigate({
+        search: {
+          ...search,
+          selected: id,
+          oauth: undefined,
+          oauthError: undefined,
+          detail: push || open ? "open" : undefined,
+        },
+        replace: !push,
+      })
     })
   }
   const changeTab = (id: string) => {
     const target = tabs.find((item) => item.id === id)
     if (!target) return
     void navigate({
+      viewTransition: navigationMotion("filter"),
       search: {
         q: search.q,
         tab: id === "linked" || id === "attention" ? id : "all",
@@ -187,11 +190,17 @@ export function IntegrationsPage() {
       })
       return
     }
-    setPane("")
-    if (q) void navigate({ search: { ...search, q: undefined }, replace: true })
-    else
-      void navigate({ search: { ...search, detail: undefined }, replace: true })
-    list.current?.focus()
+    transitionPane("close", () => {
+      setPane("")
+      if (q)
+        void navigate({ search: { ...search, q: undefined }, replace: true })
+      else
+        void navigate({
+          search: { ...search, detail: undefined },
+          replace: true,
+        })
+      list.current?.focus()
+    })
   }
   useEffect(() => {
     if (search.oauth)

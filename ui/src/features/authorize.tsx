@@ -5,6 +5,7 @@ import { redirectResponse, write } from "@/lib/api"
 import { consentQuery } from "./authorization-query"
 import { workspacesQuery, sourcesQuery } from "./queries"
 import { PageHeader, ErrorNotice } from "@/components/common"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Field, FieldLabel, FieldDescription } from "@/components/ui/field"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
@@ -18,7 +19,7 @@ export function AuthorizePage() {
   const [workspaceId, setWorkspaceId] = useState(
     consent.requestedWorkspaceId ?? ""
   )
-  const administration = consent.scope === "admin"
+  const [admin, setAdmin] = useState(false)
   const workspace = workspaces.find((w) => w.id === workspaceId)
   const scope = workspace?.allSources
     ? sources
@@ -30,7 +31,8 @@ export function AuthorizePage() {
         "POST",
         {
           ...request,
-          ...(workspaceId && !administration ? { workspaceId } : {}),
+          ...(workspaceId ? { workspaceId } : {}),
+          admin,
           allow,
         },
         redirectResponse
@@ -41,11 +43,7 @@ export function AuthorizePage() {
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <PageHeader
         title={`Authorize ${consent.clientName}?`}
-        description={
-          administration
-            ? "This client is asking to manage your workspaces and source connections."
-            : "Choose which workspace this client can use."
-        }
+        description="Choose which workspace this client can use."
       />
       <dl className="grid gap-2 text-sm break-all">
         <dt className="font-medium">Client identity</dt>
@@ -57,66 +55,70 @@ export function AuthorizePage() {
           {consent.redirectUri}
         </dd>
       </dl>
-      {!administration && (
-        <Field>
-          <FieldLabel htmlFor="oauth-workspace">Workspace</FieldLabel>
-          <NativeSelect
-            id="oauth-workspace"
-            value={workspaceId}
-            onChange={(event) => setWorkspaceId(event.target.value)}
-          >
-            <NativeSelectOption value="" disabled>
-              Choose a workspace
+      <Field>
+        <FieldLabel htmlFor="oauth-workspace">Workspace</FieldLabel>
+        <NativeSelect
+          id="oauth-workspace"
+          value={workspaceId}
+          onChange={(event) => setWorkspaceId(event.target.value)}
+        >
+          <NativeSelectOption value="" disabled>
+            Choose a workspace
+          </NativeSelectOption>
+          {workspaces.map((w) => (
+            <NativeSelectOption key={w.id} value={w.id}>
+              {w.name}
+              {w.id === consent.requestedWorkspaceId
+                ? " · from the MCP URL"
+                : ""}
             </NativeSelectOption>
-            {workspaces.map((w) => (
-              <NativeSelectOption key={w.id} value={w.id}>
-                {w.name}
-                {w.id === consent.requestedWorkspaceId
-                  ? " · from the MCP URL"
-                  : ""}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-          <FieldDescription>
-            {consent.workspaceNotice ??
-              "This authorization stays bound to your chosen workspace."}
-          </FieldDescription>
-        </Field>
-      )}
+          ))}
+        </NativeSelect>
+        <FieldDescription>
+          {consent.workspaceNotice ??
+            "This authorization stays bound to your chosen workspace."}
+        </FieldDescription>
+      </Field>
       <Alert>
         <AlertTitle>
-          {administration
-            ? "Administration access"
-            : workspace
-              ? `Access to ${workspace.name}`
-              : "Choose a workspace to see its sources"}
+          {workspace
+            ? `Access to ${workspace.name}`
+            : "Choose a workspace to see its sources"}
         </AlertTitle>
         <AlertDescription>
-          {administration ? (
-            <p>
-              The client can create, change and delete your workspaces and
-              source connections, synchronize sources and view linked account
-              metadata. This covers your own tenant. Credentials stay private;
-              provider sign-in still happens in the browser.
-            </p>
-          ) : (
-            workspace && (
-              <>
-                <p>
-                  {scope.length
-                    ? scope.map((s) => s.slug).join(", ")
-                    : "This workspace currently includes no sources."}
-                </p>
-                <p>
-                  The client can search and call tools in this workspace using
-                  your linked accounts, subject to its tool policies. Future
-                  changes to workspace membership also apply.
-                </p>
-              </>
-            )
+          {workspace && (
+            <>
+              <p>
+                {scope.length
+                  ? scope.map((s) => s.slug).join(", ")
+                  : "This workspace currently includes no sources."}
+              </p>
+              <p>
+                The client can search and call tools in this workspace using
+                your linked accounts, subject to its tool policies. Future
+                changes to workspace membership also apply.
+              </p>
+            </>
           )}
         </AlertDescription>
       </Alert>
+      <Field>
+        <FieldLabel
+          htmlFor="authorize-admin"
+          className="flex items-center gap-2"
+        >
+          <Checkbox
+            id="authorize-admin"
+            checked={admin}
+            onCheckedChange={setAdmin}
+          />
+          Also allow administration tools
+        </FieldLabel>
+        <FieldDescription>
+          Manage workspaces and sources, synchronize tools, and see linked
+          account metadata.
+        </FieldDescription>
+      </Field>
       <ErrorNotice error={decision.error} />
       <div className="flex flex-wrap justify-end gap-3">
         <Button
@@ -127,14 +129,12 @@ export function AuthorizePage() {
           Deny
         </Button>
         <Button
-          disabled={decision.isPending || (!administration && !workspace)}
+          disabled={decision.isPending || !workspace}
           onClick={() => decision.mutate(true)}
         >
           {decision.isPending
             ? "Returning to client…"
-            : administration
-              ? "Authorize administration"
-              : "Authorize workspace"}
+            : `Authorize ${workspace?.name ?? "workspace"}${admin ? " with administration" : ""}`}
         </Button>
       </div>
     </section>

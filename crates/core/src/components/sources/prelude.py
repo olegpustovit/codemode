@@ -175,3 +175,45 @@ class _Memo:
         return json.loads(_call_sync('@codemode/memo', json.dumps({'op': 'set', 'key': key, 'value': value})))
 
 memo = _Memo()
+
+class _Administration:
+    def list_workspaces(self):
+        return json.loads(_call_sync('@codemode/admin/list_workspaces', json.dumps({})))
+
+    def save_workspace(self, name, sourceIds, id=None):
+        return json.loads(_call_sync('@codemode/admin/save_workspace', json.dumps({'name': name, 'sourceIds': sourceIds, 'id': id})))
+
+    def delete_workspace(self, id):
+        return json.loads(_call_sync('@codemode/admin/delete_workspace', json.dumps({'id': id})))
+
+    def list_integrations(self):
+        return json.loads(_call_sync('@codemode/admin/list_integrations', json.dumps({})))
+
+    def list_sources(self):
+        return json.loads(_call_sync('@codemode/admin/list_sources', json.dumps({})))
+
+    def save_source(self, source, id=None):
+        return json.loads(_call_sync('@codemode/admin/save_source', json.dumps({'source': source, 'id': id})))
+
+    def delete_source(self, id):
+        return json.loads(_call_sync('@codemode/admin/delete_source', json.dumps({'id': id})))
+
+    def sync_source(self, id):
+        return json.loads(_call_sync('@codemode/admin/sync_source', json.dumps({'id': id})))
+
+    def list_accounts(self):
+        return json.loads(_call_sync('@codemode/admin/list_accounts', json.dumps({})))
+
+    def source_connection_url(self, id):
+        return json.loads(_call_sync('@codemode/admin/source_connection_url', json.dumps({'id': id})))
+
+class _Codemode:
+    admin = _Administration()
+
+    def save_script(self, name, description, code, scope="workspace"):
+        """Save reusable Python for this workspace and return its scriptId."""
+        return json.loads(_call_sync('@codemode/save_script', json.dumps({
+            'name': name, 'description': description, 'code': code, 'scope': scope
+        })))
+
+codemode = _Codemode()

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.admin FROM access_tokens t JOIN executions e ON e.token_id=t.id WHERE e.id=$1 AND t.workspace_id=$2 AND t.revoked_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "admin",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "admin"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "19dc571c00a552d1cd9518ad0fa10bae7b170a8bd3061ed4d2c91bce3622da6a"
+}

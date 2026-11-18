@@ -743,9 +743,7 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await expect(
     page.getByRole("heading", { name: "Authorize Browser test client?" })
   ).toBeVisible()
-  await expect(
-    page.getByRole("button", { name: "Authorize workspace", exact: true })
-  ).toBeDisabled()
+  await expect(page.getByRole("button", { name: /^Authorize / })).toBeDisabled()
   await page.getByLabel("Workspace", { exact: true }).selectOption(workspaceId)
   await expect(page.getByRole("alert")).toContainText("browser-fixture")
   await capture(page, "desktop-consent.png")
@@ -760,9 +758,7 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   expect(new URL(page.url()).searchParams.get("state")).toBe("browser-state")
   await page.goto(`${origin}/oauth/authorize?${query}`)
   await page.getByLabel("Workspace", { exact: true }).selectOption(workspaceId)
-  await page
-    .getByRole("button", { name: "Authorize workspace", exact: true })
-    .click()
+  await page.getByRole("button", { name: /^Authorize / }).click()
   await expect(page).toHaveURL(/client\.example\/callback\?.*code=/)
   expect(new URL(page.url()).searchParams.get("iss")).toBe(origin)
   await page.goto(`${origin}/workspaces/${workspaceId}`)
@@ -1623,7 +1619,7 @@ test("each account keeps its own MCPs, credentials, agent access and history", a
   ).toBe(404)
 })
 
-test("workspace bookmarks, preset connection and separate administration authorization", async ({
+test("workspace bookmarks, preset connection and opt-in administration authorization", async ({
   page,
 }) => {
   await login(page, "/workspaces")
@@ -1663,25 +1659,20 @@ test("workspace bookmarks, preset connection and separate administration authori
     .locator(".list-heading")
     .getByRole("button", { name: "New personal token", exact: true })
     .click()
-  await page.getByLabel("Access", { exact: true }).selectOption("admin")
-  await expect(page.getByLabel("Workspace", { exact: true })).toHaveCount(0)
+  await page
+    .getByRole("checkbox", { name: "Also allow administration tools" })
+    .click()
+  await expect(page.getByLabel("Workspace", { exact: true })).toBeVisible()
   await page
     .getByLabel("Name", { exact: true })
     .fill("Management browser check")
   await page.getByRole("button", { name: "Create token", exact: true }).click()
   const token = await page.getByLabel("New access token").inputValue()
   await expect(
-    page
-      .locator(".code-panel")
-      .filter({ hasText: "codex mcp add codemode-admin" })
-  ).toContainText(
-    "https://codemode.microapps.space/mcp-admin --bearer-token-env-var CODEMODE_TOKEN"
-  )
-  await expect(
-    page.getByText("code_mode_tool_search = false", { exact: false })
-  ).toHaveCount(0)
-  const rpc = async (resource: string, method: string, params: object) => {
-    const response = await page.request.post(`${loopback}${resource}`, {
+    page.locator(".code-panel").filter({ hasText: "codex mcp add codemode" })
+  ).toContainText("https://codemode.microapps.space/mcp?workspace=")
+  const rpc = async (method: string, params: object) => {
+    const response = await page.request.post(`${loopback}/mcp`, {
       headers: {
         host: hostname,
         Authorization: `Bearer ${token}`,
@@ -1690,45 +1681,24 @@ test("workspace bookmarks, preset connection and separate administration authori
       },
       data: { jsonrpc: "2.0", id: 1, method, params },
     })
-    return response
+    expect(response.ok()).toBe(true)
+    return (await response.json()).result
   }
-  expect((await rpc("/mcp", "tools/list", {})).status()).toBe(401)
-  const tools = await (await rpc("/mcp-admin", "tools/list", {})).json()
-  expect(tools.result.tools).toHaveLength(10)
-  const modern = await page.request.post(`${loopback}/mcp-admin`, {
-    headers: {
-      host: hostname,
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json, text/event-stream",
-      "MCP-Protocol-Version": "2026-07-28",
-      "Mcp-Method": "tools/list",
-    },
-    data: {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/list",
-      params: {
-        _meta: {
-          "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-          "io.modelcontextprotocol/clientCapabilities": {},
-          "io.modelcontextprotocol/clientInfo": {
-            name: "management-browser",
-            version: "1",
-          },
-        },
-      },
-    },
+  const tools = await rpc("tools/list", {})
+  expect(tools.tools.map((tool: { name: string }) => tool.name).sort()).toEqual(
+    ["execute", "search"]
+  )
+  const discovery = await rpc("tools/call", {
+    name: "search",
+    arguments: { query: "codemode.admin" },
   })
-  expect(modern.status()).toBe(200)
-  expect((await modern.json()).result.tools).toHaveLength(10)
-  const workspaces = await (
-    await rpc("/mcp-admin", "tools/call", {
-      name: "list_workspaces",
-      arguments: {},
-    })
-  ).json()
+  expect(JSON.parse(discovery.content[0].text).tools).toHaveLength(10)
+  const workspacesResult = await rpc("tools/call", {
+    name: "execute",
+    arguments: { code: "return codemode.admin.list_workspaces()" },
+  })
   expect(
-    JSON.parse(workspaces.result.content[0].text).some(
+    JSON.parse(workspacesResult.content[0].text).result.some(
       (w: { allSources: boolean }) => w.allSources
     )
   ).toBe(true)
@@ -1736,14 +1706,7 @@ test("workspace bookmarks, preset connection and separate administration authori
   const managementRow = page
     .getByRole("grid", { name: "Agents with access", exact: true })
     .getByRole("row", { name: "Management browser check", exact: true })
-  await expect(managementRow).toContainText("Administration")
-  await managementRow.click()
-  const managementDetails = page.getByRole("region", {
-    name: "Token details",
-    exact: true,
-  })
-  await expect(managementDetails).toContainText("Administration")
-  await expect(managementDetails).toContainText("/mcp-admin")
+  await expect(managementRow).toContainText("Admin tools")
   const registration = await page.evaluate(() =>
     fetch("/oauth/register", {
       method: "POST",
@@ -1759,8 +1722,8 @@ test("workspace bookmarks, preset connection and separate administration authori
     response_type: "code",
     client_id: registration.client_id,
     redirect_uri: "https://client.example/callback",
-    resource: `${origin}/mcp-admin`,
-    scope: "admin",
+    resource: `${origin}/mcp`,
+    scope: "mcp",
     code_challenge: createHash("sha256")
       .update("browser-verifier-123456789012345678901234567890123456789")
       .digest("base64url"),
@@ -1770,16 +1733,21 @@ test("workspace bookmarks, preset connection and separate administration authori
   await expect(
     page.getByRole("heading", { name: "Authorize Workspace manager?" })
   ).toBeVisible()
-  await expect(page.getByLabel("Workspace", { exact: true })).toHaveCount(0)
-  await expect(page.getByRole("alert")).toContainText(
-    "create, change and delete your workspaces"
-  )
+  await page
+    .getByLabel("Workspace", { exact: true })
+    .selectOption({ label: "All sources" })
+  await page
+    .getByRole("checkbox", { name: "Also allow administration tools" })
+    .click()
   await capture(page, "workspace-admin-consent-desktop.png")
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
   await capture(page, "workspace-admin-consent-mobile.png")
   await page
-    .getByRole("button", { name: "Authorize administration", exact: true })
+    .getByRole("button", {
+      name: "Authorize All sources with administration",
+      exact: true,
+    })
     .click()
   await expect(page).toHaveURL(/client\.example\/callback\?.*code=/)
 })
@@ -3013,4 +2981,51 @@ test("integrations: add a namespaced login to the selected workspace", async ({
   }, workspace)
   expect(linked).not.toBe("")
   expect(membership).toContain(linked)
+})
+
+test("script scope promotion exposes a global script in a second workspace", async ({
+  page,
+}) => {
+  await login(page, "/scripts")
+  const fixture = await page.evaluate(async () => {
+    const workspaces = await fetch("/api/workspaces").then((response) =>
+      response.json()
+    )
+    const main = workspaces.find(
+      (workspace: { allSources: boolean }) => workspace.allSources
+    ).id
+    const other = await fetch("/api/workspaces", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Global script fixture", sourceIds: [] }),
+    }).then((response) => response.json())
+    const script = await fetch(`/api/workspaces/${main}/scripts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Scope browser script",
+        description: "",
+        code: "return 17",
+      }),
+    }).then((response) => response.json())
+    return { main, other: other.id, script: script.id }
+  })
+  await page.goto(
+    `/scripts?workspace=${fixture.main}&selected=${fixture.script}&detail=open`
+  )
+  await page.getByRole("button", { name: "Make global", exact: true }).click()
+  await expect(page.getByRole("button", { name: /^Move to / })).toBeVisible()
+  await page.goto(`/scripts?workspace=${fixture.other}&scope=global`)
+  const row = page.getByRole("row", {
+    name: "Scope browser script",
+    exact: true,
+  })
+  await expect(row).toContainText("Global")
+  await row.click()
+  await expect(
+    page.getByRole("button", {
+      name: "Move to Global script fixture",
+      exact: true,
+    })
+  ).toBeVisible()
 })

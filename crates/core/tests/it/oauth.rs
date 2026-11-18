@@ -118,7 +118,7 @@ async fn oauth_workspace_resource_binds_exchange_and_refresh(pool: sqlx::PgPool)
 
 #[sqlx::test(migrations = "./migrations")]
 async fn oauth_requires_workspace_selection_and_resource_scope_cannot_escalate(pool: sqlx::PgPool) {
-    let (db, oauth, endpoints, client, mut authorization) = setup(&pool).await;
+    let (db, oauth, _endpoints, client, mut authorization) = setup(&pool).await;
     let chosen = authorization.workspace_id.unwrap();
     authorization.workspace_id = None;
     assert!(
@@ -144,7 +144,7 @@ async fn oauth_requires_workspace_selection_and_resource_scope_cannot_escalate(p
     wrong.resource = "https://test.example/mcp-admin".into();
     assert!(matches!(
         oauth.token(&client, &wrong).await,
-        Err(OAuthError::Grant)
+        Err(OAuthError::Target)
     ));
     let token = oauth.token(&client, &exchange(&code)).await.unwrap();
     let auth = Auth::new(db.clone());
@@ -159,29 +159,32 @@ async fn oauth_requires_workspace_selection_and_resource_scope_cannot_escalate(p
     wrong.resource = "https://test.example/mcp-admin".into();
     assert!(matches!(
         oauth.token(&client, &wrong).await,
-        Err(OAuthError::Grant)
+        Err(OAuthError::Target)
     ));
-    authorization.resource = "https://test.example/mcp-admin".into();
-    assert!(matches!(
-        oauth.issue_code(&authorization).await,
-        Err(OAuthError::Scope)
-    ));
-    authorization.scope = Some("admin".into());
-    authorization.workspace_id = None;
-    let code = oauth.issue_code(&authorization).await.unwrap();
-    let mut request = exchange(&code);
-    request.resource = authorization.resource.clone();
-    let token = oauth.token(&client, &request).await.unwrap();
-    assert_eq!(token.scope, "admin");
+    let code = oauth
+        .issue_code_with_administration(&authorization, true)
+        .await
+        .unwrap();
+    let token = oauth.token(&client, &exchange(&code)).await.unwrap();
+    assert_eq!(token.scope, "mcp");
     let principal = auth
         .authenticate(&token.access_token, "test.example")
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(principal.resource, "/mcp-admin");
-    assert_eq!(
-        principal.workspace_id,
-        endpoints.default_id().await.unwrap()
+    assert_eq!(principal.resource, "/mcp");
+    assert_eq!(principal.workspace_id, chosen);
+    assert!(principal.admin);
+    let refreshed = oauth
+        .token(&client, &refresh(token.refresh_token.as_deref().unwrap()))
+        .await
+        .unwrap();
+    assert!(
+        auth.authenticate(&refreshed.access_token, "test.example")
+            .await
+            .unwrap()
+            .unwrap()
+            .admin
     );
 }
 
@@ -226,7 +229,7 @@ async fn oauth_codes_require_s256_bindings_expiry_and_single_use(pool: sqlx::PgP
     request.resource = "https://test.example/mcp-admin".into();
     assert!(matches!(
         oauth.token(&client, &request).await,
-        Err(OAuthError::Grant)
+        Err(OAuthError::Target)
     ));
     let tokens = oauth.token(&client, &exchange(&code)).await.unwrap();
     assert_eq!(tokens.expires_in, 3600);

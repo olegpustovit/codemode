@@ -385,8 +385,8 @@
 .tab-bar { flex-shrink: 0; overflow-x: auto; }
 .tab-bar > button { flex-shrink: 0; }
 @media (max-width: 1000px) { .workspace-screen { --list-columns: minmax(0,1fr) 100px; } .workspace-screen .data-extra:nth-child(2) { display: none; } }
-.scripts-screen { --list-columns: minmax(0,1fr) minmax(0,1.3fr) 110px; }
-@media (max-width: 1000px) { .scripts-screen { --list-columns: minmax(0,1fr) 110px; } .scripts-screen .data-extra:nth-child(2) { display: none; } }
+.scripts-screen { --list-columns: minmax(0,1fr) minmax(0,1.3fr) 110px 110px; }
+@media (max-width: 1000px) { .scripts-screen { --list-columns: minmax(0,1fr) 110px; } .scripts-screen .data-extra:nth-child(2), .scripts-screen .data-extra:nth-child(4) { display: none; } }
 .tokens-screen { --list-columns: minmax(0,1fr) 130px 120px 120px; }
 .tokens-screen .pane-stack[data-open="true"] .list-pane { --list-columns: minmax(0,1fr) 100px; }
 .tokens-screen .pane-stack[data-open="true"] .list-pane .data-extra:nth-child(3) { display: none; }
@@ -934,3 +934,7 @@ mark {
 .integration-logins li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-1) var(--s-3); border-top: 1px solid var(--c-line); padding-block: var(--s-2); }
 .integration-logins li code, .integration-logins li small { color: var(--c-text-3); overflow-wrap: anywhere; }
 .integration-logins > button { justify-self: start; }
+
+.app-shell .tab-underline { transition: transform var(--enter) var(--e-soft), width var(--enter) var(--e-soft); }
+.app-shell .workspace-check { view-transition-name: ws-check; }
+.status-copy { display: inline-block; animation: codemode-fade-in var(--enter) var(--e-soft); }

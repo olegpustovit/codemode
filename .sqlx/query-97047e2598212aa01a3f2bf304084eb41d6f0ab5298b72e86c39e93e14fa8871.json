@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO control_changes(tenant_id,request_id,workspace_id,kind,item,action) VALUES($1,$2,$3,'script',$4,$5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "97047e2598212aa01a3f2bf304084eb41d6f0ab5298b72e86c39e93e14fa8871"
+}

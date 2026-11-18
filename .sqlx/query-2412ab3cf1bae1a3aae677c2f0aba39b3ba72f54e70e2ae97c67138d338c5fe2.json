@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id,s.name,s.description FROM saved_scripts s JOIN endpoints e ON e.id=s.endpoint_id WHERE e.id=$1 AND ($2='' OR s.search @@ websearch_to_tsquery('simple',$2)) ORDER BY ts_rank(s.search,websearch_to_tsquery('simple',$2)) DESC,s.name,s.id LIMIT 20",
+  "query": "SELECT s.id,s.name,s.description FROM saved_scripts s JOIN endpoints e ON e.tenant_id=s.tenant_id WHERE e.id=$1 AND (s.endpoint_id=e.id OR s.endpoint_id IS NULL) AND ($2='' OR s.search @@ websearch_to_tsquery('simple',$2)) ORDER BY ts_rank(s.search,websearch_to_tsquery('simple',$2)) DESC,s.name,s.id LIMIT 20",
   "describe": {
     "columns": [
       {
@@ -49,5 +49,5 @@
       false
     ]
   },
-  "hash": "75dc693c23342f18f5fa5b0993a34e541f3a00b956057fe1ac2c9a0c773c7a84"
+  "hash": "2412ab3cf1bae1a3aae677c2f0aba39b3ba72f54e70e2ae97c67138d338c5fe2"
 }

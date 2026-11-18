@@ -1,4 +1,6 @@
-import { flushSync } from "react-dom"
+import { relativeTime } from "@/lib/time"
+import { navigationMotion } from "@/lib/motion"
+import { move as transitionPane } from "@/lib/motion"
 import { BulkPane } from "@/components/bulk-pane"
 import { matches } from "@/lib/match"
 import { MatchText, SearchHint } from "@/components/match-text"
@@ -39,7 +41,7 @@ import { useStatus } from "@/components/status-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ErrorNotice, date } from "@/components/common"
-import { write, bulkResult } from "@/lib/api"
+import { message, nothing, write, bulkResult } from "@/lib/api"
 import { useWorkspace } from "@/components/workspace-context"
 const route = getRouteApi("/_authenticated/scripts")
 export function ScriptLibraryPage() {
@@ -56,13 +58,22 @@ export function ScriptLibraryPage() {
     workspaces.find((w) => w.id === (search.workspace ?? chosenWorkspace)) ??
     workspaces.find((w) => w.allSources) ??
     workspaces[0]
-  const selection = useListSelection(`${workspace?.id ?? ""}:${search.q ?? ""}`)
+  const scope = search.scope ?? "all"
+  const selection = useListSelection(
+    `${workspace?.id ?? ""}:${search.q ?? ""}:${scope}`
+  )
   const scripts = useQuery({
     ...scriptsQuery(workspace?.id ?? ""),
     enabled: !!workspace,
   })
-  const rows = (scripts.data ?? []).filter((s) =>
-    matches(search.q ?? "", s.name, s.description)
+  const all = scripts.data ?? []
+  const rows = all.filter(
+    (script) =>
+      (scope === "all" ||
+        (scope === "global"
+          ? script.workspaceId === null
+          : script.workspaceId !== null)) &&
+      matches(search.q ?? "", script.name, script.description)
   )
   const selected = rows.find((s) => s.id === cursor) ?? rows[0]
   const detail = useQuery({
@@ -94,27 +105,31 @@ export function ScriptLibraryPage() {
       return
     }
     setDeleting(false)
-    setPane("")
-    void navigate({
-      search: {
-        ...search,
-        detail: undefined,
-        q: search.detail ? search.q : undefined,
-      },
+    transitionPane("close", () => {
+      setPane("")
+      void navigate({
+        search: {
+          ...search,
+          detail: undefined,
+          q: search.detail ? search.q : undefined,
+        },
+      })
+      requestAnimationFrame(() => list.current?.focus())
     })
-    requestAnimationFrame(() => list.current?.focus())
   }
   const choose = (id: string, open = false) => {
     setCursor(id)
     if (!open) return
-    flushSync(() => setPane("open"))
-    void navigate({
-      search: {
-        ...search,
-        selected: id,
-        detail: open || search.detail ? "open" : undefined,
-      },
-      replace: !open,
+    transitionPane(pane === "open" ? "swap" : "open", () => {
+      setPane("open")
+      void navigate({
+        search: {
+          ...search,
+          selected: id,
+          detail: open || search.detail ? "open" : undefined,
+        },
+        replace: !open,
+      })
     })
   }
   useEffect(() => {
@@ -218,9 +233,31 @@ export function ScriptLibraryPage() {
       <TabBar
         label="Filter scripts"
         panelId="script-panes"
-        selected="all"
-        onSelect={() => {}}
-        tabs={[{ id: "all", label: "All", count: scripts.data?.length ?? 0 }]}
+        selected={scope}
+        onSelect={(tab) =>
+          void navigate({
+            search: {
+              ...search,
+              scope: tab === "global" || tab === "workspace" ? tab : undefined,
+              selected: undefined,
+              detail: undefined,
+            },
+            viewTransition: navigationMotion("filter"),
+          })
+        }
+        tabs={[
+          { id: "all", label: "All", count: all.length },
+          {
+            id: "workspace",
+            label: workspace?.name ?? "Workspace",
+            count: all.filter((s) => s.workspaceId !== null).length,
+          },
+          {
+            id: "global",
+            label: "Global",
+            count: all.filter((s) => s.workspaceId === null).length,
+          },
+        ]}
       />
       <PaneStack
         id="script-panes"
@@ -235,17 +272,26 @@ export function ScriptLibraryPage() {
               listRef={list}
               busy={scripts.isFetching}
               selectedId={selected?.id}
-              columns={["Script", "Description", "Saved"]}
+              columns={["Script", "Description", "Scope", "Saved"]}
               rows={rows.map((s) => ({
                 id: s.id,
                 label: s.name,
-                group: "Saved scripts",
+                group: s.workspaceId
+                  ? (workspace?.name ?? "Workspace")
+                  : "Global",
                 cells: [
                   <span key="name" className="font-mono">
                     <MatchText query={search.q ?? ""}>{s.name}</MatchText>
                   </span>,
                   s.description || "—",
-                  date(s.updatedAt),
+                  s.workspaceId ? workspace?.name : "Global",
+                  <time
+                    key="saved"
+                    dateTime={s.updatedAt}
+                    title={date(s.updatedAt)}
+                  >
+                    {relativeTime(s.updatedAt)}
+                  </time>,
                 ],
               }))}
               onDelete={() => setDeleting(true)}
@@ -386,7 +432,31 @@ export function ScriptLibraryPage() {
                     <p className="pane-meta">{detail.data.description}</p>
                     <Facts
                       items={[
-                        { label: "Workspace", value: workspace.name },
+                        {
+                          label: "Scope",
+                          value: detail.data.workspaceId
+                            ? workspace.name
+                            : "Global",
+                        },
+                        ...(detail.data.savedBy
+                          ? [
+                              {
+                                label: "Saved by",
+                                value: detail.data.fromExecution ? (
+                                  <Link
+                                    to="/executions/$executionId"
+                                    params={{
+                                      executionId: detail.data.fromExecution,
+                                    }}
+                                  >
+                                    {detail.data.savedBy}
+                                  </Link>
+                                ) : (
+                                  detail.data.savedBy
+                                ),
+                              },
+                            ]
+                          : []),
                         { label: "Saved", value: date(detail.data.updatedAt) },
                         { label: "Revision", value: detail.data.revision },
                       ]}
@@ -395,7 +465,39 @@ export function ScriptLibraryPage() {
                     <pre className="code-panel">
                       <PythonCode code={detail.data.code} />
                     </pre>
+                    <p className="pane-meta">
+                      {detail.data.workspaceId
+                        ? "Making it global shares the script with every workspace in this tenant."
+                        : "A global script runs with the calling workspace’s tools and policies."}
+                    </p>
                     <div className="detail-actions">
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          const script = detail.data
+                          try {
+                            await write(
+                              `/api/workspaces/${workspace.id}/scripts/${script.id}/scope`,
+                              "PUT",
+                              {
+                                revision: script.revision,
+                                global: script.workspaceId !== null,
+                              },
+                              nothing
+                            )
+                            await cache.invalidateQueries({
+                              queryKey: ["scripts"],
+                            })
+                            report("Script scope saved")
+                          } catch (error) {
+                            report(message(error), "error")
+                          }
+                        }}
+                      >
+                        {detail.data.workspaceId
+                          ? "Make global"
+                          : `Move to ${workspace.name}`}
+                      </Button>
                       <Button
                         render={
                           <Link

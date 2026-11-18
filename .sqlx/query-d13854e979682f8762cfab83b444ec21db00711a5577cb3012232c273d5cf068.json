@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.code FROM saved_scripts s JOIN endpoints e ON e.tenant_id=s.tenant_id WHERE e.id=$1 AND (s.endpoint_id=e.id OR s.endpoint_id IS NULL) AND s.id=$2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "saved_scripts",
+            "name": "code"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d13854e979682f8762cfab83b444ec21db00711a5577cb3012232c273d5cf068"
+}

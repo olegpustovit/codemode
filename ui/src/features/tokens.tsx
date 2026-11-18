@@ -11,6 +11,7 @@ import { mcpUrl } from "@/lib/workspace-url"
 import { configQuery } from "@/lib/runtime"
 import { write } from "@/lib/api"
 import { ErrorNotice } from "@/components/common"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -24,31 +25,27 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { useStatus } from "@/components/status-bar"
 export function TokenForm({ onDone }: { onDone: () => void }) {
   const { report } = useStatus()
-  const [administration, setAdministration] = useState(false)
+  const [admin, setAdmin] = useState(false)
   const workspaces = useSuspenseQuery(workspacesQuery).data
   const cache = useQueryClient()
-  const serverName = administration ? "codemode-admin" : "codemode"
+  const serverName = "codemode"
   const { hostname } = useSuspenseQuery(configQuery).data
   const create = useMutation({
     mutationFn: async (form: FormData) => {
-      const workspaceId = administration
-        ? undefined
-        : z.uuid().parse(form.get("workspace"))
+      const workspaceId = z.uuid().parse(form.get("workspace"))
       const result = await write(
         "/api/tokens",
         "POST",
         {
           name: z.string().trim().min(1).max(128).parse(form.get("name")),
-          administration,
+          admin,
           workspaceId,
         },
         z.object({ id: z.uuid(), token: z.string().min(1) })
       )
       return {
         ...result,
-        url: administration
-          ? `https://${hostname}/mcp-admin`
-          : mcpUrl(hostname, workspaceId),
+        url: mcpUrl(hostname, workspaceId),
       }
     },
     onSuccess: () => cache.invalidateQueries({ queryKey: ["tokens"] }),
@@ -104,24 +101,19 @@ export function TokenForm({ onDone }: { onDone: () => void }) {
               section of <code>~/.codex/config.toml</code>, add:
             </p>
             <pre className="code-panel">
-              <code>{`default_tools_approval_mode = "approve"${administration ? "" : '\nomit_tools_from = ["deferred"]'}`}</code>
+              <code>{`default_tools_approval_mode = "approve"\nomit_tools_from = ["deferred"]`}</code>
             </pre>
-            {!administration && (
-              <>
-                <p>
-                  For Codex 0.169.0 sessions using only this gateway, merge
-                  these values into the existing <code>[features]</code>{" "}
-                  section:
-                </p>
-                <pre className="code-panel">
-                  <code>
-                    {
-                      "code_mode = true\ntool_suggest = true\ncode_mode_tool_search = false"
-                    }
-                  </code>
-                </pre>
-              </>
-            )}
+            <p>
+              For Codex 0.169.0 sessions using only this gateway, merge these
+              values into the existing <code>[features]</code> section:
+            </p>
+            <pre className="code-panel">
+              <code>
+                {
+                  "code_mode = true\ntool_suggest = true\ncode_mode_tool_search = false"
+                }
+              </code>
+            </pre>
             <p>
               If ChatGPT connectors cover the same apps, set{" "}
               <code>apps = false</code> in the existing <code>[features]</code>{" "}
@@ -150,48 +142,39 @@ export function TokenForm({ onDone }: { onDone: () => void }) {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="token-access">Access</FieldLabel>
+              <FieldLabel htmlFor="token-workspace">Workspace</FieldLabel>
               <NativeSelect
-                id="token-access"
-                disabled={create.isPending}
-                value={administration ? "admin" : "mcp"}
-                onChange={(event) =>
-                  setAdministration(event.target.value === "admin")
-                }
+                id="token-workspace"
+                name="workspace"
+                defaultValue={workspaces[0]?.id}
               >
-                <NativeSelectOption value="mcp">
-                  Workspace tools · /mcp
-                </NativeSelectOption>
-                <NativeSelectOption value="admin">
-                  Administration · /mcp-admin
-                </NativeSelectOption>
+                {workspaces.map((workspace) => (
+                  <NativeSelectOption key={workspace.id} value={workspace.id}>
+                    {workspace.name}
+                    {workspace.allSources ? " · all sources" : ""}
+                  </NativeSelectOption>
+                ))}
               </NativeSelect>
               <FieldDescription>
-                {administration
-                  ? "Can create, change and delete your workspaces and sources. Credentials stay private."
-                  : "Can search and call tools in one workspace."}
+                The token stays bound to this workspace.
               </FieldDescription>
             </Field>
-            {!administration && (
-              <Field>
-                <FieldLabel htmlFor="token-workspace">Workspace</FieldLabel>
-                <NativeSelect
-                  id="token-workspace"
-                  name="workspace"
-                  defaultValue={workspaces[0]?.id}
-                >
-                  {workspaces.map((workspace) => (
-                    <NativeSelectOption key={workspace.id} value={workspace.id}>
-                      {workspace.name}
-                      {workspace.allSources ? " · all sources" : ""}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-                <FieldDescription>
-                  The token stays bound to this workspace.
-                </FieldDescription>
-              </Field>
-            )}
+            <Field>
+              <FieldLabel
+                htmlFor="token-admin"
+                className="flex items-center gap-2"
+              >
+                <Checkbox
+                  id="token-admin"
+                  checked={admin}
+                  onCheckedChange={setAdmin}
+                />
+                Also allow administration tools
+              </FieldLabel>
+              <FieldDescription>
+                Manage workspaces and sources and see linked account metadata.
+              </FieldDescription>
+            </Field>
             <ErrorNotice error={create.error} />
             <Button
               type="submit"

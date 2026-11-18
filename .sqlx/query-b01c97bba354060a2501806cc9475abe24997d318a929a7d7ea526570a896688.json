@@ -1,16 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.code FROM saved_scripts s JOIN endpoints e ON e.id=s.endpoint_id WHERE e.id=$1 AND s.id=$2",
+  "query": "SELECT id FROM saved_scripts WHERE tenant_id=$1 AND endpoint_id IS NOT DISTINCT FROM $2 AND name=$3 FOR UPDATE",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "code",
-        "type_info": "Text",
+        "name": "id",
+        "type_info": "Uuid",
         "origin": {
           "Table": {
             "table": "saved_scripts",
-            "name": "code"
+            "name": "id"
           }
         }
       }
@@ -18,12 +18,13 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid"
+        "Uuid",
+        "Text"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "065d3ae3878f221c2a851e1c1670220b0fd0dada4c2178e89a33035f843eb60a"
+  "hash": "b01c97bba354060a2501806cc9475abe24997d318a929a7d7ea526570a896688"
 }

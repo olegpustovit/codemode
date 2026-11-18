@@ -868,3 +868,74 @@ async fn session_memo_persists_atomic_bounded_non_sensitive_json_and_expires(poo
     assert_eq!(remaining, 0);
     f.close().await;
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn agent_saves_and_runs_a_script_with_the_callers_workspace_policy(pool: sqlx::PgPool) {
+    use codemode_core::components::scripts::Scripts;
+    let f = Fixture::new(&pool).await;
+    let scripts = Scripts::new(f.db.clone());
+    let save = f.execution.execute(f.principal.clone(),
+        "return codemode.save_script('Reusable', 'Inspect a fixture', 'return await tools.fixture.read()')".into(),
+    ).await.unwrap();
+    assert_eq!(save.status, "completed", "{:?}", save.error);
+    let result: serde_json::Value = serde_json::from_str(save.result.get()).unwrap();
+    let id = Uuid::parse_str(result["scriptId"].as_str().unwrap()).unwrap();
+    let local = scripts.get(f.endpoint, id).await.unwrap();
+    assert_eq!(local.summary.workspace_id, Some(f.endpoint));
+    assert!(local.summary.saved_by.is_some());
+    assert_eq!(local.summary.from_execution, Some(save.execution_id));
+
+    let denied = f.execution.execute(f.principal.clone(),
+        "try:\n    codemode.save_script('Global', '', 'return 1', scope='global')\nexcept PermissionError:\n    return 'blocked'".into(),
+    ).await.unwrap();
+    assert_eq!(denied.result.get(), "\"blocked\"");
+
+    let endpoints = Workspaces::new(f.db.clone(), "test.example".into()).unwrap();
+    let other = endpoints.create("other scope", &[f.source]).await.unwrap();
+    let (_, token) = Auth::new(f.db.clone())
+        .create_for_workspace("other agent", other, "test.example", "/mcp")
+        .await
+        .unwrap()
+        .unwrap();
+    let principal = Auth::new(f.db.clone())
+        .authenticate(&token, "test.example")
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(scripts.get(other, id).await.is_err());
+    scripts.set_scope(f.endpoint, id, 1, true).await.unwrap();
+    assert_eq!(
+        scripts.get(other, id).await.unwrap().summary.workspace_id,
+        None
+    );
+    assert_eq!(
+        f.execution
+            .execute_script(principal.clone(), id, Default::default())
+            .await
+            .unwrap()
+            .status,
+        "completed"
+    );
+    let revision = f.sources.get(f.source).await.unwrap().unwrap().revision;
+    f.sources
+        .policies()
+        .set(other, f.source, revision, "read", Choice::Block)
+        .await
+        .unwrap();
+    let blocked = f
+        .execution
+        .execute_script(principal, id, Default::default())
+        .await
+        .unwrap();
+    assert_eq!(blocked.status, "failed");
+    assert!(blocked.error.unwrap().contains("PermissionError"));
+    scripts.set_scope(other, id, 2, false).await.unwrap();
+    assert!(scripts.get(f.endpoint, id).await.is_err());
+    assert_eq!(
+        scripts.get(other, id).await.unwrap().summary.workspace_id,
+        Some(other)
+    );
+    f.stop.cancel();
+    f.tasks.close();
+    f.tasks.wait().await;
+}

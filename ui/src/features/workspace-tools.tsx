@@ -1,4 +1,4 @@
-import { flushSync } from "react-dom"
+import { move as transitionPane, navigationMotion } from "@/lib/motion"
 import { BulkPane } from "@/components/bulk-pane"
 import { ToolScopeMode } from "./policies"
 import { MatchText, SearchHint } from "@/components/match-text"
@@ -104,31 +104,38 @@ export function WorkspaceToolsPage() {
       })
       return
     }
-    setPane("")
-    void navigate({
-      search: {
-        ...search,
-        detail: undefined,
-        q: search.detail ? search.q : undefined,
-      },
+    transitionPane("close", () => {
+      setPane("")
+      void navigate({
+        search: {
+          ...search,
+          detail: undefined,
+          q: search.detail ? search.q : undefined,
+        },
+      })
+      requestAnimationFrame(() => list.current?.focus())
     })
-    requestAnimationFrame(() => list.current?.focus())
   }
   const choose = (path: string, open = false) => {
     setCursor(path)
     if (!open) return
-    flushSync(() => setPane("open"))
-    void navigate({
-      search: {
-        ...search,
-        selected: path,
-        detail: open || search.detail ? "open" : undefined,
-      },
-      replace: !open,
+    transitionPane(pane === "open" ? "swap" : "open", () => {
+      setPane("open")
+      void navigate({
+        search: {
+          ...search,
+          selected: path,
+          detail: open || search.detail ? "open" : undefined,
+        },
+        replace: !open,
+      })
     })
   }
   const changeWorkspace = (id: string) =>
-    void navigate({ search: { workspace: id, q: search.q } })
+    void navigate({
+      search: { workspace: id, q: search.q },
+      viewTransition: navigationMotion("ws"),
+    })
   const save = useMutation({
     mutationFn: ({
       tool,

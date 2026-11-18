@@ -1,4 +1,4 @@
-import { flushSync } from "react-dom"
+import { move as transitionPane } from "@/lib/motion"
 import { BulkPane } from "@/components/bulk-pane"
 import { useStatus } from "@/components/status-bar"
 import { matches } from "@/lib/match"
@@ -61,27 +61,31 @@ export function TokensPage() {
       return
     }
     setRevoking(false)
-    setPane("")
-    void navigate({
-      search: {
-        ...search,
-        detail: undefined,
-        q: search.detail ? search.q : undefined,
-      },
+    transitionPane("close", () => {
+      setPane("")
+      void navigate({
+        search: {
+          ...search,
+          detail: undefined,
+          q: search.detail ? search.q : undefined,
+        },
+      })
+      requestAnimationFrame(() => list.current?.focus())
     })
-    requestAnimationFrame(() => list.current?.focus())
   }
   const choose = (id: string, open = false) => {
     setCursor(id)
     if (!open) return
-    flushSync(() => setPane("open"))
-    void navigate({
-      search: {
-        ...search,
-        selected: id,
-        detail: open || search.detail === "open" ? "open" : undefined,
-      },
-      replace: !open,
+    transitionPane(pane === "open" ? "swap" : "open", () => {
+      setPane("open")
+      void navigate({
+        search: {
+          ...search,
+          selected: id,
+          detail: open || search.detail === "open" ? "open" : undefined,
+        },
+        replace: !open,
+      })
     })
   }
   useEffect(() => {
@@ -197,11 +201,13 @@ export function TokensPage() {
                   <MatchText key="name" query={search.q ?? ""}>
                     {t.name}
                   </MatchText>,
-                  t.oauth ? "OAuth" : "Personal token",
-                  t.resource === "/mcp-admin"
-                    ? "Administration"
-                    : (workspaces.find((w) => w.id === t.workspaceId)?.name ??
-                      "Deleted workspace"),
+                  t.admin
+                    ? "Admin tools"
+                    : t.oauth
+                      ? "OAuth"
+                      : "Personal token",
+                  workspaces.find((w) => w.id === t.workspaceId)?.name ??
+                    "Deleted workspace",
                   t.lastUsedAt ? date(t.lastUsedAt) : "Never",
                 ],
               }))
@@ -328,11 +334,9 @@ export function TokensPage() {
                           {
                             label: "Workspace",
                             value:
-                              selected.resource === "/mcp-admin"
-                                ? "Administration"
-                                : (workspaces.find(
-                                    (w) => w.id === selected.workspaceId
-                                  )?.name ?? "Deleted workspace"),
+                              workspaces.find(
+                                (w) => w.id === selected.workspaceId
+                              )?.name ?? "Deleted workspace",
                           },
                         ]}
                       />

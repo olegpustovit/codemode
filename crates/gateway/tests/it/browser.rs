@@ -25,6 +25,7 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
         codemode_core::components::workspaces::Workspaces::new(db.clone(), "test.example".into())
             .unwrap();
     endpoints.initialize().await.unwrap();
+    let workspace = endpoints.default_id().await.unwrap();
     let sources = Sources::new(
         db.clone(),
         codemode_core::components::catalogue::Catalogue::new(db.clone()),
@@ -253,6 +254,7 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
             .map(String::as_str)
             .collect::<Vec<_>>(),
         vec![
+            "admin",
             "audience",
             "id",
             "lastUsedAt",
@@ -490,7 +492,7 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
     assert_eq!(executions[0]["id"], execution_id.to_string());
     let response = request(reqwest::Method::POST, "/api/tokens")
         .header("cookie", &cookie)
-        .json(&serde_json::json!({"name":"browser-created","administration":true}))
+        .json(&serde_json::json!({"name":"browser-created","admin":true,"workspaceId":workspace}))
         .send()
         .await
         .unwrap();

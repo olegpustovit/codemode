@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT left(t.name,120) AS \"name!\",t.admin FROM executions e JOIN access_tokens t ON t.id=e.token_id WHERE e.id=$1 AND t.workspace_id=$2 AND t.tenant_id=$3 AND t.revoked_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "admin",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "admin"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "a3a31301bb903dde2a748b52275c5bf0474e0c997061d48add534921c857eb9d"
+}

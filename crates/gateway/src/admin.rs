@@ -81,6 +81,10 @@ pub fn router(state: State) -> Router {
             "/api/workspaces/{id}/scripts/{script}",
             get(saved_script).put(update_script).delete(remove_script),
         )
+        .route(
+            "/api/workspaces/{id}/scripts/{script}/scope",
+            put(set_script_scope),
+        )
         .route("/api/integrations", get(integration_list))
         .route("/api/integrations/{slug}", post(add_integration))
         .route("/api/sources", get(sources).post(create_source))
@@ -331,6 +335,8 @@ struct OAuthDecision {
     #[serde(flatten)]
     request: codemode_core::components::auth::oauth::AuthorizationRequest,
     allow: bool,
+    #[serde(default)]
+    admin: bool,
 }
 async fn oauth_decision(
     AxumState(state): AxumState<State>,
@@ -342,7 +348,12 @@ async fn oauth_decision(
         .await?;
     state.oauth.consent(&decision.request).await?;
     let code = if decision.allow {
-        Some(state.oauth.issue_code(&decision.request).await?)
+        Some(
+            state
+                .oauth
+                .issue_code_with_administration(&decision.request, decision.admin)
+                .await?,
+        )
     } else {
         None
     };
@@ -444,18 +455,11 @@ async fn source(
         .map(Json)
         .ok_or(ApiError::Message(StatusCode::NOT_FOUND, "source not found"))
 }
-pub(crate) fn user_source(source: &sources::Source) -> Result<(), &'static str> {
-    if matches!(source.transport, sources::Transport::McpStdio { .. }) {
-        return Err("local MCP commands must be installed by the server operator");
-    }
-    Ok(())
-}
-
 async fn create_source(
     AxumState(state): AxumState<State>,
     ApiJson(input): ApiJson<sources::SourceInput>,
 ) -> Result<Response, ApiError> {
-    user_source(&input.source)
+    sources::user_source(&input.source)
         .map_err(|message| ApiError::Message(StatusCode::FORBIDDEN, message))?;
     let id = state.sources.save_input(None, input).await?;
     Ok((StatusCode::CREATED, Json(serde_json::json!({"id":id}))).into_response())
@@ -465,7 +469,7 @@ async fn update_source(
     Path(id): Path<Uuid>,
     ApiJson(input): ApiJson<sources::SourceInput>,
 ) -> Result<StatusCode, ApiError> {
-    user_source(&input.source)
+    sources::user_source(&input.source)
         .map_err(|message| ApiError::Message(StatusCode::FORBIDDEN, message))?;
     state.sources.save_input(Some(id), input).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -699,7 +703,7 @@ struct NewToken {
     #[serde(rename = "workspaceId")]
     workspace_id: Option<Uuid>,
     #[serde(default)]
-    administration: bool,
+    admin: bool,
 }
 async fn create_token(
     AxumState(state): AxumState<State>,
@@ -712,26 +716,13 @@ async fn create_token(
             "name must contain 1..128 bytes",
         ));
     }
-    let workspace_id = if input.administration {
-        state.workspaces.default_id().await?
-    } else {
-        input.workspace_id.ok_or(ApiError::Message(
-            StatusCode::BAD_REQUEST,
-            "choose a workspace",
-        ))?
-    };
+    let workspace_id = input.workspace_id.ok_or(ApiError::Message(
+        StatusCode::BAD_REQUEST,
+        "choose a workspace",
+    ))?;
     let (id, token) = state
         .auth
-        .create_for_workspace(
-            name,
-            workspace_id,
-            &state.hostname,
-            if input.administration {
-                "/mcp-admin"
-            } else {
-                "/mcp"
-            },
-        )
+        .create_with_administration(name, workspace_id, &state.hostname, "/mcp", input.admin)
         .await
         .map_err(ApiError::from)?
         .ok_or(ApiError::Message(
@@ -1046,6 +1037,10 @@ async fn set_tool_scope_member(
 impl From<scripts::Error> for ApiError {
     fn from(error: scripts::Error) -> Self {
         match error {
+            scripts::Error::Permission => Self::Message(
+                StatusCode::FORBIDDEN,
+                "saving a global script needs administration access",
+            ),
             scripts::Error::NotFound => {
                 Self::Message(StatusCode::NOT_FOUND, "saved script or endpoint not found")
             }
@@ -1079,6 +1074,23 @@ async fn saved_scripts(
         .await?
         .ok_or(workspaces::Error::NotFound)?;
     Ok(Json(state.scripts.list(id).await?))
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ScriptScope {
+    revision: i64,
+    global: bool,
+}
+async fn set_script_scope(
+    AxumState(state): AxumState<State>,
+    Path((workspace, id)): Path<(Uuid, Uuid)>,
+    ApiJson(scope): ApiJson<ScriptScope>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .scripts
+        .set_scope(workspace, id, scope.revision, scope.global)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 async fn saved_script(
     AxumState(state): AxumState<State>,

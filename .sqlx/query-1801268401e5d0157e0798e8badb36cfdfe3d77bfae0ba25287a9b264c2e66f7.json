@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH changed AS (DELETE FROM saved_scripts WHERE tenant_id=(SELECT tenant_id FROM endpoints WHERE id=$1) AND (endpoint_id=$1 OR endpoint_id IS NULL) AND id=ANY($2) RETURNING id) INSERT INTO control_changes(request_id,workspace_id,kind,item,action) SELECT $3,$1,'script',id::text,'delete' FROM changed",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1801268401e5d0157e0798e8badb36cfdfe3d77bfae0ba25287a9b264c2e66f7"
+}

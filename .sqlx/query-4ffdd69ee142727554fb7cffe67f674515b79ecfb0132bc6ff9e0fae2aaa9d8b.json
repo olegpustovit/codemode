@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO access_tokens(name,audience,token_hash,expires_at,oauth_grant,tenant_id,workspace_id,resource,admin) SELECT $1,$2,$3,LEAST(now()+interval '1 hour',g.expires_at),g.id,e.tenant_id,e.id,'/mcp',g.admin FROM oauth_grants g JOIN endpoints e ON e.id=g.endpoint_id WHERE g.id=$4 RETURNING extract(epoch FROM expires_at-now())::bigint AS \"seconds!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "seconds!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Bytea",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "4ffdd69ee142727554fb7cffe67f674515b79ecfb0132bc6ff9e0fae2aaa9d8b"
+}

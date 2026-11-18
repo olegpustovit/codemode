@@ -57,11 +57,13 @@ export function StatusBar({
         aria-atomic="true"
         data-tone={notice?.tone}
       >
-        {notice?.action ? (
-          <button onClick={notice.action}>{notice.text}</button>
-        ) : (
-          (notice?.text ?? "Ready")
-        )}
+        <span key={notice?.id} className="status-copy">
+          {notice?.action ? (
+            <button onClick={notice.action}>{notice.text}</button>
+          ) : (
+            (notice?.text ?? "Ready")
+          )}
+        </span>
       </output>
       <div id="status-keys" className="status-keys" ref={keysRef}>
         {children}

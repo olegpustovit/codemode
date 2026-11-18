@@ -368,7 +368,7 @@ export function ScriptLibraryPage() {
               key={JSON.stringify([selection.value, deleting])}
               count={selectedCount}
               names={deleteSelection.map((script) => script.name)}
-              allMatching={selection.value.allMatching}
+              allMatching={selection.value.allMatching && scope === "all"}
               confirmAction={deleting ? "delete" : undefined}
               actions={[
                 {
@@ -391,9 +391,10 @@ export function ScriptLibraryPage() {
                   `/api/workspaces/${workspace.id}/scripts/bulk-delete`,
                   "POST",
                   {
-                    selection: selection.value.allMatching
-                      ? { query: search.q ?? "" }
-                      : { ids: deleteSelection.map((script) => script.id) },
+                    selection:
+                      selection.value.allMatching && scope === "all"
+                        ? { query: search.q ?? "" }
+                        : { ids: deleteSelection.map((script) => script.id) },
                     expectedCount: selectedCount,
                     revisions: deleteSelection.map((script) => ({
                       id: script.id,

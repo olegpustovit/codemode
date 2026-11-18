@@ -303,3 +303,60 @@ async fn nudge_recipe_is_discoverable_for_its_scoped_source(pool: sqlx::PgPool) 
             .is_empty()
     );
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn global_script_scope_keeps_tenant_isolation_and_audits_moves(pool: sqlx::PgPool) {
+    let db = database(&pool).await;
+    let mut scopes = Vec::new();
+    for _ in 0..2 {
+        let tenant: Uuid = sqlx::query_scalar("INSERT INTO tenants DEFAULT VALUES RETURNING id")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let private = db.for_tenant(tenant).await.unwrap();
+        let workspaces = Workspaces::new(private.clone(), "test.example".into()).unwrap();
+        workspaces.initialize().await.unwrap();
+        scopes.push((
+            Scripts::new(private),
+            workspaces.default_id().await.unwrap(),
+        ));
+    }
+    let (owner, workspace) = &scopes[0];
+    let (foreign, foreign_workspace) = &scopes[1];
+    let row = owner
+        .save(*workspace, None, content("Private global", "return 12"))
+        .await
+        .unwrap();
+    let id = row.summary.id;
+    owner
+        .set_scope(*workspace, id, row.summary.revision, true)
+        .await
+        .unwrap();
+    assert!(matches!(
+        foreign.code_for(*foreign_workspace, id).await,
+        Err(ScriptError::NotFound)
+    ));
+    assert!(matches!(
+        foreign.code_for(*workspace, id).await,
+        Err(ScriptError::NotFound)
+    ));
+    assert!(foreign.list(*foreign_workspace).await.unwrap().is_empty());
+    assert!(matches!(
+        owner
+            .set_scope(*workspace, id, row.summary.revision, false)
+            .await,
+        Err(ScriptError::Changed)
+    ));
+    owner
+        .set_scope(*workspace, id, row.summary.revision + 1, false)
+        .await
+        .unwrap();
+    let actions: Vec<String> = sqlx::query_scalar(
+        "SELECT action FROM control_changes WHERE kind='script' AND item=$1 ORDER BY changed_at",
+    )
+    .bind(id.to_string())
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(actions, ["promote", "demote"]);
+}

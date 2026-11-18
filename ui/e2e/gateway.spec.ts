@@ -745,7 +745,9 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   ).toBeVisible()
   await expect(page.getByRole("button", { name: /^Authorize / })).toBeDisabled()
   await page.getByLabel("Workspace", { exact: true }).selectOption(workspaceId)
-  await expect(page.getByRole("alert")).toContainText("browser-fixture")
+  await expect(
+    page.getByRole("region", { name: "Workspace sources" })
+  ).toContainText("browser-fixture")
   await capture(page, "desktop-consent.png")
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
@@ -3028,4 +3030,49 @@ test("script scope promotion exposes a global script in a second workspace", asy
       exact: true,
     })
   ).toBeVisible()
+})
+
+test("prototype motion carries transition types and honors reduced motion", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.addInitScript(() => {
+    const start = document.startViewTransition?.bind(document)
+    if (!start) return
+    document.startViewTransition = (options) => {
+      if (options && typeof options === "object" && options.types?.length) {
+        document.documentElement.dataset.transitionTypes = [
+          document.documentElement.dataset.transitionTypes,
+          ...options.types,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      }
+      return start(options)
+    }
+  })
+  await login(page, "/sessions")
+  const types = () => page.locator("html").getAttribute("data-transition-types")
+  await page.getByRole("link", { name: "Integrations", exact: true }).click()
+  await expect.poll(types).toContain("down")
+  await page.getByRole("row", { name: "Linear", exact: true }).click()
+  await expect.poll(types).toContain("open")
+  await page.getByRole("button", { name: /^Close/ }).click()
+  await expect.poll(types).toContain("close")
+  await page.getByRole("link", { name: "Sessions", exact: true }).click()
+  await expect.poll(types).toContain("up")
+  await capture(page, "ux-prototype-sessions-1440x900.png")
+
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  const before = await types()
+  await page.getByRole("link", { name: "Integrations", exact: true }).click()
+  await page.getByRole("row", { name: "Linear", exact: true }).click()
+  await expect(
+    page.getByRole("heading", { name: "Linear", exact: true })
+  ).toBeVisible()
+  expect(await types()).toBe(before)
+  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  await capture(page, "ux-prototype-integration-390x844.png")
 })

@@ -4,15 +4,16 @@ export const fragmentShader = `precision highp float;uniform vec2 r;uniform floa
   float cen(float x,float k){return .30+k*.03+.105*sin(x*1.10+t*.20+k)+.040*sin(x*2.45-t*.16+1.2+k*2.)+.010*sin(x*5.2+t*.31);}
   float wid(float x,float k){return .17*sin(x*.80-t*.12+.7+k*1.7)+.045*sin(x*1.9+t*.18+k);}
   /* strand coordinate; the warp depends on v itself, so strands curl apart and together like a flow field */
-  float g(vec2 p,float k,float n){float v=(p.y-cen(p.x,k))/wid(p.x,k);
+  float g(vec2 p,float k,float n,float c,float w){float v=(p.y-c)/w;
     v+=.11*sin(p.x*2.3+v*4.2+t*.33+k)+.06*sin(p.x*5.1-v*7.0-t*.26)+.03*sin(p.x*9.0+v*11.-t*.41);
     return v*n;}
   /* sig: strand blur in pixels (depth of field) */
-  float strands(vec2 p,float px,float k,float n,float sig,out float a){
-    float v=g(p,k,n);
+  float strands(vec2 p,float px,float k,float n,float sig,float c,float w,out float a){
+    float v=g(p,k,n,c,w);
     a=abs(v)/(n*.5);
     if(a>1.15) return 0.;
-    vec2 gr=vec2(g(p+vec2(px,0.),k,n)-v,g(p+vec2(0.,px),k,n)-v);
+    vec2 right=p+vec2(px,0.);
+    vec2 gr=vec2(g(right,k,n,cen(right.x,k),wid(right.x,k))-v,g(p+vec2(0.,px),k,n,c,w)-v);
     float dw=max(length(gr),1e-4);              /* strands per pixel */
     float d=abs(fract(v+.5)-.5)/dw;             /* pixels to nearest strand */
     float s=exp(-d*d/(2.*sig*sig))*pow(1.1/sig,.6); /* gaussian; blurrier strands are dimmer, as out-of-focus light is */
@@ -20,8 +21,12 @@ export const fragmentShader = `precision highp float;uniform vec2 r;uniform floa
     return mix(s,avg,smoothstep(.10,.22,dw*sig));/* strands closer than ~5 sigma blend into a glow before moire can form */
   }
   vec3 ribbon(vec2 p,float px,float k,float n,float amp,float sig){
+    /* The warp moves v by at most .20, and the ribbon body is zero at |v| >= .50. */
+    float c=cen(p.x,k), w=wid(p.x,k);
+    if(abs(p.y-c) > .75*abs(w)) return vec3(0.);
     float a0,a1;
-    float l=.5*(strands(p,px,k,n,sig,a0)+strands(p+vec2(.5*px,.5*px),px,k,n,sig,a1));
+    vec2 shifted=p+vec2(.5*px,.5*px);
+    float l=.5*(strands(p,px,k,n,sig,c,w,a0)+strands(shifted,px,k,n,sig,cen(shifted.x,k),wid(shifted.x,k),a1));
     float body=(1.-smoothstep(.7,1.,a0))*(.5+.5*(1.-a0));
     float pulse=.75+.5*pow(.5+.5*sin(p.x*1.6-t*.55+k),4.);   /* light travelling along the ribbon */
     return mix(vec3(.80,.86,1.),h*1.5+.12,.35)*l*body*pulse*amp;}

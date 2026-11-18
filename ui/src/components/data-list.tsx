@@ -1,5 +1,14 @@
 /* oxlint-disable jsx-a11y/no-noninteractive-element-to-interactive-role -- The WAI-ARIA grid pattern uses native table cells and one active-descendant focus. */
-import { Fragment, memo, useId, useLayoutEffect, useRef, useState } from "react"
+import {
+  cloneElement,
+  Fragment,
+  memo,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import type { ReactNode, RefObject } from "react"
 import {
   useListNavigation,
@@ -246,6 +255,46 @@ export function DataList({
       element.scrollTop = scrollTop
     }
   }, [active, groupsBeforeActive, root])
+  const staticRows = useMemo(
+    () =>
+      rows.map((row, index) => (
+        <StaticRow
+          key={row.id}
+          row={row}
+          id={`${prefix}-${index}`}
+          first={index === 0 || rows[index - 1].group !== row.group}
+          columns={columns.length}
+          active={false}
+          selected={selection.value.allMatching}
+        />
+      )),
+    [rows, prefix, columns.length, selection.value.allMatching]
+  )
+  const rowIndexes = useMemo(
+    () => new Map(rows.map((row, index) => [row.id, index])),
+    [rows]
+  )
+  const selectedStaticRows = staticRows.slice()
+  if (!touchSelection && !rename && staticRows.length) {
+    for (const id of selection.value.ids) {
+      const index = rowIndexes.get(id)
+      if (
+        index !== undefined &&
+        index !== active &&
+        !selection.value.allMatching
+      )
+        selectedStaticRows[index] = cloneElement(staticRows[index], {
+          selected: true,
+        })
+    }
+    selectedStaticRows[active] = cloneElement(staticRows[active], {
+      active: true,
+      selected:
+        selection.value.allMatching ||
+        !selectedRows.size ||
+        selectedRows.has(rows[active].id),
+    })
+  }
   return (
     <div className={`data-list ${className}`}>
       {!!rows.length && (
@@ -354,98 +403,105 @@ export function DataList({
               <td aria-hidden="true" colSpan={columns.length} />
             </tr>
           ) : null}
-          {rows.map((row, index) => {
-            const first = index === 0 || rows[index - 1].group !== row.group
-            const selected =
-              selection.value.allMatching ||
-              (selectedRows.size ? selectedRows.has(row.id) : index === active)
-            if (!touchSelection && rename?.id !== row.id) {
-              return (
-                <StaticRow
-                  key={row.id}
-                  row={row}
-                  id={`${prefix}-${index}`}
-                  first={first}
-                  columns={columns.length}
-                  active={index === active}
-                  selected={selected}
-                />
-              )
-            }
-            return (
-              <Fragment key={row.id}>
-                {first && (
-                  <tr className="data-group">
-                    <td colSpan={columns.length}>{row.group}</td>
-                  </tr>
-                )}
-                <tr
-                  id={`${prefix}-${index}`}
-                  className="data-row"
-                  aria-label={row.label}
-                  aria-selected={selected}
-                  data-active={index === active}
-                >
-                  {row.cells.map((cell, i) => (
-                    <td className={i ? "data-extra" : "data-name"} key={i}>
-                      {i === 0 && touchSelection && (
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${row.label}`}
-                          checked={
-                            selection.value.allMatching ||
-                            selection.value.ids.includes(row.id)
-                          }
-                          onChange={() => choose(row.id, "toggle")}
-                        />
-                      )}
-                      {i === 0 && rename?.id === row.id ? (
-                        <input
-                          className="row-rename"
-                          aria-label={`Rename ${row.label}`}
-                          value={rename.value}
-                          ref={(node) => {
-                            node?.focus()
-                          }}
-                          maxLength={120}
-                          disabled={saving}
-                          onChange={(event) =>
-                            setRename({ ...rename, value: event.target.value })
-                          }
-                          onKeyDown={(event) => {
-                            event.stopPropagation()
-                            if (event.key === "Escape") {
-                              event.preventDefault()
-                              setRename(null)
-                              root.current?.focus()
-                            } else if (
-                              event.key === "Enter" &&
-                              onRename &&
-                              !saving
-                            ) {
-                              event.preventDefault()
-                              setSaving(true)
-                              void onRename(rename.id, rename.value)
-                                .then(() => {
+          {!touchSelection && !rename
+            ? selectedStaticRows
+            : rows.map((row, index) => {
+                const first = index === 0 || rows[index - 1].group !== row.group
+                const selected =
+                  selection.value.allMatching ||
+                  (selectedRows.size
+                    ? selectedRows.has(row.id)
+                    : index === active)
+                if (!touchSelection && rename?.id !== row.id) {
+                  return (
+                    <StaticRow
+                      key={row.id}
+                      row={row}
+                      id={`${prefix}-${index}`}
+                      first={first}
+                      columns={columns.length}
+                      active={index === active}
+                      selected={selected}
+                    />
+                  )
+                }
+                return (
+                  <Fragment key={row.id}>
+                    {first && (
+                      <tr className="data-group">
+                        <td colSpan={columns.length}>{row.group}</td>
+                      </tr>
+                    )}
+                    <tr
+                      id={`${prefix}-${index}`}
+                      className="data-row"
+                      aria-label={row.label}
+                      aria-selected={selected}
+                      data-active={index === active}
+                    >
+                      {row.cells.map((cell, i) => (
+                        <td className={i ? "data-extra" : "data-name"} key={i}>
+                          {i === 0 && touchSelection && (
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${row.label}`}
+                              checked={
+                                selection.value.allMatching ||
+                                selection.value.ids.includes(row.id)
+                              }
+                              onChange={() => choose(row.id, "toggle")}
+                            />
+                          )}
+                          {i === 0 && rename?.id === row.id ? (
+                            <input
+                              className="row-rename"
+                              aria-label={`Rename ${row.label}`}
+                              value={rename.value}
+                              ref={(node) => {
+                                node?.focus()
+                              }}
+                              maxLength={120}
+                              disabled={saving}
+                              onChange={(event) =>
+                                setRename({
+                                  ...rename,
+                                  value: event.target.value,
+                                })
+                              }
+                              onKeyDown={(event) => {
+                                event.stopPropagation()
+                                if (event.key === "Escape") {
+                                  event.preventDefault()
                                   setRename(null)
                                   root.current?.focus()
-                                })
-                                .catch((error) =>
-                                  setRenameError(message(error))
-                                )
-                                .finally(() => setSaving(false))
-                            }
-                          }}
-                        />
-                      ) : (
-                        cell
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              </Fragment>
-            )
-          })}
+                                } else if (
+                                  event.key === "Enter" &&
+                                  onRename &&
+                                  !saving
+                                ) {
+                                  event.preventDefault()
+                                  setSaving(true)
+                                  void onRename(rename.id, rename.value)
+                                    .then(() => {
+                                      setRename(null)
+                                      root.current?.focus()
+                                    })
+                                    .catch((error) =>
+                                      setRenameError(message(error))
+                                    )
+                                    .finally(() => setSaving(false))
+                                }
+                              }}
+                            />
+                          ) : (
+                            cell
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  </Fragment>
+                )
+              })}
         </tbody>
       </table>
       {!rows.length && (

@@ -57,9 +57,15 @@ export function Backdrop() {
       document.documentElement.style.setProperty("--hue", hue)
     let worker: Worker | undefined
     let admission: number | undefined
+    let delayedAdmission: number | undefined
+    let inputQuietAt = 0
+    const prioritizeInput = () => {
+      inputQuietAt = performance.now() + 100
+    }
     const cancelAdmission = () => {
       if (admission !== undefined) cancelIdleCallback(admission)
-      admission = undefined
+      if (delayedAdmission !== undefined) window.clearTimeout(delayedAdmission)
+      admission = delayedAdmission = undefined
     }
     const send = (
       message: BackdropWorkerRequest,
@@ -67,9 +73,18 @@ export function Backdrop() {
     ) => worker?.postMessage(message, transfer)
     const admitFrame = (frame: number) => {
       cancelAdmission()
+      const delay = inputQuietAt - performance.now()
+      if (!motion.matches && delay > 0) {
+        delayedAdmission = window.setTimeout(() => admitFrame(frame), delay)
+        return
+      }
       admission = requestIdleCallback((deadline) => {
         admission = undefined
-        if (deadline.timeRemaining() < 8) admitFrame(frame)
+        if (
+          deadline.timeRemaining() < 8 ||
+          (!motion.matches && performance.now() < inputQuietAt)
+        )
+          admitFrame(frame)
         else send({ frame })
       })
     }
@@ -141,11 +156,19 @@ export function Backdrop() {
     } else {
       startLocal()
     }
+    const inputEvents = ["keydown", "pointerdown", "wheel"]
+    for (const type of inputEvents)
+      document.addEventListener(type, prioritizeInput, {
+        capture: true,
+        passive: true,
+      })
     window.addEventListener("resize", sync)
     document.addEventListener("visibilitychange", sync)
     motion.addEventListener("change", sync)
     return () => {
       wake.current = null
+      for (const type of inputEvents)
+        document.removeEventListener(type, prioritizeInput, true)
       window.removeEventListener("resize", sync)
       document.removeEventListener("visibilitychange", sync)
       motion.removeEventListener("change", sync)

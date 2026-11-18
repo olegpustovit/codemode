@@ -283,8 +283,8 @@ export function IntegrationsPage() {
               })
             }
           />
-          {/[*?]/.test(q) && <SearchHint />}
           <span className="kbd">/</span>
+          <SearchHint hoverOnly={!/[*?]/.test(q)} />
         </label>
       </ShellSlot>
       <header className="list-heading">

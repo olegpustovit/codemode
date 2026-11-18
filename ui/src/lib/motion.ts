@@ -21,7 +21,11 @@ export function move(type: string, update: () => void) {
   type TransitionScope = Element & {
     startViewTransition?: Document["startViewTransition"]
   }
-  const scope = document.querySelector?.<TransitionScope>(".pane-stack")
+  // Depth changes can move named cursors between panes during Chromium's scoped capture.
+  const scope =
+    type === "push" || type === "pop"
+      ? undefined
+      : document.querySelector?.<TransitionScope>(".pane-stack")
   const options = { types: [type], update: () => flushSync(update) }
   const transition =
     scope?.startViewTransition?.(options) ??

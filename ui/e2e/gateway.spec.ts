@@ -1902,6 +1902,17 @@ test("integrations: real catalogue search, URL-backed panes and keyboard focus",
       page.getByRole("heading", { name: "keyboard-integration", exact: true })
     ).toBeVisible()
     const search = page.getByRole("searchbox", { name: "Search this list" })
+    const syntax = page.getByText(
+      "* any characters · ? one character · spaces match all terms",
+      { exact: true }
+    )
+    await search.focus()
+    await expect(syntax).toBeHidden()
+    await page.locator(".global-search > .kbd").hover()
+    await expect(syntax).toBeVisible()
+    await search.hover()
+    await expect(syntax).toBeHidden()
+    await search.blur()
     await page.keyboard.press("Backslash")
     await expect(
       page.getByRole("button", { name: "Expand sidebar" })
@@ -1916,6 +1927,8 @@ test("integrations: real catalogue search, URL-backed panes and keyboard focus",
     await expect(
       page.getByRole("button", { name: "Collapse sidebar" })
     ).toBeVisible()
+    await search.fill("keyboard*")
+    await expect(syntax).toBeVisible()
     await search.fill("keyboard integration echo")
     const grid = page.getByRole("grid", { name: "Integrations", exact: true })
     await expect(
@@ -3251,7 +3264,8 @@ async function observeViewTransitions(page: Page) {
     }
     const observe = (
       transition: ViewTransition,
-      options?: ViewTransitionUpdateCallback | StartViewTransitionOptions
+      options?: ViewTransitionUpdateCallback | StartViewTransitionOptions,
+      scope: Document | Element = document
     ) => {
       record(options)
       if (!options || typeof options !== "object" || !options.types)
@@ -3289,14 +3303,33 @@ async function observeViewTransitions(page: Page) {
               (!filter || filter === "none")
             )
           })
+          const snapshotNames = Array.from(scope.querySelectorAll("*"))
+            .filter((element) =>
+              element.checkVisibility({ visibilityProperty: true })
+            )
+            .map((element) => getComputedStyle(element).viewTransitionName)
+            .filter((name) => name && name !== "none")
+          const uniqueNames =
+            new Set(snapshotNames).size === snapshotNames.length
           for (const type of options.types ?? []) {
             document.documentElement.setAttribute(
               `data-played-${type}`,
-              validDrift ? names.join(" ") : "invalid-drift"
+              !validDrift
+                ? "invalid-drift"
+                : !uniqueNames
+                  ? "duplicate-snapshots"
+                  : names.join(" ")
             )
           }
         },
-        () => {}
+        (error: Error) => {
+          for (const type of options.types ?? []) {
+            document.documentElement.setAttribute(
+              `data-played-${type}`,
+              error.message
+            )
+          }
+        }
       )
       return transition
     }
@@ -3311,7 +3344,7 @@ async function observeViewTransitions(page: Page) {
     const scopedStart = prototype.startViewTransition
     if (scopedStart)
       prototype.startViewTransition = function (options) {
-        return observe(scopedStart.call(this, options), options)
+        return observe(scopedStart.call(this, options), options, this)
       }
   })
 }
@@ -3368,9 +3401,23 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page.getByRole("button", { name: /^Close/ }).click()
   await expect.poll(types).toContain("close")
   await expectPlayedTransition(page, "close", "codemode-fade-out")
+  const underline = page.locator(".tab-underline")
+  const oldUnderlinePosition = await underline.evaluate(
+    (element) => element.getBoundingClientRect().x
+  )
   await page.getByRole("tab", { name: /^Needs attention/ }).click()
   await expect.poll(types).toContain("filter")
   await expectPlayedTransition(page, "filter", "codemode-fade-in")
+  await expectPlayedTransition(
+    page,
+    "filter",
+    "-ua-view-transition-group-anim-tab-line"
+  )
+  await expect
+    .poll(() =>
+      underline.evaluate((element) => element.getBoundingClientRect().x)
+    )
+    .toBeGreaterThan(oldUnderlinePosition)
   await expect(
     page.getByText("No integrations need attention", { exact: true })
   ).toBeVisible()

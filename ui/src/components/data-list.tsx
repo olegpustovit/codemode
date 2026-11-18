@@ -397,6 +397,7 @@ export function DataList({
               className="data-cursor"
               aria-hidden="true"
               style={{
+                viewTransitionName: `cursor-${prefix.replace(/[^a-z0-9_-]/gi, "")}`,
                 transform: `translateY(calc(var(--row) * ${active} + var(--data-group-height) * ${groupsBeforeActive}))`,
               }}
             >

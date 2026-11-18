@@ -22,9 +22,13 @@ export function MatchText({
     </>
   )
 }
-export function SearchHint() {
+export function SearchHint({ hoverOnly = false }: { hoverOnly?: boolean }) {
   return (
-    <span className="search-hint" id="list-search-hint">
+    <span
+      className="search-hint"
+      id="list-search-hint"
+      data-hover-only={hoverOnly || undefined}
+    >
       * any characters · ? one character · spaces match all terms
     </span>
   )

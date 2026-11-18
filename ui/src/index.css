@@ -674,7 +674,8 @@ code, pre, kbd, .font-mono { font-variant-ligatures: none; font-feature-settings
   max-width: min(460px, 85vw);
   white-space: normal;
 }
-.global-search:focus-within .search-hint {
+.global-search:focus-within .search-hint:not([data-hover-only]),
+.global-search > .kbd:hover + .search-hint {
   display: block;
 }
 mark {
@@ -862,10 +863,9 @@ mark {
 ::view-transition-group(detail) { overflow: clip; }
 ::view-transition-old(detail), ::view-transition-new(detail) { width: 100%; height: 100%; object-fit: none; object-position: left top; }
 :active-view-transition-type(push)::view-transition-new(main) { animation: codemode-settle-left var(--enter) var(--e-soft) 40ms both; }
-:active-view-transition-type(pop)::view-transition-new(main),
-.pane-stack:active-view-transition-type(pop)::view-transition-new(detail) { animation: codemode-settle-right var(--enter) var(--e-soft) 40ms both; }
-:active-view-transition-type(open)::view-transition-new(detail),
-:active-view-transition-type(push)::view-transition-new(detail) { animation: codemode-settle-left var(--enter) var(--e-soft) both; }
+:active-view-transition-type(pop)::view-transition-new(main) { animation: codemode-settle-right var(--enter) var(--e-soft) 40ms both; }
+:active-view-transition-type(open)::view-transition-new(detail):only-child,
+:active-view-transition-type(push)::view-transition-new(detail):only-child { animation: codemode-settle-left var(--enter) var(--e-soft) both; }
 :active-view-transition-type(swap)::view-transition-new(detail) { animation: codemode-settle-up var(--enter) var(--e-soft) both; }
 @keyframes codemode-settle-left { from { opacity: 0; transform: translateX(12px); } }
 @keyframes codemode-settle-right { from { opacity: 0; transform: translateX(-12px); } }
@@ -943,7 +943,8 @@ mark {
 .script-scope[data-global="true"] { color: var(--c-accent-text); }
 
 
-.app-shell .tab-underline { transition: transform var(--enter) var(--e-soft), width var(--enter) var(--e-soft); }
+.app-shell .tab-underline { view-transition-name: tab-line; transition: transform var(--enter) var(--e-soft), width var(--enter) var(--e-soft); }
+:active-view-transition-type(filter) .app-shell .tab-underline { transition: none; }
 .app-shell .workspace-check { view-transition-name: ws-check; }
 .status-copy { display: inline-block; animation: codemode-fade-in var(--enter) var(--e-soft); }
 

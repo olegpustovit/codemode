@@ -255,9 +255,33 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
     let consent = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(consent["clientName"], "Fixture agent");
     assert_eq!(consent["resource"], "https://test.example/mcp");
+    let workspace_path = format!("/mcp?workspace={workspace}");
+    let workspace_resource = format!("https://test.example{workspace_path}");
+    let metadata_path = format!("/.well-known/oauth-protected-resource{workspace_path}");
+    let challenge = request(reqwest::Method::GET, &workspace_path)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(challenge.status(), 401);
+    assert!(
+        challenge.headers()["www-authenticate"]
+            .to_str()
+            .unwrap()
+            .contains(&metadata_path)
+    );
+    let resource = request(reqwest::Method::GET, &metadata_path)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resource.status(), 200);
+    assert_eq!(
+        resource.json::<serde_json::Value>().await.unwrap()["resource"],
+        workspace_resource
+    );
     let mut decision = authorization.clone();
     decision["allow"] = serde_json::json!(true);
     decision["workspaceId"] = serde_json::json!(workspace);
+    decision["resource"] = serde_json::json!(workspace_resource);
     let response = request(reqwest::Method::POST, "/api/oauth/authorize")
         .bearer_auth(&agent)
         .header("origin", "https://test.example")
@@ -293,6 +317,7 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
     assert!(!denied.query_pairs().any(|(k, _)| k == "code"));
     decision["allow"] = serde_json::json!(true);
     decision["workspaceId"] = serde_json::json!(workspace);
+    decision["resource"] = serde_json::json!(workspace_resource);
     let response = request(reqwest::Method::POST, "/api/oauth/authorize")
         .header("cookie", &cookie)
         .header("origin", "https://test.example")
@@ -324,7 +349,7 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
         ("grant_type", "authorization_code"),
         ("code", &code),
         ("redirect_uri", "https://client.example/callback"),
-        ("resource", "https://test.example/mcp"),
+        ("resource", &workspace_resource),
         (
             "code_verifier",
             "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
@@ -340,6 +365,30 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
     assert_eq!(response.headers()["cache-control"], "no-store");
     let tokens = response.json::<serde_json::Value>().await.unwrap();
     let token = tokens["access_token"].as_str().unwrap();
+    let mismatch = request(
+        reqwest::Method::POST,
+        &format!("/mcp?workspace={}", uuid::Uuid::new_v4()),
+    )
+    .bearer_auth(token)
+    .send()
+    .await
+    .unwrap();
+    assert_eq!(mismatch.status(), 403);
+    assert!(
+        mismatch.json::<serde_json::Value>().await.unwrap()["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Reconnect to switch.")
+    );
+    let matched = request(reqwest::Method::POST, &workspace_path)
+        .bearer_auth(token)
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2025-11-25")
+        .json(&serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+            "protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"workspace-url-test","version":"1"}
+        }}))
+        .send().await.unwrap();
+    assert_eq!(matched.status(), 200);
     for version in ["2025-11-25", "2026-07-28"] {
         if version == "2025-11-25" {
             rpc(&client,&url,"test.example",token,version,"initialize",serde_json::json!({"protocolVersion":version,"capabilities":{},"clientInfo":{"name":"oauth-test","version":"1"}})).await;
@@ -362,7 +411,7 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
     let body = form(&[
         ("client_id", id),
         ("grant_type", "refresh_token"),
-        ("resource", "https://test.example/mcp"),
+        ("resource", &workspace_resource),
         ("refresh_token", tokens["refresh_token"].as_str().unwrap()),
     ]);
     let response = request(reqwest::Method::POST, "/oauth/token")

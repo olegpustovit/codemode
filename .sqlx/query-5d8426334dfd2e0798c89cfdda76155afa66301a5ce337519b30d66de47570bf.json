@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id,client_id,scope,refresh_allowed,expires_at>now() AND revoked_at IS NULL AS \"valid!\" FROM oauth_grants WHERE id=$1 FOR UPDATE",
+  "query": "SELECT id,client_id,scope,refresh_allowed,resource_url,expires_at>now() AND revoked_at IS NULL AS \"valid!\" FROM oauth_grants WHERE id=$1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -49,6 +49,17 @@
       },
       {
         "ordinal": 4,
+        "name": "resource_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "oauth_grants",
+            "name": "resource_url"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
         "name": "valid!",
         "type_info": "Bool",
         "origin": "Expression"
@@ -64,8 +75,9 @@
       false,
       false,
       false,
+      true,
       null
     ]
   },
-  "hash": "bbb84ec5880449ab81b9cff1802734455be11d9e006e3743bc53f817c28407b7"
+  "hash": "5d8426334dfd2e0798c89cfdda76155afa66301a5ce337519b30d66de47570bf"
 }

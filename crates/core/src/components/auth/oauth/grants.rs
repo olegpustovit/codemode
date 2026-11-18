@@ -23,6 +23,8 @@ pub struct Consent {
     pub resource: String,
     pub scope: &'static str,
     pub workspace_id: Option<Uuid>,
+    pub requested_workspace_id: Option<Uuid>,
+    pub workspace_notice: Option<&'static str>,
 }
 #[derive(serde::Deserialize)]
 pub struct TokenRequest {
@@ -79,6 +81,15 @@ impl OAuth {
         } else {
             None
         };
+        let requested = resource_workspace(&request.resource);
+        let requested_workspace_id = if let Some(id) = requested {
+            sqlx::query_scalar!("SELECT id FROM endpoints WHERE id=$1", id)
+                .fetch_optional(&self.db.0)
+                .await
+                .map_err(DbError::from)?
+        } else {
+            None
+        };
         Ok(Consent {
             client_id: request.client_id.clone(),
             client_name: client.client_name,
@@ -86,6 +97,10 @@ impl OAuth {
             resource: request.resource.clone(),
             scope,
             workspace_id: workspace,
+            requested_workspace_id,
+            workspace_notice: (requested.is_some() && requested_workspace_id.is_none()).then_some(
+                "The workspace in the MCP URL is unavailable. Choose a workspace below.",
+            ),
         })
     }
 
@@ -105,7 +120,8 @@ impl OAuth {
         .map_err(DbError::from)?
         .ok_or(Error::Target)?;
         let refresh = client.grant_types.iter().any(|g| g == "refresh_token");
-        let grant=sqlx::query_scalar!("INSERT INTO oauth_grants(client_id,endpoint_id,scope,refresh_allowed) VALUES($1,$2,$3,$4) RETURNING id",request.client_id,workspace,consent.scope,refresh)
+        let resource = canonical_resource(&request.resource)?;
+        let grant=sqlx::query_scalar!("INSERT INTO oauth_grants(client_id,endpoint_id,scope,refresh_allowed,resource_url) VALUES($1,$2,$3,$4,$5) RETURNING id",request.client_id,workspace,consent.scope,refresh,resource)
             .fetch_one(&mut *tx).await.map_err(DbError::from)?;
         let code = random("cmc_");
         sqlx::query!("INSERT INTO oauth_codes(code_hash,grant_id,redirect_uri,challenge) VALUES($1,$2,$3,$4)",digest(&code),grant,request.redirect_uri,request.code_challenge)
@@ -240,9 +256,14 @@ async fn lock_grant(
     let hostname = resource_host(resource)?;
     sqlx::query!("SELECT e.id FROM endpoints e JOIN oauth_grants g ON g.endpoint_id=e.id WHERE g.id=$1 AND g.client_id=$2 AND g.scope=$3 FOR KEY SHARE OF e",id,client,resource_scope(resource)?)
         .fetch_optional(&mut *tx).await.map_err(DbError::from)?.ok_or(Error::Grant)?;
-    let row=sqlx::query!("SELECT id,client_id,scope,refresh_allowed,expires_at>now() AND revoked_at IS NULL AS \"valid!\" FROM oauth_grants WHERE id=$1 FOR UPDATE",id)
+    let row=sqlx::query!("SELECT id,client_id,scope,refresh_allowed,resource_url,expires_at>now() AND revoked_at IS NULL AS \"valid!\" FROM oauth_grants WHERE id=$1 FOR UPDATE",id)
         .fetch_optional(&mut *tx).await.map_err(DbError::from)?.ok_or(Error::Grant)?;
-    if !row.valid {
+    let canonical = canonical_resource(resource)?;
+    let matching_resource = match row.resource_url {
+        Some(saved) => saved == canonical,
+        None => resource_workspace(resource).is_none(),
+    };
+    if !row.valid || !matching_resource {
         return Err(Error::Grant);
     }
     Ok(Grant {
@@ -319,7 +340,9 @@ fn resource_host(value: &str) -> Result<String, Error> {
     if url.scheme() != "https"
         || url.port().is_some()
         || !matches!(url.path(), "/mcp" | "/mcp-admin")
-        || url.query().is_some()
+        || url
+            .query()
+            .is_some_and(|query| url.path() != "/mcp" || parse_workspace_query(query).is_none())
         || url.fragment().is_some()
         || !url.username().is_empty()
         || url.password().is_some()
@@ -327,6 +350,24 @@ fn resource_host(value: &str) -> Result<String, Error> {
         return Err(Error::Target);
     }
     url.host_str().map(str::to_owned).ok_or(Error::Target)
+}
+
+fn canonical_resource(value: &str) -> Result<String, Error> {
+    resource_host(value)?;
+    url::Url::parse(value)
+        .map(|url| url.to_string())
+        .map_err(|_| Error::Target)
+}
+
+fn resource_workspace(value: &str) -> Option<Uuid> {
+    let url = url::Url::parse(value).ok()?;
+    parse_workspace_query(url.query()?)
+}
+
+pub fn parse_workspace_query(query: &str) -> Option<Uuid> {
+    let text = query.strip_prefix("workspace=")?;
+    let id = Uuid::parse_str(text).ok()?;
+    (id.hyphenated().to_string() == text).then_some(id)
 }
 
 fn resource_scope(value: &str) -> Result<&'static str, Error> {
@@ -342,6 +383,25 @@ fn resource_scope(value: &str) -> Result<&'static str, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn workspace_resources_require_exactly_one_canonical_uuid() {
+        let id = "abcdef01-2345-4678-9abc-def012345678";
+        assert_eq!(
+            parse_workspace_query(&format!("workspace={id}")),
+            Uuid::parse_str(id).ok()
+        );
+        assert!(resource_host(&format!("https://work.example/mcp?workspace={id}")).is_ok());
+        for query in [
+            format!("workspace={id}&q=x"),
+            format!("workspace={id}&workspace={id}"),
+            format!("workspace={}", id.to_uppercase()),
+            format!("workspace={id}&"),
+        ] {
+            assert!(parse_workspace_query(&query).is_none());
+            assert!(resource_host(&format!("https://work.example/mcp?{query}")).is_err());
+        }
+        assert!(resource_host(&format!("https://work.example/mcp-admin?workspace={id}")).is_err());
+    }
     #[test]
     fn pkce_and_resources_reject_ambiguous_inputs() {
         assert!(valid_verifier(&"a".repeat(43)));

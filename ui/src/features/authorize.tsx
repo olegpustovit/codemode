@@ -15,7 +15,9 @@ export function AuthorizePage() {
   const consent = useSuspenseQuery(consentQuery(request)).data
   const workspaces = useSuspenseQuery(workspacesQuery).data
   const sources = useSuspenseQuery(sourcesQuery).data
-  const [workspaceId, setWorkspaceId] = useState("")
+  const [workspaceId, setWorkspaceId] = useState(
+    consent.requestedWorkspaceId ?? ""
+  )
   const administration = consent.scope === "admin"
   const workspace = workspaces.find((w) => w.id === workspaceId)
   const scope = workspace?.allSources
@@ -69,11 +71,15 @@ export function AuthorizePage() {
             {workspaces.map((w) => (
               <NativeSelectOption key={w.id} value={w.id}>
                 {w.name}
+                {w.id === consent.requestedWorkspaceId
+                  ? " · from the MCP URL"
+                  : ""}
               </NativeSelectOption>
             ))}
           </NativeSelect>
           <FieldDescription>
-            This authorization stays bound to your chosen workspace.
+            {consent.workspaceNotice ??
+              "This authorization stays bound to your chosen workspace."}
           </FieldDescription>
         </Field>
       )}

@@ -77,6 +77,46 @@ fn refresh(token: &str) -> TokenRequest {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn oauth_workspace_resource_binds_exchange_and_refresh(pool: sqlx::PgPool) {
+    let (_, oauth, endpoints, client, mut authorization) = setup(&pool).await;
+    let chosen = authorization.workspace_id.unwrap();
+    let other = endpoints.create("other", &[]).await.unwrap();
+    let resource = format!("https://test.example/mcp?workspace={chosen}");
+    authorization.resource = resource.clone();
+    authorization.workspace_id = None;
+    let consent = oauth.consent(&authorization).await.unwrap();
+    assert_eq!(consent.requested_workspace_id, Some(chosen));
+    assert_eq!(consent.workspace_id, None);
+    authorization.resource = format!("https://test.example/mcp?workspace={}", Uuid::new_v4());
+    let unavailable = oauth.consent(&authorization).await.unwrap();
+    assert_eq!(unavailable.requested_workspace_id, None);
+    assert!(unavailable.workspace_notice.is_some());
+    authorization.resource = resource.clone();
+    authorization.workspace_id = Some(chosen);
+    let code = oauth.issue_code(&authorization).await.unwrap();
+    let mut wrong = exchange(&code);
+    assert!(matches!(
+        oauth.token(&client, &wrong).await,
+        Err(OAuthError::Grant)
+    ));
+    wrong.resource = format!("https://test.example/mcp?workspace={other}");
+    assert!(matches!(
+        oauth.token(&client, &wrong).await,
+        Err(OAuthError::Grant)
+    ));
+    let mut right = exchange(&code);
+    right.resource = resource.clone();
+    let token = oauth.token(&client, &right).await.unwrap();
+    let mut renewal = refresh(token.refresh_token.as_deref().unwrap());
+    assert!(matches!(
+        oauth.token(&client, &renewal).await,
+        Err(OAuthError::Grant)
+    ));
+    renewal.resource = resource;
+    assert!(oauth.token(&client, &renewal).await.is_ok());
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn oauth_requires_workspace_selection_and_resource_scope_cannot_escalate(pool: sqlx::PgPool) {
     let (db, oauth, endpoints, client, mut authorization) = setup(&pool).await;
     let chosen = authorization.workspace_id.unwrap();

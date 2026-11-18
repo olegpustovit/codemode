@@ -27,6 +27,8 @@ export const consentQuery = (request: z.infer<typeof authorizationSearch>) =>
           resource: z.string(),
           scope: z.string(),
           workspaceId: z.uuid().nullable(),
+          requestedWorkspaceId: z.uuid().nullable(),
+          workspaceNotice: z.string().nullable(),
         })
       )
     },

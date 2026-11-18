@@ -7,6 +7,8 @@ import {
 import { z } from "zod"
 import { Copy } from "lucide-react"
 import { workspacesQuery } from "./queries"
+import { mcpUrl } from "@/lib/workspace-url"
+import { configQuery } from "@/lib/runtime"
 import { write } from "@/lib/api"
 import { ErrorNotice } from "@/components/common"
 import { Button } from "@/components/ui/button"
@@ -26,21 +28,29 @@ export function TokenForm({ onDone }: { onDone: () => void }) {
   const workspaces = useSuspenseQuery(workspacesQuery).data
   const cache = useQueryClient()
   const serverName = administration ? "codemode-admin" : "codemode"
-  const resource = administration ? "/mcp-admin" : "/mcp"
+  const { hostname } = useSuspenseQuery(configQuery).data
   const create = useMutation({
-    mutationFn: (form: FormData) =>
-      write(
+    mutationFn: async (form: FormData) => {
+      const workspaceId = administration
+        ? undefined
+        : z.uuid().parse(form.get("workspace"))
+      const result = await write(
         "/api/tokens",
         "POST",
         {
           name: z.string().trim().min(1).max(128).parse(form.get("name")),
           administration,
-          ...(administration
-            ? {}
-            : { workspaceId: z.uuid().parse(form.get("workspace")) }),
+          workspaceId,
         },
         z.object({ id: z.uuid(), token: z.string().min(1) })
-      ),
+      )
+      return {
+        ...result,
+        url: administration
+          ? `https://${hostname}/mcp-admin`
+          : mcpUrl(hostname, workspaceId),
+      }
+    },
     onSuccess: () => cache.invalidateQueries({ queryKey: ["tokens"] }),
   })
   return (
@@ -87,7 +97,7 @@ export function TokenForm({ onDone }: { onDone: () => void }) {
               above, then connect Codex:
             </p>
             <pre className="code-panel">
-              <code>{`codex mcp add ${serverName} --url https://codemode.microapps.space${resource} --bearer-token-env-var CODEMODE_TOKEN`}</code>
+              <code>{`codex mcp add ${serverName} --url ${create.data.url} --bearer-token-env-var CODEMODE_TOKEN`}</code>
             </pre>
             <p>
               In the existing <code>{`[mcp_servers.${serverName}]`}</code>{" "}

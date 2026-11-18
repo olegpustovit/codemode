@@ -2,7 +2,9 @@ mod clients;
 mod grants;
 mod metadata;
 pub use clients::{ClientMetadata, Registration};
-pub use grants::{AuthorizationRequest, Consent, TokenRequest, TokenResponse};
+pub use grants::{
+    AuthorizationRequest, Consent, TokenRequest, TokenResponse, parse_workspace_query,
+};
 
 use crate::infrastructure::postgres::{Database, Error as DbError};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};

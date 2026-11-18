@@ -422,6 +422,21 @@ fn routes(state: State) -> Router {
         ))
 }
 
+fn requested_workspace(
+    uri: &axum::http::Uri,
+    admin: bool,
+) -> Result<Option<uuid::Uuid>, StatusCode> {
+    match uri.query() {
+        None => Ok(None),
+        Some(query) if !admin => {
+            codemode_core::components::auth::oauth::parse_workspace_query(query)
+                .map(Some)
+                .ok_or(StatusCode::BAD_REQUEST)
+        }
+        Some(_) => Err(StatusCode::BAD_REQUEST),
+    }
+}
+
 async fn resource_metadata(
     AxumState(state): AxumState<State>,
     headers: HeaderMap,
@@ -436,8 +451,15 @@ async fn resource_metadata(
         return (StatusCode::NOT_FOUND, "unknown resource").into_response();
     }
     let admin = request.uri().path().ends_with("/mcp-admin");
+    let workspace = match requested_workspace(request.uri(), admin) {
+        Ok(workspace) => workspace,
+        Err(status) => return (status, "invalid workspace resource").into_response(),
+    };
     let resource = if admin { "/mcp-admin" } else { "/mcp" };
-    Json(serde_json::json!({"resource":format!("https://{}{resource}",state.hostname),"authorization_servers":[format!("https://{}",state.hostname)],"bearer_methods_supported":["header"],"scopes_supported":[if admin {"admin"}else{"mcp"}],"resource_name":if admin {"Codemode Administration"}else{"Codemode Workspace"}})).into_response()
+    let query = workspace
+        .map(|id| format!("?workspace={id}"))
+        .unwrap_or_default();
+    Json(serde_json::json!({"resource":format!("https://{}{resource}{query}",state.hostname),"authorization_servers":[format!("https://{}",state.hostname)],"bearer_methods_supported":["header"],"scopes_supported":[if admin {"admin"}else{"mcp"}],"resource_name":if admin {"Codemode Administration"}else{"Codemode Workspace"}})).into_response()
 }
 
 async fn health(AxumState(state): AxumState<State>) -> Response {
@@ -472,6 +494,10 @@ pub(crate) async fn authenticate(
         return (StatusCode::NOT_FOUND, "unknown resource").into_response();
     }
     let resource = request.uri().path().trim_end_matches('/').to_owned();
+    let workspace = match requested_workspace(request.uri(), resource == "/mcp-admin") {
+        Ok(workspace) => workspace,
+        Err(status) => return (status, "invalid workspace resource").into_response(),
+    };
     let Ok(canonical_host) = axum::http::HeaderValue::from_str(&host) else {
         return (StatusCode::BAD_REQUEST, "invalid hostname").into_response();
     };
@@ -495,7 +521,17 @@ pub(crate) async fn authenticate(
         match state.auth.authenticate(token, &host).await {
             Ok(Some(principal)) if principal.resource == resource => {
                 match state.workspaces.get(principal.workspace_id).await {
-                    Ok(Some(_)) => {}
+                    Ok(Some(bound)) => {
+                        if workspace.is_some_and(|requested| requested != principal.workspace_id) {
+                            let message = format!(
+                                "This connection is authorized for {}, not the workspace in this URL. Reconnect to switch.",
+                                bound.name
+                            );
+                            return (StatusCode::FORBIDDEN, Json(serde_json::json!({
+                                "jsonrpc":"2.0","id":null,"error":{"code":-32001,"message":message}
+                            }))).into_response();
+                        }
+                    }
                     Ok(None) => {
                         return (StatusCode::UNAUTHORIZED, "workspace is no longer available")
                             .into_response();
@@ -578,9 +614,12 @@ pub(crate) async fn authenticate(
             _ => {}
         }
     }
+    let query = workspace
+        .map(|id| format!("?workspace={id}"))
+        .unwrap_or_default();
     let mut response = (StatusCode::UNAUTHORIZED, "valid bearer token required").into_response();
     if let Ok(challenge) = axum::http::HeaderValue::from_str(&format!(
-        "Bearer resource_metadata=\"https://{host}/.well-known/oauth-protected-resource{resource}\", scope=\"{}\"",
+        "Bearer resource_metadata=\"https://{host}/.well-known/oauth-protected-resource{resource}{query}\", scope=\"{}\"",
         if resource == "/mcp-admin" {
             "admin"
         } else {

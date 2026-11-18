@@ -348,7 +348,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
         let stored_output = log::preview(&output, 16384);
         sqlx::query!("UPDATE tool_calls SET outcome='cancelled',error='Execution ended while call was in flight; upstream may have completed' WHERE execution_id=$1 AND outcome='running'",id).execute(&mut *tx).await.map_err(DbError::from)?;
         sqlx::query!("UPDATE executions SET status=$2,error=$3,tool_calls=$4,title=$5,result=$6,output=$7,finished_at=clock_timestamp() WHERE id=$1 AND status='running'",id,status,error,count as i32,title,stored_result,stored_output).execute(&mut *tx).await.map_err(DbError::from)?;
-        sqlx::query!("UPDATE agent_sessions s SET last_seen_at=GREATEST(s.last_seen_at,clock_timestamp()),title=COALESCE(s.title,CASE WHEN NOT EXISTS(SELECT 1 FROM executions earlier JOIN executions current ON current.id=$1 WHERE earlier.session_id=s.id AND (earlier.started_at,earlier.id)<(current.started_at,current.id)) THEN $2 ELSE NULL END) WHERE s.id=(SELECT session_id FROM executions WHERE id=$1)",id,title).execute(&mut *tx).await.map_err(DbError::from)?;
+        sqlx::query!("UPDATE agent_sessions s SET last_seen_at=GREATEST(s.last_seen_at,clock_timestamp()) WHERE s.id=(SELECT session_id FROM executions WHERE id=$1)",id).execute(&mut *tx).await.map_err(DbError::from)?;
         tx.commit().await.map_err(DbError::from)?;
         let (result, result_dropped_bytes) = truncate_result(result, self.limits.result_bytes);
         Ok(ResultValue {

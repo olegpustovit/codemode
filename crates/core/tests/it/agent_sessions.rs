@@ -61,6 +61,21 @@ async fn activity_groups_concurrent_starts_isolates_grants_and_workspaces_and_sl
     let sessions = history.list("", None).await.unwrap();
     assert_eq!(sessions.sessions.len(), 1);
     assert_eq!(sessions.sessions[0].executions, 12);
+    sqlx::query(
+        "INSERT INTO tool_calls(execution_id,seq,path,args_redacted,outcome)
+         SELECT e.id,c.seq,c.path,'{}','ok' FROM
+         (SELECT id FROM executions WHERE session_id=$1 ORDER BY started_at,id LIMIT 1) e
+         CROSS JOIN (VALUES (0,'zeta.fetch'),(1,'@codemode/memo'),(2,'alpha.find'),
+         (3,'zeta.save'),(4,'delta.list'),(5,'beta.read')) c(seq,path)",
+    )
+    .bind(first.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        history.detail(first.id, None).await.unwrap().session.title,
+        "zeta · alpha · delta +1"
+    );
     history
         .rename(first.id, "  Renamed investigation  ")
         .await

@@ -252,7 +252,7 @@ export function IntegrationsPage() {
             }
             ref={mountSearch}
             type="search"
-            aria-describedby="list-search-hint"
+            aria-describedby={/[*?]/.test(q) ? "list-search-hint" : undefined}
             aria-label="Search this list"
             placeholder="Search vendors and tools"
             value={q}
@@ -263,7 +263,7 @@ export function IntegrationsPage() {
               })
             }
           />
-          <SearchHint />
+          {/[*?]/.test(q) && <SearchHint />}
           <span className="kbd">/</span>
         </label>
       </ShellSlot>

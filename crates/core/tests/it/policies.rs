@@ -566,6 +566,7 @@ async fn session_history_stores_bounded_utf8_results_previews_and_stdout_on_fail
     let history = AgentSessions::new(f.db.clone());
     let page = history.list("Large result", None).await.unwrap();
     assert_eq!(page.sessions.len(), 1);
+    assert_eq!(page.sessions[0].title, "fixture");
     assert_eq!(page.sessions[0].sources, ["fixture"]);
     let detail = history.detail(page.sessions[0].id, None).await.unwrap();
     let stored = &detail.executions[0];

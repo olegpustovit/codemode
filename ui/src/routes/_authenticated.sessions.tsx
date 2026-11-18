@@ -5,7 +5,6 @@ import { agentSessionsInfiniteQuery } from "@/features/queries"
 export const Route = createFileRoute("/_authenticated/sessions")({
   validateSearch: z.object({
     q: z.string().max(1024).optional().catch(undefined),
-    view: z.enum(["list", "timeline"]).optional().catch(undefined),
     tab: z.enum(["all", "errors"]).optional().catch(undefined),
     cursor: z.uuid().optional().catch(undefined),
     runCursor: z.uuid().optional().catch(undefined),

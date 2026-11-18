@@ -112,7 +112,6 @@ pub fn router(state: State) -> Router {
         .route("/api/accounts/{id}/environment", put(link_environment))
         .route("/api/accounts/{id}/http", put(link_http_account))
         .route("/api/sessions", get(agent_session_list))
-        .route("/api/session-activity", get(agent_session_activity))
         .route(
             "/api/sessions/{id}",
             get(agent_session_detail).patch(rename_agent_session),
@@ -1237,12 +1236,6 @@ async fn agent_session_list(
             .list_filtered(&query.q, query.before, query.errors_only)
             .await?,
     ))
-}
-async fn agent_session_activity(
-    AxumState(state): AxumState<State>,
-    Query(query): Query<LogQuery>,
-) -> Result<Json<agent_sessions::ActivityPage>, ApiError> {
-    Ok(Json(state.agent_sessions.activity(query.before).await?))
 }
 async fn agent_session_detail(
     AxumState(state): AxumState<State>,

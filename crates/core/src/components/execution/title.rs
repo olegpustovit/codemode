@@ -7,10 +7,28 @@ pub(crate) fn title(code: &str, paths: &[String]) -> String {
     let text = match comment {
         Some(comment) => comment,
         None if !paths.is_empty() => {
-            fallback = paths.join(" → ");
+            let mut counts: Vec<(&str, usize)> = Vec::new();
+            for path in paths {
+                if let Some((_, count)) = counts.iter_mut().find(|(seen, _)| *seen == path) {
+                    *count += 1;
+                } else {
+                    counts.push((path, 1));
+                }
+            }
+            fallback = counts
+                .into_iter()
+                .map(|(path, count)| {
+                    if count == 1 {
+                        path.to_owned()
+                    } else {
+                        format!("{path} ×{count}")
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
             &fallback
         }
-        None => "Python execution",
+        None => "No tool calls",
     };
     text.chars().take(160).collect()
 }
@@ -26,9 +44,13 @@ mod tests {
         );
         assert_eq!(
             title("return '# not a comment'", &paths),
-            "sentry.list_issues → linear.create_issue"
+            "sentry.list_issues, linear.create_issue"
         );
-        assert_eq!(title("return 42", &[]), "Python execution");
+        assert_eq!(
+            title("", &[paths[0].clone(), paths[1].clone(), paths[0].clone()]),
+            "sentry.list_issues ×2, linear.create_issue"
+        );
+        assert_eq!(title("return 42", &[]), "No tool calls");
         assert_eq!(
             title(&format!("# {}", "雪".repeat(200)), &[]),
             "雪".repeat(160)

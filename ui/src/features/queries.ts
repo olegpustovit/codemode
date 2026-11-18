@@ -112,16 +112,6 @@ export const tokensQuery = queryOptions({
   queryKey: ["tokens"],
   queryFn: () => api("/api/tokens", tokenSchema.array()),
 })
-export const executionsQuery = (before?: string) =>
-  queryOptions({
-    queryKey: ["executions", { before }],
-    queryFn: () =>
-      api(
-        `/api/executions${before ? `?before=${encodeURIComponent(before)}` : ""}`,
-        summary.array()
-      ),
-    refetchInterval: 5_000,
-  })
 export const executionQuery = (id: string) =>
   queryOptions({
     queryKey: ["executions", id],
@@ -291,15 +281,3 @@ export const agentSessionInfiniteQuery = (id: string) =>
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     refetchInterval: 5_000,
   })
-
-export const sessionActivitySchema = z.object({
-  executions: z.array(
-    z.object({
-      id: z.uuid(),
-      sessionId: z.uuid(),
-      startedAt: z.string(),
-      status: z.string(),
-    })
-  ),
-  nextCursor: z.uuid().nullable(),
-})

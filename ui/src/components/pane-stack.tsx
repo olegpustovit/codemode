@@ -47,9 +47,11 @@ export function PaneStack({
       role="tabpanel"
       aria-label={`${label} results`}
     >
-      <section className="stack-pane list-pane" aria-label={`${label} list`}>
-        {list}
-      </section>
+      {!execution && (
+        <section className="stack-pane list-pane" aria-label={`${label} list`}>
+          {list}
+        </section>
+      )}
       <section
         className="stack-pane detail-pane"
         aria-label={`${label} details`}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_sessions s SET last_seen_at=GREATEST(s.last_seen_at,clock_timestamp()) WHERE s.id=(SELECT session_id FROM executions WHERE id=$1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0d68da9874913b10b9be8f4f65c398fe6d05e42b2fff9ca37beffd8efb59c6b7"
+}

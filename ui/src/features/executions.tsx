@@ -1,228 +1,243 @@
-import type { ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
+import { prettyJson } from "@/lib/pretty-json"
 import { PythonCode } from "@/components/python-code"
-import { Link, getRouteApi } from "@tanstack/react-router"
-import { useSuspenseQuery } from "@tanstack/react-query"
 import { useStatus } from "@/components/status-bar"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
 import type { ExecutionDetail } from "./queries"
-import { executionQuery, executionsQuery } from "./queries"
-import { PageHeader, Blank, StateBadge, date } from "@/components/common"
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
+import { StateBadge, date } from "@/components/common"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-const listRoute = getRouteApi("/_authenticated/executions/")
-const detailRoute = getRouteApi("/_authenticated/executions/$executionId")
-export function ExecutionsPage() {
-  const { before } = listRoute.useSearch()
-  const executions = useSuspenseQuery(executionsQuery(before)).data
+
+function CallPreview({ preview }: { preview: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const lines = prettyJson(preview).split("\n")
   return (
     <>
-      <PageHeader
-        title="Executions"
-        description="Review code, tool calls and outcomes from your agents."
-      />
-      {!executions.length ? (
-        <Blank
-          title="No executions here"
-          description="Executions appear after an agent runs Python through this gateway."
-        />
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Execution</TableHead>
-              <TableHead>Started</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Tool calls</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {executions.map((execution) => (
-              <TableRow key={execution.id}>
-                <TableCell>
-                  <Link
-                    className="font-mono text-xs underline underline-offset-4"
-                    to="/executions/$executionId"
-                    params={{ executionId: execution.id }}
-                    aria-label={`Execution ${execution.id.slice(0, 8)}`}
-                  >
-                    {execution.id.slice(0, 8)}
-                  </Link>
-                </TableCell>
-                <TableCell>{date(execution.startedAt)}</TableCell>
-                <TableCell>
-                  <StateBadge state={execution.status} />
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {execution.toolCalls}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-      <div className="flex justify-between gap-3">
-        <Button
-          variant="outline"
-          disabled={!before}
-          render={<Link to="/executions" search={{}} />}
+      <pre className="trace-preview">
+        <code>{(expanded ? lines : lines.slice(0, 24)).join("\n")}</code>
+      </pre>
+      {lines.length > 24 && (
+        <button
+          type="button"
+          className="trace-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
         >
-          Latest executions
-        </Button>
-        {executions.length === 50 && (
-          <Button
-            variant="outline"
-            render={
-              <Link
-                to="/executions"
-                search={{ before: executions.at(-1)?.id }}
-              />
-            }
-          >
-            Older executions
-          </Button>
-        )}
-      </div>
+          {expanded ? "Show less" : "Show whole preview"}
+        </button>
+      )}
     </>
   )
 }
-export function ExecutionPage() {
-  const { executionId } = detailRoute.useParams()
-  const execution = useSuspenseQuery(executionQuery(executionId)).data
-  return <ExecutionContent execution={execution} />
+
+function PrintedOutput({ output }: { output: string }) {
+  const [raw, setRaw] = useState(false)
+  let value: unknown
+  try {
+    value = JSON.parse(output)
+  } catch {
+    value = null
+  }
+  const entries =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.entries(value)
+      : null
+  const flat = entries?.every(
+    ([, item]) => item === null || typeof item !== "object"
+  )
+  return (
+    <>
+      <h3>
+        Printed{" "}
+        {flat && (
+          <button
+            type="button"
+            className="trace-more"
+            aria-pressed={raw}
+            onClick={() => setRaw(!raw)}
+          >
+            Raw output
+          </button>
+        )}
+      </h3>
+      {entries && flat && !raw ? (
+        <table className="trace-output">
+          <thead className="sr-only">
+            <tr>
+              <th>Key</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map(([key, item]) => (
+              <tr key={key}>
+                <th scope="row">{key}</th>
+                <td>{JSON.stringify(item)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <pre className="code-panel">
+          <code>{output}</code>
+        </pre>
+      )}
+    </>
+  )
 }
+
 export function ExecutionContent({
   execution,
-  embedded = false,
   action,
 }: {
   execution: ExecutionDetail
-  embedded?: boolean
   action?: ReactNode
 }) {
-  const executionId = execution.id
+  const callList = useRef<HTMLDivElement>(null)
+  const totalToolTime = execution.calls.reduce(
+    (total, call) => total + call.durationMs,
+    0
+  )
+  const origin = Date.parse(execution.startedAt)
+  const callOffsets = execution.calls.map((call) =>
+    Math.max(0, Date.parse(call.startedAt) - origin)
+  )
+  const waterfallDuration = callOffsets.reduce(
+    (end, offset, index) =>
+      Math.max(end, offset + execution.calls[index].durationMs),
+    1
+  )
+  function jumpToCall(path: string) {
+    const call = Array.from(
+      callList.current?.querySelectorAll("details") ?? []
+    ).find((item) => item.dataset.path === path)
+    if (!call) return
+    call.open = true
+    call.querySelector("summary")?.focus({ preventScroll: true })
+    call.scrollIntoView({ block: "nearest" })
+  }
   const { report } = useStatus()
   return (
     <>
-      {!embedded && (
-        <Link
-          to="/executions"
-          search={{}}
-          className="flex items-center gap-2 text-sm text-muted-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Executions
-        </Link>
-      )}
-      {embedded ? (
-        <header>
-          <h2>{execution.title ?? "Python execution"}</h2>
-          <StateBadge state={execution.status} />
-        </header>
-      ) : (
-        <PageHeader
-          title={`Execution ${executionId.slice(0, 8)}`}
-          description={`Started ${date(execution.startedAt)}`}
-          action={<StateBadge state={execution.status} />}
-        />
-      )}
+      <header className="trace-header">
+        <h2>{execution.title ?? "No tool calls"}</h2>
+        <StateBadge state={execution.status} />
+        <p>
+          Started {date(execution.startedAt)} · {totalToolTime} ms ·{" "}
+          {execution.calls.length} calls
+        </p>
+      </header>
       {execution.error && (
         <Alert variant="destructive">
           <AlertTitle>Execution error</AlertTitle>
           <AlertDescription>{execution.error}</AlertDescription>
         </Alert>
       )}
-      <section className="flex flex-col gap-3">
-        <h2>Python code</h2>
-        <pre className="code-panel">
-          <PythonCode code={execution.code} />
+      <section className="trace-section">
+        <h3>
+          Tool calls{" "}
+          <span>
+            {execution.calls.length} calls · {totalToolTime} ms
+          </span>
+        </h3>
+        <div className="trace-calls" ref={callList}>
+          {execution.calls.length === 0 && (
+            <p className="text-muted-foreground">No tool calls</p>
+          )}
+          {execution.calls.map((call, index) => {
+            const args = Object.entries(call.argsRedacted ?? {})
+            const left = (callOffsets[index] / waterfallDuration) * 100
+            const width = (call.durationMs / waterfallDuration) * 100
+            return (
+              <details
+                className="trace-call"
+                data-path={call.path}
+                key={call.seq}
+              >
+                <summary>
+                  <span className="trace-index">{index + 1}</span>
+                  <span className="trace-path" title={call.path}>
+                    {call.path}
+                  </span>
+                  <span className="trace-args">
+                    {args
+                      .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+                      .join(" ")}
+                  </span>
+                  <span className="trace-waterfall" aria-hidden="true">
+                    <i style={{ left: `${left}%`, width: `${width}%` }} />
+                  </span>
+                  <span className="trace-duration">{call.durationMs} ms</span>
+                  <StateBadge state={call.outcome} />
+                </summary>
+                <div className="trace-call-body">
+                  <h4>Arguments</h4>
+                  {args.length ? (
+                    <dl className="trace-kv">
+                      {args.map(([key, value]) => (
+                        <div key={key}>
+                          <dt>{key}</dt>
+                          <dd>{JSON.stringify(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : (
+                    <p className="text-muted-foreground">None</p>
+                  )}
+                  {call.preview !== null && (
+                    <>
+                      <h4>Result</h4>
+                      <CallPreview preview={call.preview} />
+                    </>
+                  )}
+                  {call.error && (
+                    <p className="text-sm break-words text-destructive">
+                      {call.error}
+                    </p>
+                  )}
+                </div>
+              </details>
+            )
+          })}
+        </div>
+      </section>
+      <section className="trace-section">
+        <h3>
+          Python <span>{execution.code.split("\n").length} lines</span>
+        </h3>
+        <pre className="code-panel" tabIndex={0} aria-label="Python code">
+          <PythonCode code={execution.code} onTool={jumpToCall} />
         </pre>
       </section>
-      {execution.result !== null && (
-        <section className="flex flex-col gap-3">
-          <h2>Result preview</h2>
-          <pre className="code-panel">
-            <code>{execution.result}</code>
-          </pre>
-        </section>
-      )}
-      {execution.output !== null && (
-        <section className="flex flex-col gap-3">
-          <h2>Stdout</h2>
-          <pre className="code-panel">
-            <code>{execution.output || "No output"}</code>
-          </pre>
-        </section>
-      )}
-      <section className="flex flex-col gap-5">
-        <h2>Tool calls</h2>
-        {execution.calls.length === 0 ? (
-          <p className="text-muted-foreground">
-            This execution has no recorded tool calls.
-          </p>
-        ) : (
-          execution.calls.map((call) => (
-            <article
-              key={call.seq}
-              className="flex flex-col gap-3 border-b pb-5"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="font-mono text-sm font-medium">
-                  {call.seq + 1}. {call.path}
-                </h3>
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="text-muted-foreground tabular-nums">
-                    {call.durationMs} ms
-                  </span>
-                  <StateBadge state={call.outcome} />
-                </div>
-              </div>
-              <pre className="code-panel">
-                <code>{JSON.stringify(call.argsRedacted, null, 2)}</code>
-              </pre>
-              {call.preview !== null && (
-                <>
-                  <h4>Result preview</h4>
-                  <pre className="code-panel">
-                    <code>{call.preview}</code>
-                  </pre>
-                </>
-              )}
-              {call.error && (
-                <p className="text-sm break-words text-destructive">
-                  {call.error}
-                </p>
-              )}
-            </article>
-          ))
-        )}
+      <section className="trace-section">
+        <h3>Output</h3>
+        <dl className="trace-return">
+          <dt>Returned</dt>
+          <dd>
+            {execution.result === null ? (
+              <span className="text-muted-foreground">nothing (None)</span>
+            ) : (
+              <code>{execution.result}</code>
+            )}
+          </dd>
+        </dl>
+        {execution.output && <PrintedOutput output={execution.output} />}
       </section>
-      {embedded && (
-        <div className="detail-actions">
-          {" "}
-          <Button
-            variant="outline"
-            onClick={() =>
-              void navigator.clipboard
-                .writeText(execution.code)
-                .then(() => report("Code copied"))
-                .catch(() =>
-                  report("Copy failed. Select the code and copy it.", "error")
-                )
-            }
-          >
-            Copy code
-          </Button>
-          {action}
-        </div>
-      )}
+      <div className="detail-actions">
+        <Button
+          variant="outline"
+          onClick={() =>
+            void navigator.clipboard
+              .writeText(execution.code)
+              .then(() => report("Code copied"))
+              .catch(() =>
+                report("Copy failed. Select the code and copy it.", "error")
+              )
+          }
+        >
+          Copy code
+        </Button>
+        {action}
+      </div>
     </>
   )
 }

@@ -1,3 +1,4 @@
+import { navigationMotion } from "@/lib/motion"
 import { useEffect, useState } from "react"
 import {
   Link,
@@ -13,7 +14,7 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, PanelLeftClose } from "lucide-react"
 import { AccountMenu } from "@/components/account-menu"
 import { Button } from "@/components/ui/button"
 import { ErrorNotice } from "@/components/common"
@@ -56,12 +57,32 @@ const sections = [
     path: "M12 15a4 4 0 1 1-8 0a4 4 0 0 1 8 0M11 12l9-9M17 6l3 3M14 9l2 2",
   },
 ] as const
+function sectionTransition(from: number, to: number) {
+  return from === to ? false : navigationMotion(to > from ? "down" : "up")
+}
 export function AppShell() {
   const config = useSuspenseQuery(configQuery).data
   const session = useSuspenseQuery(sessionQuery).data
   const workspaces = useSuspenseQuery(workspacesQuery).data
   const search = useSearch({ strict: false })
   const path = useRouterState({ select: (state) => state.location.pathname })
+  const [railCollapsed, setRailCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("codemode.rail") === "collapsed"
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "codemode.rail",
+        railCollapsed ? "collapsed" : "expanded"
+      )
+    } catch {
+      // The rail still works when storage is disabled.
+    }
+  }, [railCollapsed])
   const [pickedWorkspace, setPickedWorkspace] = useState<string>()
   const workspace =
     workspaces.find((w) => w.id === (search.workspace ?? pickedWorkspace)) ??
@@ -88,6 +109,14 @@ export function AppShell() {
   const { report } = useStatus()
   const [searchHost, setSearchHost] = useState<HTMLDivElement | null>(null)
   const [statusHost, setStatusHost] = useState<HTMLDivElement | null>(null)
+  function isActive(to: (typeof sections)[number]["to"]) {
+    return to === "/scripts"
+      ? path.includes("/scripts")
+      : to === "/workspaces"
+        ? path.startsWith("/workspaces") && !path.includes("/scripts")
+        : Boolean(match({ to, fuzzy: true }))
+  }
+  const currentSection = sections.findIndex(({ to }) => isActive(to))
   useEffect(() => {
     const keys = (event: KeyboardEvent) => {
       if (
@@ -99,12 +128,24 @@ export function AppShell() {
           event.target.closest("input,textarea,select,[contenteditable=true]"))
       )
         return
+      if (
+        event.key === "\\" &&
+        !window.matchMedia("(max-width: 767px)").matches
+      ) {
+        event.preventDefault()
+        setRailCollapsed((collapsed) => !collapsed)
+        return
+      }
       const section = sections[Number(event.key) - 1]
       if (section) {
         event.preventDefault()
         setPickedWorkspace(workspace?.id)
         void router.navigate({
           to: section.to,
+          viewTransition: sectionTransition(
+            currentSection,
+            sections.indexOf(section)
+          ),
           search:
             section.to === "/scripts" || section.to === "/workspaces"
               ? { workspace: workspace?.id }
@@ -114,7 +155,7 @@ export function AppShell() {
     }
     document.addEventListener("keydown", keys)
     return () => document.removeEventListener("keydown", keys)
-  }, [router, workspace?.id])
+  }, [router, workspace?.id, currentSection])
   const chooseWorkspace = (id: string) => {
     setPickedWorkspace(id)
     if (path === "/scripts")
@@ -137,14 +178,17 @@ export function AppShell() {
       <ShellTargets.Provider
         value={{ "shell-search": searchHost, "status-keys": statusHost }}
       >
-        <div className="app-shell">
+        <div
+          className="app-shell"
+          data-rail={railCollapsed ? "collapsed" : "expanded"}
+        >
           <a className="skip-link" href="#content">
             Skip to content
           </a>
           <header className="shell-top">
-            <Link to="/sources" className="shell-brand">
+            <Link to="/sources" className="shell-brand" aria-label="Codemode">
               <i aria-hidden="true" />
-              Codemode
+              <span>Codemode</span>
             </Link>
             <button
               className="workspace-switch"
@@ -172,7 +216,7 @@ export function AppShell() {
               onClick={() => {
                 void navigator.clipboard
                   .writeText(`https://${config.hostname}/mcp`)
-                  .then(() => report("Agent URL copied"))
+                  .then(() => report("MCP URL copied"))
                   .catch(() =>
                     report(
                       `Copy failed. Select and copy https://${config.hostname}/mcp`,
@@ -181,7 +225,7 @@ export function AppShell() {
                   )
               }}
             >
-              Copy agent URL
+              Copy MCP URL
             </Button>
             <AccountMenu
               email={session.user?.email ?? ""}
@@ -203,22 +247,19 @@ export function AppShell() {
                   }
                   className="section-link"
                   aria-label={section.label}
-                  aria-current={
-                    (
-                      section.to === "/scripts"
-                        ? path.includes("/scripts")
-                        : section.to === "/workspaces"
-                          ? path.startsWith("/workspaces") &&
-                            !path.includes("/scripts")
-                          : match({ to: section.to, fuzzy: true })
-                    )
-                      ? "page"
-                      : undefined
-                  }
+                  title={section.label}
+                  aria-current={isActive(section.to) ? "page" : undefined}
+                  viewTransition={sectionTransition(
+                    currentSection,
+                    sections.indexOf(section)
+                  )}
                   onClick={() => {
                     setPickedWorkspace(workspace?.id)
                   }}
                 >
+                  {isActive(section.to) && (
+                    <span className="rail-mark" aria-hidden="true" />
+                  )}
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"
@@ -227,7 +268,7 @@ export function AppShell() {
                   >
                     <path d={section.path} />
                   </svg>
-                  <span>{section.label}</span>
+                  <span className="section-label">{section.label}</span>
                   <span className="section-count" aria-hidden="true">
                     {counts[section.to]}
                   </span>
@@ -240,11 +281,22 @@ export function AppShell() {
                 <button
                   key={w.id}
                   aria-pressed={workspace?.id === w.id}
+                  aria-label={w.name}
+                  title={w.name}
                   onClick={() => {
                     chooseWorkspace(w.id)
                   }}
                 >
-                  <span>{w.name}</span>
+                  <span className="workspace-label">{w.name}</span>
+                  <span className="workspace-initials" aria-hidden="true">
+                    {w.name
+                      .trim()
+                      .split(/\s+/)
+                      .slice(0, 2)
+                      .map((word) => word[0])
+                      .join("")
+                      .toUpperCase()}
+                  </span>
                   {workspace?.id === w.id && (
                     <span className="workspace-check" aria-hidden="true">
                       ✓
@@ -253,11 +305,28 @@ export function AppShell() {
                 </button>
               ))}
             </fieldset>
+            <button
+              type="button"
+              className="rail-collapse"
+              aria-expanded={!railCollapsed}
+              aria-controls="section-navigation"
+              aria-label={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              onClick={() => setRailCollapsed(!railCollapsed)}
+            >
+              <PanelLeftClose aria-hidden="true" />
+              <span>Collapse</span>
+              <kbd className="kbd">{"\\"}</kbd>
+            </button>
           </aside>
           <main id="content" className="work-area" tabIndex={-1}>
             <Outlet />
           </main>
-          <StatusBar keysRef={setStatusHost} />
+          <StatusBar keysRef={setStatusHost}>
+            <span className="rail-key">
+              <kbd className="kbd">{"\\"}</kbd> Sidebar
+            </span>
+          </StatusBar>
         </div>
       </ShellTargets.Provider>
     </WorkspaceContext.Provider>

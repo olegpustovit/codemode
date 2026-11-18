@@ -339,7 +339,9 @@ export function WorkspaceToolsPage() {
             id="workspace-search"
             ref={input}
             type="search"
-            aria-describedby="list-search-hint"
+            aria-describedby={
+              /[*?]/.test(search.q ?? "") ? "list-search-hint" : undefined
+            }
             aria-label="Search tools"
             placeholder="Search tools"
             value={search.q ?? ""}
@@ -364,7 +366,7 @@ export function WorkspaceToolsPage() {
               )
             }
           />
-          <SearchHint />
+          {/[*?]/.test(search.q ?? "") && <SearchHint />}
           <span className="kbd">/</span>
         </label>
       </ShellSlot>

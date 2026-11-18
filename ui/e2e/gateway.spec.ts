@@ -618,7 +618,7 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
     (entry: { workspaceId: string; client: string }) =>
       entry.workspaceId === workspaceId && entry.client === "Browser agent"
   )
-  expect(session.title).toBe(`${source.pythonName}.echo`)
+  expect(session.title).toBe(source.pythonName)
   expect(
     new Date(session.expiresAt).getTime() -
       new Date(session.lastSeenAt).getTime()
@@ -674,40 +674,29 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   ).toBe(true)
   await cdp.detach()
   await capture(page, "desktop-sources.png")
-  await page.goto("/executions")
-  await expect(
-    page.getByRole("heading", { name: "Executions", exact: true })
-  ).toBeVisible()
-  await capture(page, "desktop-executions.png")
+  await page.goto(`/executions/${execution.executionId}`)
+  await expect(page).toHaveURL(/\/sessions\?.*execution=/)
+  await expect(page.getByLabel("Python code", { exact: true })).toBeVisible()
   await page
-    .getByRole("link", {
-      name: `Execution ${execution.executionId.slice(0, 8)}`,
+    .getByRole("button", {
+      name: `tools.${source.pythonName}.echo`,
       exact: true,
     })
     .click()
   await expect(
-    page.getByRole("heading", { name: "Python code", exact: true })
-  ).toBeVisible()
-  await expect(page.getByRole("heading", { name: /echo/ })).toBeVisible()
-  await expect(
-    page.locator("pre").filter({ hasText: '"value": "fixture-value"' })
+    page.locator(".trace-kv").filter({ hasText: "fixture-value" })
   ).toBeVisible()
   await page.reload()
-  await expect(
-    page.getByRole("heading", { name: "Python code", exact: true })
-  ).toBeVisible()
+  await expect(page.getByLabel("Python code", { exact: true })).toBeVisible()
   await expect(
     page
-      .getByRole("heading", { name: "Stdout", exact: true })
+      .getByRole("heading", { name: "Printed", exact: true })
       .locator("..")
       .locator("pre")
   ).toHaveText("browser execution\n")
-  await expect(
-    page
-      .getByRole("heading", { name: "Result preview", level: 2, exact: true })
-      .locator("..")
-      .locator("pre")
-  ).toHaveText(JSON.stringify(execution.result))
+  await expect(page.locator(".trace-return dd")).toHaveText(
+    JSON.stringify(execution.result)
+  )
   await capture(page, "desktop-execution.png")
   await page.goto(`/sources/${sourceId}/accounts`)
   await page
@@ -939,10 +928,9 @@ test("OpenAPI: add YAML document, pin the server, link a header key and execute 
     expect(execution.result).toEqual(["item-one"])
     await page.goto(`/executions/${execution.executionId}`)
     await expect(
-      page.getByRole("heading", {
-        name: `1. ${source.pythonName}.listItems`,
-        exact: true,
-      })
+      page
+        .locator("summary")
+        .filter({ hasText: `${source.pythonName}.listItems` })
     ).toBeVisible()
     const invoke = async (name: string, args: unknown) => {
       const response = await page.request.post(`${loopback}/mcp`, {
@@ -1874,6 +1862,20 @@ test("integrations: real catalogue search, URL-backed panes and keyboard focus",
       page.getByRole("heading", { name: "keyboard-integration", exact: true })
     ).toBeVisible()
     const search = page.getByRole("searchbox", { name: "Search this list" })
+    await page.keyboard.press("Backslash")
+    await expect(
+      page.getByRole("button", { name: "Expand sidebar" })
+    ).toBeVisible()
+    await page.reload()
+    const railToggle = page.getByRole("button", { name: "Expand sidebar" })
+    await expect(railToggle).toBeVisible()
+    await search.focus()
+    await page.keyboard.press("Backslash")
+    await expect(railToggle).toBeVisible()
+    await railToggle.click()
+    await expect(
+      page.getByRole("button", { name: "Collapse sidebar" })
+    ).toBeVisible()
     await search.fill("keyboard integration echo")
     const grid = page.getByRole("grid", { name: "Integrations", exact: true })
     await expect(
@@ -2114,7 +2116,7 @@ test("OAuth apps: write-only setup, static PKCE redirect and guarded removal", a
   expect(errors).toEqual([])
 })
 
-test("sessions: real execution grouping, rename, three panes and mobile focus", async ({
+test("sessions: real execution grouping, rename, two panes and mobile focus", async ({
   page,
 }) => {
   const errors: string[] = []
@@ -2179,41 +2181,6 @@ test("sessions: real execution grouping, rename, three panes and mobile focus", 
       sessions.getByRole("row", { name: "First investigation", exact: true })
     ).toHaveCount(1)
     await sessions.focus()
-    await page.keyboard.press("v")
-    await expect(
-      page.getByRole("grid", { name: "Sessions timeline", exact: true })
-    ).toBeVisible()
-    await expect(
-      page
-        .getByRole("grid", { name: "Sessions timeline", exact: true })
-        .getByRole("row", { name: "First investigation", exact: true })
-        .locator(".timeline-track > b")
-    ).toHaveCount(2)
-    await expect(
-      page
-        .getByRole("row", { name: "First investigation", exact: true })
-        .locator(".timeline-bar.has-failures")
-    ).toHaveCount(1)
-    await expect(
-      page
-        .getByRole("row", { name: "First investigation", exact: true })
-        .locator(".timeline-track > b.failed")
-    ).toHaveCount(1)
-    await page.reload()
-    await expect(
-      page.getByRole("button", { name: "Timeline", exact: true })
-    ).toHaveAttribute("aria-pressed", "true")
-    await capture(page, "sessions-timeline-desktop.png")
-    await page.setViewportSize({ width: 390, height: 844 })
-    await capture(page, "sessions-timeline-mobile.png")
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth > innerWidth
-      )
-    ).toBe(false)
-    await page.setViewportSize({ width: 1440, height: 1000 })
-    await page.getByRole("button", { name: "List", exact: true }).click()
-    await sessions.focus()
     await page.keyboard.press("Enter")
     await page
       .getByRole("button", { name: "Rename session", exact: true })
@@ -2252,7 +2219,7 @@ test("sessions: real execution grouping, rename, three panes and mobile focus", 
     ).toBeVisible()
     await execution.getByRole("button", { name: /Close/ }).focus()
     const beforeArrow = page.url()
-    await page.keyboard.press("ArrowDown")
+    await page.keyboard.press("j")
     await expect(
       execution.getByRole("heading", {
         name: "First investigation",
@@ -2262,9 +2229,7 @@ test("sessions: real execution grouping, rename, three panes and mobile focus", 
     await expect(
       execution.getByText("captured stdout", { exact: true })
     ).toBeVisible()
-    expect(page.url()).toBe(beforeArrow)
-    await runs.focus()
-    await page.keyboard.press("Enter")
+    await expect(sessions).toHaveCount(0)
     await expect.poll(() => page.url()).not.toBe(beforeArrow)
     await page.reload()
     await expect(

@@ -1,6 +1,6 @@
 WITH matched AS (
 SELECT s.id,s.token_id,s.workspace_id,s.client,
- COALESCE(s.title,a.first_title,'Python execution') AS title,
+ COALESCE(s.title,n.source_title,a.first_title,'No tool calls') AS title,
  COALESCE(w.slug,'Deleted workspace') AS workspace_name,
  to_char(s.started_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS started_at,
  to_char(s.last_seen_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS last_seen_at,
@@ -21,9 +21,23 @@ CROSS JOIN LATERAL (
  SELECT array_agg(DISTINCT split_part(t.path,'.',1) ORDER BY split_part(t.path,'.',1)) AS sources,array_agg(DISTINCT t.path) AS paths
  FROM tool_calls t JOIN executions e ON e.id=t.execution_id WHERE e.session_id=s.id
 ) c
+CROSS JOIN LATERAL (
+ SELECT string_agg(source,' · ' ORDER BY first_seen,execution_start,execution_id,seq,source) FILTER(WHERE position<=3) ||
+ CASE WHEN count(*)>3 THEN ' +' || (count(*)-3)::text ELSE '' END AS source_title
+ FROM (
+  SELECT source,first_seen,execution_start,execution_id,seq,row_number() OVER(ORDER BY first_seen,execution_start,execution_id,seq,source) AS position
+  FROM (
+   SELECT DISTINCT ON (split_part(t.path,'.',1)) split_part(t.path,'.',1) AS source,
+    t.started_at AS first_seen,e.started_at AS execution_start,e.id AS execution_id,t.seq
+   FROM tool_calls t JOIN executions e ON e.id=t.execution_id
+   WHERE e.session_id=s.id AND t.path NOT LIKE '@codemode/%'
+   ORDER BY split_part(t.path,'.',1),t.started_at,e.started_at,e.id,t.seq,t.id
+  ) first_use
+ ) ordered
+) n
 WHERE s.expires_at>now() AND ($1::uuid IS NULL OR s.id=$1)
  AND NOT EXISTS(SELECT 1 FROM unnest($2::text[]) terms(pattern) WHERE NOT (
- COALESCE(s.title,a.first_title,'Python execution') ILIKE pattern OR s.client ILIKE pattern OR COALESCE(w.slug,'Deleted workspace') ILIKE pattern
+ COALESCE(s.title,n.source_title,a.first_title,'No tool calls') ILIKE pattern OR a.first_title ILIKE pattern OR s.client ILIKE pattern OR COALESCE(w.slug,'Deleted workspace') ILIKE pattern
  OR (CASE WHEN a.running>0 THEN 'running' WHEN a.failures>0 THEN 'failed' ELSE 'completed' END) ILIKE pattern
  OR EXISTS(SELECT 1 FROM unnest(COALESCE(c.sources,ARRAY[]::text[]) || COALESCE(c.paths,ARRAY[]::text[])) names(name) WHERE name ILIKE pattern)))
 )

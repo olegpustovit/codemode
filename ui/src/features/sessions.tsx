@@ -1,4 +1,4 @@
-import { flushSync } from "react-dom"
+import { move, navigationMotion } from "@/lib/motion"
 import {
   useListCursor,
   useListSelection,
@@ -6,7 +6,7 @@ import {
 } from "@/hooks/use-list-navigation"
 import { MatchText, SearchHint } from "@/components/match-text"
 import { Breadcrumbs } from "@/components/breadcrumbs"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link, getRouteApi } from "@tanstack/react-router"
 import {
   useInfiniteQuery,
@@ -21,7 +21,6 @@ import {
   agentSessionsInfiniteQuery,
   agentSessionInfiniteQuery,
   executionQuery,
-  sessionActivitySchema,
 } from "./queries"
 import { ExecutionContent } from "./executions"
 import { DataList, ListEmpty } from "@/components/data-list"
@@ -31,8 +30,9 @@ import { ShellSlot } from "@/components/shell-slot"
 import { useStatus } from "@/components/status-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { relativeTime } from "@/lib/time"
 import { ErrorNotice, date } from "@/components/common"
-import { api, message, nothing, write } from "@/lib/api"
+import { message, nothing, write } from "@/lib/api"
 const route = getRouteApi("/_authenticated/sessions")
 export function SessionsPage() {
   const search = route.useSearch()
@@ -129,40 +129,8 @@ export function SessionsPage() {
     sessionPageError,
     fetchSessions,
   ])
-  const timeline = search.view === "timeline" && !openedExecution
-  const activity = useInfiniteQuery({
-    queryKey: ["session-activity"],
-    initialPageParam: "",
-    queryFn: ({ pageParam }) =>
-      api(
-        `/api/session-activity${pageParam ? `?before=${pageParam}` : ""}`,
-        sessionActivitySchema
-      ),
-    getNextPageParam: (page) => page.nextCursor ?? undefined,
-    enabled: timeline,
-    refetchInterval: 5_000,
-  })
   const { report } = useStatus()
   const cache = useQueryClient()
-  const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } =
-    activity
-  useEffect(() => {
-    if (timeline && hasNextPage && !isFetching && !isFetchNextPageError)
-      void fetchNextPage()
-  }, [timeline, hasNextPage, isFetching, isFetchNextPageError, fetchNextPage])
-  const ticks = useMemo(() => {
-    const grouped = new Map<
-      string,
-      { id: string; startedAt: string; status: string }[]
-    >()
-    for (const page of activity.data?.pages ?? [])
-      for (const tick of page.executions) {
-        const rows = grouped.get(tick.sessionId) ?? []
-        rows.push(tick)
-        grouped.set(tick.sessionId, rows)
-      }
-    return grouped
-  }, [activity.data])
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = setInterval(() => {
@@ -170,45 +138,50 @@ export function SessionsPage() {
     }, 5_000)
     return () => clearInterval(timer)
   }, [])
-  const toggleView = () =>
-    void navigate({
-      search: {
-        ...search,
-        view: search.view === "timeline" ? "list" : "timeline",
-      },
-    })
   const selected = cursor ?? rows[0]?.id
   const back = () => {
-    if (openedExecution) {
-      setOpenedExecution("")
-      void navigate({ search: { ...search, execution: undefined } })
-      requestAnimationFrame(() => runs.current?.focus())
-    } else {
-      setOpened("")
-      void navigate({
-        search: {
-          ...search,
-          selected: undefined,
-          q: search.q ? undefined : search.q,
-          runBefore: undefined,
-        },
-      })
-      requestAnimationFrame(() => list.current?.focus())
-    }
+    move(openedExecution ? "pop" : "close", () => {
+      if (openedExecution) {
+        setOpenedExecution("")
+        void navigate({ search: { ...search, execution: undefined } })
+        requestAnimationFrame(() => runs.current?.focus())
+      } else {
+        setOpened("")
+        void navigate({
+          search: {
+            ...search,
+            selected: undefined,
+            q: undefined,
+            runBefore: undefined,
+          },
+        })
+        requestAnimationFrame(() => list.current?.focus())
+      }
+    })
   }
   const choose = (id: string, open = false) => {
     setCursor(id)
-    if (open) flushSync(() => setOpened(id))
-    else if (opened) setOpened(id)
-    if (!open) return
-    void navigate({
-      search: {
-        ...search,
-        selected: id,
-        execution: undefined,
-        runBefore: undefined,
-      },
-      replace: !open,
+    if (!open) {
+      if (opened) setOpened(id)
+      return
+    }
+    move(opened ? "swap" : "open", () => {
+      setOpened(id)
+      void navigate({
+        search: {
+          ...search,
+          selected: id,
+          execution: undefined,
+          runBefore: undefined,
+        },
+      })
+    })
+  }
+  function openRun(id: string) {
+    setRunCursor(id)
+    move(openedExecution ? "swap" : "push", () => {
+      setOpenedExecution(id)
+      void navigate({ search: { ...search, selected: opened, execution: id } })
     })
   }
   useEffect(() => {
@@ -230,14 +203,11 @@ export function SessionsPage() {
       if (event.key === "/") {
         event.preventDefault()
         input.current?.focus()
-      } else if (event.key.toLowerCase() === "v") {
-        event.preventDefault()
-        toggleView()
       } else if (event.key === "[" || event.key === "]") {
         event.preventDefault()
         void navigate({
+          viewTransition: navigationMotion("filter"),
           search: {
-            view: search.view,
             q: search.q,
             tab: search.tab === "errors" ? "all" : "errors",
           },
@@ -247,7 +217,7 @@ export function SessionsPage() {
         back()
       } else if (
         openedExecution &&
-        (event.key === "ArrowDown" || event.key === "ArrowUp")
+        ["ArrowDown", "ArrowUp", "j", "k"].includes(event.key)
       ) {
         const items = session.data?.executions ?? []
         const index = items.findIndex((e) => e.id === openedExecution)
@@ -257,14 +227,14 @@ export function SessionsPage() {
               0,
               Math.min(
                 items.length - 1,
-                index + (event.key === "ArrowDown" ? 1 : -1)
+                index +
+                  (event.key === "ArrowDown" || event.key === "j" ? 1 : -1)
               )
             )
           ]
         if (next) {
           event.preventDefault()
-          setRunCursor(next.id)
-          setOpenedExecution(next.id)
+          openRun(next.id)
         }
       }
     }
@@ -280,14 +250,15 @@ export function SessionsPage() {
             id="session-search"
             ref={input}
             type="search"
-            aria-describedby="list-search-hint"
+            aria-describedby={
+              /[*?]/.test(search.q ?? "") ? "list-search-hint" : undefined
+            }
             aria-label="Search sessions"
             placeholder="Search sessions"
             value={search.q ?? ""}
             onChange={(e) =>
               void navigate({
                 search: {
-                  view: search.view,
                   q: e.target.value || undefined,
                   tab: search.tab,
                 },
@@ -306,7 +277,7 @@ export function SessionsPage() {
               )
             }
           />
-          <SearchHint />
+          {/[*?]/.test(search.q ?? "") && <SearchHint />}
           <span className="kbd">/</span>
         </label>
       </ShellSlot>
@@ -351,23 +322,6 @@ export function SessionsPage() {
           </p>
         </div>
       </header>
-      <fieldset className="session-view-controls" aria-label="Sessions layout">
-        <button
-          aria-pressed={search.view !== "timeline"}
-          onClick={() => void navigate({ search: { ...search, view: "list" } })}
-        >
-          List
-        </button>
-        <button
-          aria-pressed={search.view === "timeline"}
-          onClick={() =>
-            void navigate({ search: { ...search, view: "timeline" } })
-          }
-        >
-          Timeline
-        </button>
-        <span className="kbd">V</span>
-      </fieldset>
       <TabBar
         label="Filter sessions"
         panelId="session-panes"
@@ -386,8 +340,8 @@ export function SessionsPage() {
         selected={search.tab ?? "all"}
         onSelect={(tab) =>
           void navigate({
+            viewTransition: navigationMotion("filter"),
             search: {
-              view: search.view,
               q: search.q,
               tab: tab === "errors" ? "errors" : "all",
             },
@@ -401,22 +355,16 @@ export function SessionsPage() {
         list={
           <>
             <DataList
-              label={timeline ? "Sessions timeline" : "Sessions"}
-              className={timeline ? "timeline-list" : undefined}
-              busy={timeline && activity.isFetching}
+              label="Sessions"
               listRef={list}
-              columns={
-                timeline
-                  ? ["Session", <TimelineAxis key="axis" now={now} />]
-                  : [
-                      "Session",
-                      "Agent",
-                      "Runs",
-                      "Calls",
-                      "Status",
-                      "Last activity",
-                    ]
-              }
+              columns={[
+                "Session",
+                "Agent",
+                "Runs",
+                "Calls",
+                "Failures",
+                "Last activity",
+              ]}
               selectedId={selected}
               rows={rows.map((s) => ({
                 id: s.id,
@@ -426,35 +374,26 @@ export function SessionsPage() {
                   month: "short",
                   day: "numeric",
                 }),
-                cells: timeline
-                  ? [
-                      <MatchText key="title" query={search.q ?? ""}>
-                        {s.title}
-                      </MatchText>,
-                      <TimelineLane
-                        key="track"
-                        session={s}
-                        ticks={ticks.get(s.id) ?? []}
-                        now={now}
-                      />,
-                    ]
-                  : [
-                      <MatchText key="title" query={search.q ?? ""}>
-                        {s.title}
-                      </MatchText>,
-                      <MatchText key="client" query={search.q ?? ""}>
-                        {s.client}
-                      </MatchText>,
-                      s.executions,
-                      s.toolCalls,
-                      <span
-                        key="status"
-                        className={s.failures ? "bad" : undefined}
-                      >
-                        {s.status}
-                      </span>,
-                      date(s.lastSeenAt),
-                    ],
+                cells: [
+                  <MatchText key="title" query={search.q ?? ""}>
+                    {s.title}
+                  </MatchText>,
+                  <MatchText key="client" query={search.q ?? ""}>
+                    {s.client}
+                  </MatchText>,
+                  s.executions,
+                  s.toolCalls,
+                  <span key="status" className={s.failures ? "bad" : undefined}>
+                    {s.failures ? `${s.failures} failed` : "—"}
+                  </span>,
+                  <time
+                    key="lastSeen"
+                    dateTime={s.lastSeenAt}
+                    title={date(s.lastSeenAt)}
+                  >
+                    {relativeTime(s.lastSeenAt, now)}
+                  </time>,
+                ],
               }))}
               selection={selection}
               totalMatches={totalMatches}
@@ -514,14 +453,6 @@ export function SessionsPage() {
                 )
               }
             />
-            {timeline && (
-              <>
-                <ErrorNotice error={activity.error} />
-                {activity.isFetching && (
-                  <p className="timeline-loading">Loading execution ticks…</p>
-                )}
-              </>
-            )}
             <ErrorNotice error={pages.error} />
             {pages.isFetchingNextPage && (
               <output className="list-loading">Loading more sessions…</output>
@@ -581,13 +512,7 @@ export function SessionsPage() {
                     setRunCursor(id)
                     if (openedExecution) setOpenedExecution(id)
                   }}
-                  onOpen={(id) => {
-                    setRunCursor(id)
-                    setOpenedExecution(id)
-                    void navigate({
-                      search: { ...search, selected: opened, execution: id },
-                    })
-                  }}
+                  onOpen={openRun}
                   onLoadMore={
                     session.hasNextPage
                       ? () => {
@@ -634,7 +559,6 @@ export function SessionsPage() {
                 <div className="pane-body execution-content">
                   <ExecutionContent
                     execution={execution.data}
-                    embedded
                     action={
                       <Button
                         variant="outline"
@@ -670,9 +594,6 @@ export function SessionsPage() {
           disabled={!selected}
         >
           <span className="kbd">↵</span>Open
-        </button>
-        <button onClick={toggleView}>
-          <span className="kbd">V</span>Layout
         </button>
         <button onClick={back}>
           <span className="kbd">Esc</span>Back
@@ -784,74 +705,5 @@ function SessionFacts({
         ))}
       </dl>
     </div>
-  )
-}
-
-const retentionMs = 96 * 60 * 60 * 1000
-export function timelinePosition(time: string | number, now: number) {
-  return Math.max(
-    0,
-    Math.min(
-      100,
-      ((new Date(time).getTime() - now + retentionMs) / retentionMs) * 100
-    )
-  )
-}
-function TimelineAxis({ now }: { now: number }) {
-  return (
-    <span className="timeline-axis">
-      <span className="expires">← expires</span>
-      {[1, 2, 3].map((day) => (
-        <span key={day} style={{ left: `${day * 25}%` }}>
-          {new Date(now - (4 - day) * 24 * 3600000).toLocaleDateString(
-            undefined,
-            { weekday: "short" }
-          )}
-        </span>
-      ))}
-      <span className="now">now</span>
-    </span>
-  )
-}
-function TimelineLane({
-  session,
-  ticks,
-  now,
-}: {
-  session: AgentSession
-  ticks: { id: string; startedAt: string; status: string }[]
-  now: number
-}) {
-  const left = timelinePosition(session.startedAt, now)
-  const right = timelinePosition(session.lastSeenAt, now)
-  return (
-    <figure className="timeline-track">
-      <figcaption className="sr-only">{`${session.executions} executions, ${session.failures} failed; ${date(session.startedAt)} to ${date(session.lastSeenAt)}`}</figcaption>
-      {[25, 50, 75].map((x) => (
-        <i key={x} style={{ left: `${x}%` }} />
-      ))}
-      <span
-        className={
-          session.failures ? "timeline-bar has-failures" : "timeline-bar"
-        }
-        style={{ left: `${left}%`, width: `${right - left}%` }}
-      />
-      {ticks
-        .filter(
-          (tick) => new Date(tick.startedAt).getTime() >= now - retentionMs
-        )
-        .map((tick) => (
-          <b
-            key={tick.id}
-            className={
-              ["failed", "timed_out", "expired"].includes(tick.status)
-                ? "failed"
-                : undefined
-            }
-            style={{ left: `${timelinePosition(tick.startedAt, now)}%` }}
-            title={`${date(tick.startedAt)} · ${tick.status}`}
-          />
-        ))}
-    </figure>
   )
 }

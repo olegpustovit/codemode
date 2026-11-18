@@ -809,7 +809,7 @@ test("mobile: navigation, filter URL, deep-link refresh and narrow content", asy
   await capture(page, "mobile-navigation.png")
   await page.getByRole("link", { name: "Workspaces", exact: true }).click()
   await expect(
-    page.getByRole("heading", { name: "Workspaces", exact: true })
+    page.getByRole("heading", { name: "All sources", exact: true })
   ).toBeVisible()
   await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible()
   await page.goto("/sources?q=browser")
@@ -957,7 +957,7 @@ test("OpenAPI: add YAML document, pin the server, link a header key and execute 
     await page.goto(`/workspaces/${main.id}`)
     await page.getByRole("link", { name: "Manage tool policies" }).click()
     await expect(
-      page.getByRole("heading", { name: "Workspaces", exact: true })
+      page.getByRole("heading", { name: "All sources", exact: true })
     ).toBeVisible()
     const update = async (path: string, action: () => Promise<unknown>) => {
       const response = page.waitForResponse(
@@ -997,7 +997,7 @@ test("OpenAPI: add YAML document, pin the server, link a header key and execute 
     )
     await expect(
       page.getByRole("button", { name: "Save tool scope", exact: true })
-    ).toBeDisabled()
+    ).toHaveCount(0)
     await page.reload()
     await expect(page.getByLabel("Tool scope", { exact: true })).toHaveValue(
       "selected"
@@ -2284,7 +2284,9 @@ test("sessions: real execution grouping, rename, two panes and mobile focus", as
     await expect(
       page.getByRole("tab", { name: /^Script scope fixture/ })
     ).toHaveAttribute("aria-selected", "true")
-    await page.getByRole("heading", { name: "Workspaces", exact: true }).click()
+    await page
+      .getByRole("heading", { name: "Script scope fixture", exact: true })
+      .click()
     await page.keyboard.press("4")
     await expect(
       scriptGrid.getByRole("row", { name: "from-session-browser", exact: true })

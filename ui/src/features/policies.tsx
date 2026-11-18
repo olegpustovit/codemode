@@ -9,6 +9,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 
 export function ToolScopeMode({ workspace }: { workspace: Workspace }) {
   const [mode, setMode] = useState(workspace.allTools ? "all" : "selected")
+  const dirty = (mode === "all") !== workspace.allTools
   const cache = useQueryClient()
   const save = useMutation({
     mutationFn: () =>
@@ -30,7 +31,7 @@ export function ToolScopeMode({ workspace }: { workspace: Workspace }) {
       className="scope-controls"
       onSubmit={(event) => {
         event.preventDefault()
-        save.mutate()
+        if (dirty) save.mutate()
       }}
     >
       <Field className="max-w-md">
@@ -54,16 +55,16 @@ export function ToolScopeMode({ workspace }: { workspace: Workspace }) {
         hidden.
       </p>
       <ErrorNotice error={save.error} />
-      <Button
-        className="self-start"
-        variant="outline"
-        type="submit"
-        disabled={
-          save.isPending || mode === (workspace.allTools ? "all" : "selected")
-        }
-      >
-        {save.isPending ? "Saving…" : "Save tool scope"}
-      </Button>
+      {dirty && (
+        <Button
+          className="self-start"
+          variant="outline"
+          type="submit"
+          disabled={save.isPending}
+        >
+          {save.isPending ? "Saving…" : "Save tool scope"}
+        </Button>
+      )}
     </form>
   )
 }

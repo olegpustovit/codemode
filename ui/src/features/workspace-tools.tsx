@@ -379,14 +379,29 @@ export function WorkspaceToolsPage() {
               ...(search.detail && selected ? [{ label: selected.path }] : []),
             ]}
           />
-          <h1>Workspaces</h1>
+          <h1>{workspace?.name ?? "Workspaces"}</h1>
           <span className="list-total">{totalMatches} tools</span>
           <p>
             Choose which tools agents may call. Everything is allowed until you
             block it.
           </p>
         </div>
-        <Button render={<Link to="/workspaces/new" />}>New workspace</Button>
+        <div className="detail-actions">
+          {workspace && (
+            <Button
+              variant="outline"
+              render={
+                <Link
+                  to="/workspaces/$workspaceId"
+                  params={{ workspaceId: workspace.id }}
+                />
+              }
+            >
+              Manage {workspace.name}
+            </Button>
+          )}
+          <Button render={<Link to="/workspaces/new" />}>New workspace</Button>
+        </div>
       </header>
       {workspace && (
         <ToolScopeMode
@@ -499,21 +514,6 @@ export function WorkspaceToolsPage() {
                 Retry loading tools
               </Button>
             )}
-            <div className="pane-pagination">
-              {workspace && (
-                <Button
-                  variant="ghost"
-                  render={
-                    <Link
-                      to="/workspaces/$workspaceId"
-                      params={{ workspaceId: workspace.id }}
-                    />
-                  }
-                >
-                  Manage workspace
-                </Button>
-              )}
-            </div>
           </>
         }
         detail={

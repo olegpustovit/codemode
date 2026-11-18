@@ -581,7 +581,10 @@ function IntegrationDetails({
                 .map((method) => methodNames[method])
                 .join(" / "),
             },
-            { label: "Tools", value: <code>{entry.toolCount}</code> },
+            {
+              label: "Tools",
+              value: <code>{linked ? entry.toolCount : "—"}</code>,
+            },
             ...(source
               ? [
                   {

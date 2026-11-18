@@ -13,3 +13,11 @@
 - Empty lists center their content and actions. Search hints appear when a query contains a wildcard.
 
 The focused execution-title and session naming tests passed through `cargo t`. The session test covers repeated namespaces, built-ins, overflow count, and manual rename priority. The UI build, bundle budget, and 36 UI unit tests passed. An earlier browser run stopped at the staged-asset check because the source changed during the optimized build. The optimized desktop trace, OpenAPI, Sessions, and Integrations workflows passed on the prior Wave 1 UI snapshot. Integrations measured 59.7 ms p95 against the prototype’s 100 ms budget. The workspaces header and integration detail refinements still need browser verification on the staged release. Full motion, visual review, and deployment remain pending.
+
+### Wave 1 deployment receipt
+
+- Production build `f4039e315d8fa03d06fa77816eace19355117766`, schema 25, embedded UI `1e74c08237ec`.
+- Release `8a505a4766e0485b9c84773d33071e69`. Restored-backup preflight preserved all 28 protected tables.
+- The live gate passed all eight standard smoke tasks and both aggregation tasks. Public `/healthz` returned the expected build and schema.
+- The optimized mobile, OpenAPI, and Sessions workflows passed together. Integrations passed with a fresh database. The combined run exposed an order dependency because OpenAPI left the default workspace in selected-tool mode.
+- Exact visual parity and complete motion verification remain open.

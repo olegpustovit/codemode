@@ -3455,13 +3455,19 @@ test("prototype motion carries transition types and honors reduced motion", asyn
         painted: true,
       })
   await expectBackdropFrame(1440, 900)
-  await page.evaluate(() =>
-    fetch("/api/workspaces", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Acme", sourceIds: [] }),
-    })
-  )
+  await page.evaluate(async () => {
+    const workspaces = await fetch("/api/workspaces").then((r) => r.json())
+    for (const name of ["Acme", "Personal"]) {
+      if (workspaces.some((workspace: { name: string }) => workspace.name === name))
+        continue
+      const response = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, sourceIds: [] }),
+      })
+      if (!response.ok) throw new Error(`Could not create ${name} workspace`)
+    }
+  })
   await page.reload()
   const types = () => page.locator("html").getAttribute("data-transition-types")
   await page.getByRole("link", { name: "Integrations", exact: true }).click()
@@ -3568,6 +3574,9 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await expect(workspaceMenu.locator(".workspace-menu-note")).toHaveText(
     "Agents that open this URL are asked to authorize All sources."
   )
+  await expect(
+    workspaceMenu.getByRole("menuitemradio", { name: /Personal/ })
+  ).toBeVisible()
   await capture(page, "ux-prototype-workspace-menu-1440x900.png")
   expect(await workspaceMenu.boundingBox()).toMatchObject({
     x: 240,

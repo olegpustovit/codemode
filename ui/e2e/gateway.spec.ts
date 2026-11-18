@@ -3011,6 +3011,11 @@ test("integrations: add a namespaced login to the selected workspace", async ({
   }, workspace)
   expect(linked).not.toBe("")
   expect(membership).toContain(linked)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await capture(page, "ux-prototype-logins-1440x900.png")
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  await capture(page, "ux-prototype-logins-390x844.png")
 })
 
 test("script scope promotion exposes a global script in a second workspace", async ({
@@ -3058,6 +3063,11 @@ test("script scope promotion exposes a global script in a second workspace", asy
       exact: true,
     })
   ).toBeVisible()
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await capture(page, "ux-prototype-script-scope-1440x900.png")
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  await capture(page, "ux-prototype-script-scope-390x844.png")
 })
 
 test("prototype motion carries transition types and honors reduced motion", async ({
@@ -3121,6 +3131,9 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     .getByRole("button", { name: "Switch workspace", exact: true })
     .click()
   await capture(page, "ux-prototype-workspace-menu-1440x900.png")
+  await page.setViewportSize({ width: 390, height: 844 })
+  await capture(page, "ux-prototype-workspace-menu-390x844.png")
+  await page.setViewportSize({ width: 1440, height: 900 })
   await page.getByRole("menuitemradio", { name: /Motion workspace/ }).click()
   await expect.poll(types).toContain("ws")
   await page
@@ -3131,12 +3144,18 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     "collapsed"
   )
   await capture(page, "ux-prototype-collapsed-rail-1440x900.png")
+  await page.setViewportSize({ width: 390, height: 844 })
+  await capture(page, "ux-prototype-collapsed-rail-390x844.png")
+  await page.setViewportSize({ width: 1440, height: 900 })
   await page
     .getByRole("button", { name: "Expand sidebar", exact: true })
     .click()
   await page.getByRole("link", { name: "Sessions", exact: true }).click()
   await expect.poll(types).toContain("up")
   await capture(page, "ux-prototype-sessions-1440x900.png")
+  await page.setViewportSize({ width: 390, height: 844 })
+  await capture(page, "ux-prototype-sessions-390x844.png")
+  await page.setViewportSize({ width: 1440, height: 900 })
 
   await page.emulateMedia({ reducedMotion: "reduce" })
   const before = await types()
@@ -3150,4 +3169,7 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
   await capture(page, "ux-prototype-integration-390x844.png")
+  await page.getByRole("button", { name: /^Close/ }).click()
+  await page.getByRole("tab", { name: /^Needs attention/ }).click()
+  await capture(page, "ux-prototype-empty-390x844.png")
 })

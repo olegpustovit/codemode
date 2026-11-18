@@ -3335,30 +3335,41 @@ async function observeViewTransitions(page: Page) {
                 animation instanceof CSSAnimation
             )
           const names = animations.map(({ animationName }) => animationName)
-          const drift = animations
-            .filter(({ animationName }) =>
-              animationName.startsWith("codemode-settle-")
-            )
-            .flatMap(({ effect }) =>
-              effect instanceof KeyframeEffect ? effect.getKeyframes() : []
-            )
-          const validDrift = drift.every(({ transform, filter }) => {
-            const matrix = new DOMMatrixReadOnly(
-              typeof transform === "string" && transform !== "none"
-                ? transform
-                : undefined
-            )
-            return (
-              matrix.is2D &&
-              matrix.a === 1 &&
-              matrix.b === 0 &&
-              matrix.c === 0 &&
-              matrix.d === 1 &&
-              Math.abs(matrix.e) <= 12 &&
-              Math.abs(matrix.f) <= 8 &&
-              (!filter || filter === "none")
-            )
-          })
+          const directions = {
+            "codemode-settle-up": [0, 8],
+            "codemode-settle-down": [0, -8],
+            "codemode-settle-left": [12, 0],
+            "codemode-settle-right": [-12, 0],
+          }
+          const validDrift = animations
+            .filter(({ animationName }) => animationName in directions)
+            .every(({ animationName, effect }) => {
+              if (!(effect instanceof KeyframeEffect)) return false
+              const [x, y] = directions[animationName as keyof typeof directions]
+              const frames = effect.getKeyframes()
+              const timing = effect.getTiming()
+              return (
+                timing.duration === 420 &&
+                frames.length === 2 &&
+                frames.every(({ transform, filter }, index) => {
+                  const matrix = new DOMMatrixReadOnly(
+                    typeof transform === "string" && transform !== "none"
+                      ? transform
+                      : undefined
+                  )
+                  return (
+                    matrix.is2D &&
+                    matrix.a === 1 &&
+                    matrix.b === 0 &&
+                    matrix.c === 0 &&
+                    matrix.d === 1 &&
+                    matrix.e === (index === 0 ? x : 0) &&
+                    matrix.f === (index === 0 ? y : 0) &&
+                    (!filter || filter === "none")
+                  )
+                })
+              )
+            })
           const snapshotNames = Array.from(scope.querySelectorAll("*"))
             .filter((element) =>
               element.checkVisibility({ visibilityProperty: true })

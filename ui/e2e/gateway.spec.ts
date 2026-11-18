@@ -3434,6 +3434,7 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   ).toBeVisible()
   await expect.poll(types).toContain("open")
   await expectPlayedTransition(page, "open", "codemode-settle-left")
+  await capture(page, "ux-prototype-integration-1440x900.png")
   await page.getByRole("row", { name: "Notion", exact: true }).click()
   await expect.poll(types).toContain("swap")
   await expectPlayedTransition(page, "swap", "codemode-settle-up")

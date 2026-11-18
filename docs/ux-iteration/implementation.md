@@ -75,3 +75,20 @@ The layout release preserved 28 tables in the restored-backup preflight, matched
 The mobile rail release restores the prototype’s collapse control and Backslash shortcut in the horizontal layout. The rail measures 85 px in both states at 390×844. All eight measured boxes in the empty scene match at 390×844 and 1440×900. The production UI bundle passed all 40 UI tests and all 15 Chromium workflows against the debug gateway, including reduced motion and keyboard expansion on mobile. The restored-backup preflight preserved 28 tables, all 84 public UI assets matched staging and all 11 live Codex cases passed. UI fingerprint `d6a55dc2f4a9`, ARM SHA-256 `ad43ff2f55262458587d3ad6685c7d09f75e43deb4ffbc4592b154476a59c7e9`.
 
 The workspace menu matches the prototype’s desktop position and width at 1440×900. Its mobile position keeps the full popup within the viewport. Consent places the source list directly below the workspace explanation. The menu and consent heights remain dependent on the fixture entries. All 40 UI tests passed. Chromium passed 14 workflows in the suite run. The remaining workflow recorded a 52 ms task at 4× CPU throttle during the ARM build and passed when rerun in isolation after the compile. The restored-backup preflight preserved 28 tables, all 84 public UI assets matched staging and all 11 live Codex cases passed. UI fingerprint `89c66c2230c5`, ARM SHA-256 `121707690331de6b4c6a773a1af775d2643230a803a3cf8110ff043b5091c050`.
+
+## Geometry audit after the workspace menu release
+
+The browser captures now include the Linear detail pane at both viewport sizes. The table counts reference boxes whose x, y, width and height each match within 1 px on Chromium. For the trace scene, the prototype detail pane corresponds to the app’s execution pane on the right. Captures use local fixtures with different text and data.
+
+| Prototype scene | 1440×900 | 390×844 |
+| --- | ---: | ---: |
+| Sessions | 7/7 | 7/7 |
+| Trace | 8/8 | 8/8 |
+| Linear detail | 8/8 | 4/8 |
+| Empty | 8/8 | 8/8 |
+| Workspace menu | 7/8 | 4/8 |
+| Consent | 4/5 | 4/5 |
+| Script scope | 8/8 | 4/8 |
+| Collapsed rail | 7/7 | 7/7 |
+
+The four shell boxes match in every scene. On mobile, the Linear header is 24.78 px taller, the workspace header is 20.80 px shorter and the Scripts header is 20.79 px taller. These differences carry through to the tabs and pane bounds. Consent is 4.49 px shorter on desktop and 99.94 px taller on mobile. The desktop menu position and width match, with a 15.22 px height difference. The mobile menu uses a 366 px width to fit the viewport. This audit measures boxes. Full screenshot and motion parity remain open.

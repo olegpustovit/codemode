@@ -100,6 +100,7 @@ mod tests {
     async fn task_handles_are_caller_bound_bounded_and_cancellable() {
         let tasks = Tasks::default();
         let owner = Principal {
+            admin: false,
             tenant_id: Uuid::nil(),
             workspace_id: Uuid::nil(),
             resource: "/mcp".into(),
@@ -116,6 +117,7 @@ mod tests {
             .unwrap();
         for foreign in [
             Principal {
+                admin: false,
                 tenant_id: Uuid::nil(),
                 workspace_id: Uuid::nil(),
                 resource: "/mcp".into(),
@@ -123,6 +125,7 @@ mod tests {
                 audience: owner.audience.clone(),
             },
             Principal {
+                admin: false,
                 tenant_id: Uuid::nil(),
                 workspace_id: Uuid::nil(),
                 resource: "/mcp".into(),

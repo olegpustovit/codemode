@@ -1,3 +1,4 @@
+import { relativeTime } from "@/lib/time"
 import { useState } from "react"
 import { Link, useRouter } from "@tanstack/react-router"
 import {
@@ -71,7 +72,13 @@ export function ScriptsPage({ workspaceId }: { workspaceId: string }) {
                 </p>
               </div>
               <p className="text-sm text-muted-foreground">
-                Updated {date(script.updatedAt)}
+                Updated{" "}
+                <time
+                  dateTime={script.updatedAt}
+                  title={date(script.updatedAt)}
+                >
+                  {relativeTime(script.updatedAt)}
+                </time>
               </p>
             </article>
           ))}

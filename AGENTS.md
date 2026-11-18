@@ -6,6 +6,8 @@ Implementation plan: https://artifacts.microapps.space/a/saqdh2xm7jcd (revision 
 
 ## Active replacement proposal
 
+The owner requested the full UX prototype at https://artifacts.microapps.space/a/gema4jxq4n60, including its motion. The Wave 4 implementation retires the separate `/mcp-admin` endpoint and exposes administration through an explicit grant on `/mcp`. See `docs/ux-iteration/implementation.md` for release evidence.
+
 The owner requested the v7 discovery recovery at https://artifacts.microapps.space/a/nfnvpkejdb81. Its implementation and Codex-only comparison are in `docs/discovery-recovery/implementation.md`.
 
 The owner requested full implementation of https://artifacts.microapps.space/a/7m9atvt6k7xa. W1 and W2 are deployed. The full W3 measurements, report and archive links are in `docs/next-iteration/implementation.md`. Use Codex only for current model evals at the owner's direction.
@@ -59,7 +61,7 @@ Follow the `build-rust-stack` skill for workspace layout, components, errors, co
 
 The `/mcp` execution surface has exactly two tools. Do not add more without asking.
 
-The owner also authorized a separate `/mcp-admin` management surface: workspace CRUD, source CRUD/sync, account metadata and browser account-link URLs. It requires its own OAuth resource and `admin` scope (or a management PAT), never an ordinary `/mcp` token. Management always stays within the signed-in user’s tenant; the first-user admin attribute grants no cross-tenant access. Never return credentials or grant provider consent through a tool. Audit every management invocation.
+Administration is available as `codemode.admin.*` through `execute` when the user explicitly grants it at consent or token creation. It remains private to the user’s tenant, preserves the agent’s workspace binding, and audits every invocation. Provider credentials and consent remain in the browser.
 
 | Tool | Input | Behaviour |
 |---|---|---|
@@ -80,7 +82,7 @@ The owner also authorized a separate `/mcp-admin` management surface: workspace 
 - **Never run Monty in the gateway process.** Untrusted code runs only in `monty-pool` workers started with an empty environment. A crash or interpreter bug must end one worker, not the gateway.
 - **The sandbox has no network and no secrets.** Its single exit is the broker. Credentials are attached on the host side at dispatch.
 - **Never pass the agent's token to an upstream.** Every upstream gets its own linked credential, stored in Postgres and encrypted with a key from the service environment.
-- **Tokens are bound to a workspace and resource.** OAuth consent selects a workspace for `/mcp`; its source membership and policies govern search and dispatch. `/mcp-admin` requires separate management authorization. The canonical host publishes protected-resource metadata for each path.
+- **Tokens are bound to a workspace and resource.** OAuth consent selects a workspace for `/mcp`; its source membership and policies govern search and dispatch. Administrative built-ins require an explicit administration grant. The canonical host publishes protected-resource metadata for `/mcp`, including workspace-qualified URLs.
 - **The gateway validates every frame from a worker.** Workers remain isolated; execution snapshots are not stored.
 - **Policies are allow or block, default allow.** Blocked calls fail before upstream dispatch with `PermissionError`. Provider OAuth consent still happens in the browser.
 - **Every execution is audited**: the code, each tool call with redacted arguments, timing and outcome.
@@ -112,7 +114,7 @@ Per tool: allow or block, default allow. Workspace source/tool scopes still cons
 
 - `codemode.microapps.space` is the only supported host. No wildcard routing, custom domains or subdomain configuration.
 - `/mcp` is the shared execution URL. During OAuth consent the user explicitly chooses a named workspace containing selected sources. Access and refresh tokens retain that workspace selection.
-- `/mcp-admin` is the separate management URL for the user's own tenant. Its consent explicitly grants administration access, not workspace execution access.
+- Administration is an explicit, default-off permission on a workspace OAuth grant or personal token. Existing grants for the retired administration endpoint are revoked.
 - Each tenant has a protected default “All sources” workspace. Other workspaces have a human name, selected sources, tool scopes, policies and saved scripts.
 - The Sources page offers popular MCP presets. Adding a preset creates a source; linking and provider consent happen in the browser.
 - Keep existing IDs, sources, credentials, memberships, scripts, policies and audit history during migration. Legacy custom-host grants are revoked rather than silently reassigned to a different OAuth resource.

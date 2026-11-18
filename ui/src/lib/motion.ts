@@ -2,17 +2,17 @@ import { flushSync } from "react-dom"
 
 let active: ViewTransition | undefined
 
+const reducedMotion = () =>
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
 export function navigationMotion(type: string) {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  return reducedMotion()
     ? false
-    : { types: [type] }
+    : { types: (): string[] | false => (reducedMotion() ? false : [type]) }
 }
 
 export function move(type: string, update: () => void) {
-  if (
-    typeof document.startViewTransition !== "function" ||
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  ) {
+  if (typeof document.startViewTransition !== "function" || reducedMotion()) {
     update()
     return
   }

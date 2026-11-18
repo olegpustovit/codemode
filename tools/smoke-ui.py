@@ -66,12 +66,13 @@ assert status == 404 and headers["Content-Type"] == "application/json"
 assert json.loads(body) == {"error": "route not found"}
 status, headers, body = get("/api/config")
 assert status == 200 and json.loads(body)["hostname"] == args.hostname
-for resource,scope in [("/mcp","mcp"),("/mcp-admin","admin")]:
-    status, headers, body = get(resource)
-    assert status == 401 and f"oauth-protected-resource{resource}" in headers["WWW-Authenticate"] and f'scope="{scope}"' in headers["WWW-Authenticate"]
-    status,headers,body = get(f"/.well-known/oauth-protected-resource{resource}")
-    metadata = json.loads(body)
-    assert status == 200 and metadata["resource"] == f"https://{args.hostname}{resource}" and metadata["scopes_supported"] == [scope]
+status, headers, body = get("/mcp")
+assert status == 401 and "/.well-known/oauth-protected-resource/mcp" in headers["WWW-Authenticate"] and 'scope="mcp"' in headers["WWW-Authenticate"]
+status, headers, body = get("/.well-known/oauth-protected-resource/mcp")
+metadata = json.loads(body)
+assert status == 200 and metadata["resource"] == f"https://{args.hostname}/mcp" and metadata["scopes_supported"] == ["mcp"]
+for retired in ["/mcp-admin", "/.well-known/oauth-protected-resource/mcp-admin"]:
+    assert get(retired)[0] == 404
 status, headers, body = get("/healthz")
 assert status == 200 and json.loads(body)["status"] == "ok"
 status, headers, body = get("/site.webmanifest")

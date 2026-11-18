@@ -65,12 +65,7 @@ impl OAuth {
             return Err(Error::Target);
         }
         let scope = resource_scope(&request.resource)?;
-        let workspace = if scope == "admin" {
-            sqlx::query_scalar!("SELECT id FROM endpoints WHERE all_sources")
-                .fetch_optional(&self.db.0)
-                .await
-                .map_err(DbError::from)?
-        } else if let Some(id) = request.workspace_id {
+        let workspace = if let Some(id) = request.workspace_id {
             Some(
                 sqlx::query_scalar!("SELECT id FROM endpoints WHERE id=$1", id)
                     .fetch_optional(&self.db.0)
@@ -106,6 +101,14 @@ impl OAuth {
 
     // Only the session-protected browser consent handler may call this method.
     pub async fn issue_code(&self, request: &AuthorizationRequest) -> Result<String, Error> {
+        self.issue_code_with_administration(request, false).await
+    }
+
+    pub async fn issue_code_with_administration(
+        &self,
+        request: &AuthorizationRequest,
+        admin: bool,
+    ) -> Result<String, Error> {
         let consent = self.consent(request).await?;
         let client = self.client(&request.client_id).await?;
         let workspace = consent.workspace_id.ok_or(Error::Request)?;
@@ -121,7 +124,7 @@ impl OAuth {
         .ok_or(Error::Target)?;
         let refresh = client.grant_types.iter().any(|g| g == "refresh_token");
         let resource = canonical_resource(&request.resource)?;
-        let grant=sqlx::query_scalar!("INSERT INTO oauth_grants(client_id,endpoint_id,scope,refresh_allowed,resource_url) VALUES($1,$2,$3,$4,$5) RETURNING id",request.client_id,workspace,consent.scope,refresh,resource)
+        let grant=sqlx::query_scalar!("INSERT INTO oauth_grants(client_id,endpoint_id,scope,refresh_allowed,resource_url,admin) VALUES($1,$2,$3,$4,$5,$6) RETURNING id",request.client_id,workspace,consent.scope,refresh,resource,admin)
             .fetch_one(&mut *tx).await.map_err(DbError::from)?;
         let code = random("cmc_");
         sqlx::query!("INSERT INTO oauth_codes(code_hash,grant_id,redirect_uri,challenge) VALUES($1,$2,$3,$4)",digest(&code),grant,request.redirect_uri,request.code_challenge)
@@ -278,7 +281,7 @@ async fn mint(tx: &mut sqlx::PgConnection, grant: &Grant) -> Result<TokenRespons
     // Older binaries must reject expiring OAuth tokens rather than treat them as permanent PATs.
     let access_token = random("cmo_");
     let name = format!("OAuth: {}", grant.client_id);
-    let seconds=sqlx::query_scalar!("INSERT INTO access_tokens(name,audience,token_hash,expires_at,oauth_grant,tenant_id,workspace_id,resource) SELECT $1,$2,$3,LEAST(now()+interval '1 hour',g.expires_at),g.id,e.tenant_id,e.id,CASE WHEN g.scope='admin' THEN '/mcp-admin' ELSE '/mcp' END FROM oauth_grants g JOIN endpoints e ON e.id=g.endpoint_id WHERE g.id=$4 RETURNING extract(epoch FROM expires_at-now())::bigint AS \"seconds!\"",name,grant.hostname,digest(&access_token),grant.id)
+    let seconds=sqlx::query_scalar!("INSERT INTO access_tokens(name,audience,token_hash,expires_at,oauth_grant,tenant_id,workspace_id,resource,admin) SELECT $1,$2,$3,LEAST(now()+interval '1 hour',g.expires_at),g.id,e.tenant_id,e.id,'/mcp',g.admin FROM oauth_grants g JOIN endpoints e ON e.id=g.endpoint_id WHERE g.id=$4 RETURNING extract(epoch FROM expires_at-now())::bigint AS \"seconds!\"",name,grant.hostname,digest(&access_token),grant.id)
         .fetch_one(&mut *tx).await.map_err(DbError::from)?;
     let refresh_token = if grant.refresh_allowed {
         let refresh = random("cmr_");
@@ -339,10 +342,10 @@ fn resource_host(value: &str) -> Result<String, Error> {
     let url = url::Url::parse(value).map_err(|_| Error::Target)?;
     if url.scheme() != "https"
         || url.port().is_some()
-        || !matches!(url.path(), "/mcp" | "/mcp-admin")
+        || url.path() != "/mcp"
         || url
             .query()
-            .is_some_and(|query| url.path() != "/mcp" || parse_workspace_query(query).is_none())
+            .is_some_and(|query| parse_workspace_query(query).is_none())
         || url.fragment().is_some()
         || !url.username().is_empty()
         || url.password().is_some()
@@ -372,12 +375,7 @@ pub fn parse_workspace_query(query: &str) -> Option<Uuid> {
 
 fn resource_scope(value: &str) -> Result<&'static str, Error> {
     resource_host(value)?;
-    let url = url::Url::parse(value).map_err(|_| Error::Target)?;
-    Ok(if url.path() == "/mcp-admin" {
-        "admin"
-    } else {
-        "mcp"
-    })
+    Ok("mcp")
 }
 
 #[cfg(test)]

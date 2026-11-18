@@ -33,6 +33,7 @@ pub struct Principal {
     pub workspace_id: Uuid,
     pub resource: String,
     pub audience: String,
+    pub admin: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -43,6 +44,7 @@ pub struct Token {
     pub audience: String,
     pub workspace_id: Option<Uuid>,
     pub resource: String,
+    pub admin: bool,
     pub revoked: bool,
     pub oauth: bool,
     pub last_used_at: Option<String>,
@@ -76,10 +78,22 @@ impl Auth {
         audience: &str,
         resource: &str,
     ) -> Result<Option<(Uuid, String)>, Error> {
+        self.create_with_administration(name, workspace, audience, resource, false)
+            .await
+    }
+
+    pub async fn create_with_administration(
+        &self,
+        name: &str,
+        workspace: Uuid,
+        audience: &str,
+        resource: &str,
+        admin: bool,
+    ) -> Result<Option<(Uuid, String)>, Error> {
         self.access.workspace(workspace).await?;
         let token = format!("cm_{}", URL_SAFE_NO_PAD.encode(rand::random::<[u8; 32]>()));
         let hash = Sha256::digest(token.as_bytes()).to_vec();
-        let id=sqlx::query_scalar!("WITH workspace AS (SELECT id FROM endpoints WHERE id=$1 FOR KEY SHARE) INSERT INTO access_tokens(name,audience,token_hash,workspace_id,resource) SELECT $2,$3,$4,id,$5 FROM workspace RETURNING id",workspace,name,audience,hash,resource).fetch_optional(&self.db.0).await?;
+        let id=sqlx::query_scalar!("WITH workspace AS (SELECT id FROM endpoints WHERE id=$1 FOR KEY SHARE) INSERT INTO access_tokens(name,audience,token_hash,workspace_id,resource,admin) SELECT $2,$3,$4,id,$5,$6 FROM workspace RETURNING id",workspace,name,audience,hash,resource,admin).fetch_optional(&self.db.0).await?;
         Ok(id.map(|id| (id, token)))
     }
 
@@ -94,7 +108,7 @@ impl Auth {
             return Ok(None);
         }
         let hash = Sha256::digest(token.as_bytes()).to_vec();
-        let row = sqlx::query!("SELECT id,token_hash,audience,tenant_id,workspace_id AS \"workspace_id!\",resource FROM access_tokens WHERE workspace_id IS NOT NULL AND token_hash=$1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",hash)
+        let row = sqlx::query!("SELECT id,token_hash,audience,tenant_id,workspace_id AS \"workspace_id!\",resource,admin FROM access_tokens WHERE workspace_id IS NOT NULL AND token_hash=$1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",hash)
             .fetch_optional(&self.db.0).await?;
         let Some(row) = row else {
             return Ok(None);
@@ -112,6 +126,7 @@ impl Auth {
         Ok(Some(Principal {
             token_id: row.id,
             tenant_id: row.tenant_id,
+            admin: row.admin,
             workspace_id: row.workspace_id,
             resource: row.resource,
             audience: row.audience,
@@ -119,7 +134,7 @@ impl Auth {
     }
 
     pub async fn list(&self) -> Result<Vec<Token>, DbError> {
-        let rows = sqlx::query!(r#"SELECT id,name,audience,workspace_id,resource,revoked_at IS NOT NULL AS "revoked!",oauth_grant IS NOT NULL AS "oauth!",
+        let rows = sqlx::query!(r#"SELECT id,name,audience,workspace_id,resource,admin,revoked_at IS NOT NULL AS "revoked!",oauth_grant IS NOT NULL AS "oauth!",
             to_char(last_used_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS last_used_at
             FROM access_tokens ORDER BY created_at"#).fetch_all(&self.db.0).await?;
         Ok(rows
@@ -130,6 +145,7 @@ impl Auth {
                 audience: r.audience,
                 workspace_id: r.workspace_id,
                 resource: r.resource,
+                admin: r.admin,
                 revoked: r.revoked,
                 oauth: r.oauth,
                 last_used_at: r.last_used_at,

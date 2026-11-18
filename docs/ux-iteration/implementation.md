@@ -21,3 +21,9 @@ Workspace selection carries through authenticated URLs. The shell menu exposes w
 The wave plan anticipated no migration. Schema 25 has no OAuth grant resource field, so this wave adds a nullable resource column in migration 0026. Existing grants retain their plain MCP resource binding. The script and administration migration planned for Wave 4 moves to 0027.
 
 Local UI type checking and 37 unit tests passed before rebasing onto the latest Wave 1 work. Browser, release, and live client verification are pending.
+
+## Wave 3 and Wave 4 work in progress
+
+The Wave 3 namespaced-login browser workflow passed with provider OAuth stubbed. It verifies the created source, workspace membership, and grouped integration row. Search results label tools from providers with multiple connections.
+
+Wave 4 adds migration 0027 for global scripts, provenance, and explicit per-token administration. Saved scripts continue to run under the calling workspace's policies. The separate administration route is retired, and the broker handles its ten operations with the existing administration audit. The eval gate can also require a Codex run that saves a workspace script and replays it by ID.

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "WITH workspace AS (SELECT id FROM endpoints WHERE id=$1 FOR KEY SHARE) INSERT INTO access_tokens(name,audience,token_hash,workspace_id,resource) SELECT $2,$3,$4,id,$5 FROM workspace RETURNING id",
+  "query": "WITH workspace AS (SELECT id FROM endpoints WHERE id=$1 FOR KEY SHARE) INSERT INTO access_tokens(name,audience,token_hash,workspace_id,resource,admin) SELECT $2,$3,$4,id,$5,$6 FROM workspace RETURNING id",
   "describe": {
     "columns": [
       {
@@ -21,12 +21,13 @@
         "Text",
         "Text",
         "Bytea",
-        "Text"
+        "Text",
+        "Bool"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "e7c40ec70a6ee1498286bf44582867950f1687f2a2f82880e095b9fa10333c56"
+  "hash": "a446fc6566bbd684fa5dd7729d3da1ef6bbcbcded204c5a2ea03df70331e4b2a"
 }

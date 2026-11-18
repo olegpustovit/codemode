@@ -1,5 +1,6 @@
 mod http;
 pub(crate) const SEARCH_PATH: &str = "@codemode/search";
+pub(crate) const SAVE_SCRIPT_PATH: &str = "@codemode/save_script";
 pub(crate) const MEMO_PATH: &str = "@codemode/memo";
 pub(crate) const UNKNOWN_PATH: &str = "@codemode/unknown";
 use super::{
@@ -122,7 +123,12 @@ impl Broker {
     pub(crate) fn account_link(&self, source: Uuid) -> String {
         format!("{}/sources/{source}/accounts", self.origin)
     }
-    async fn search(&self, args: Value, workspace: Uuid) -> Result<Box<RawValue>, CallError> {
+    async fn search(
+        &self,
+        args: Value,
+        workspace: Uuid,
+        execution: Uuid,
+    ) -> Result<Box<RawValue>, CallError> {
         #[derive(serde::Deserialize)]
         #[serde(deny_unknown_fields)]
         struct Input {
@@ -135,7 +141,7 @@ impl Broker {
             .sources(workspace)
             .await
             .map_err(|_| CallError::Blocked("workspace scope unavailable".into()))?;
-        let page = super::catalogue::Catalogue::new(self.db.clone())
+        let mut page = super::catalogue::Catalogue::new(self.db.clone())
             .search_scoped(
                 &input.query,
                 false,
@@ -145,6 +151,10 @@ impl Broker {
             )
             .await
             .map_err(|error| CallError::Invalid(error.to_string()))?;
+        let admin = sqlx::query_scalar!("SELECT t.admin FROM access_tokens t JOIN executions e ON e.token_id=t.id WHERE e.id=$1 AND t.workspace_id=$2 AND t.revoked_at IS NULL",execution,workspace)
+            .fetch_optional(&self.db.0).await.map_err(|_| CallError::Upstream("administration lookup unavailable".into()))?
+            .unwrap_or(false);
+        super::administration::discover(&input.query, admin, &mut page.tools);
         serde_json::value::to_raw_value(if page.tools.is_empty() {
             &page.suggestions
         } else {
@@ -176,8 +186,48 @@ impl Broker {
         }
     }
 
+    async fn save_script(
+        &self,
+        execution: Uuid,
+        workspace: Uuid,
+        args: Value,
+    ) -> Result<Box<RawValue>, CallError> {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Save {
+            name: String,
+            description: String,
+            code: String,
+            scope: super::scripts::Scope,
+        }
+        let input: Save = serde_json::from_value(args).map_err(|_| {
+            CallError::Invalid(
+                "save_script requires name, description, code, and scope workspace or global"
+                    .into(),
+            )
+        })?;
+        let content = super::scripts::Content {
+            name: input.name,
+            description: input.description,
+            code: input.code,
+        };
+        let id = super::scripts::Scripts::new(self.db.clone())
+            .save_from_execution(workspace, execution, input.scope, content)
+            .await
+            .map_err(|error| match error {
+                super::scripts::Error::Permission => CallError::Blocked(error.to_string()),
+                super::scripts::Error::Database(_) => {
+                    CallError::Upstream("script storage unavailable".into())
+                }
+                error => CallError::Invalid(error.to_string()),
+            })?;
+        serde_json::value::to_raw_value(&serde_json::json!({"scriptId":id}))
+            .map_err(|_| CallError::Upstream("could not encode saved script".into()))
+    }
+
     pub async fn dispatch(
         &self,
+        sources: &super::sources::Sources,
         execution: Uuid,
         seq: usize,
         call: PendingCall,
@@ -199,6 +249,10 @@ impl Broker {
                 _ => "invalid",
             };
             serde_json::json!({"op":op,"contents":"[REDACTED]"})
+        } else if call.path.starts_with(super::administration::PREFIX) {
+            serde_json::json!({"arguments":"[REDACTED]"})
+        } else if call.path == SAVE_SCRIPT_PATH {
+            serde_json::json!({"script":"[REDACTED]"})
         } else {
             args.as_ref().map(redact).unwrap_or(Value::Null)
         };
@@ -215,7 +269,37 @@ impl Broker {
                     "unknown-tool lookup unavailable".into()
                 })))
             }
-            Ok(args) if call.path == SEARCH_PATH => self.search(args, workspace).await,
+            Ok(args) if call.path == SEARCH_PATH => self.search(args, workspace, execution).await,
+            Ok(args) if call.path.starts_with(super::administration::PREFIX) => {
+                super::administration::run(
+                    &self.db,
+                    sources,
+                    &self.workspaces,
+                    &self.accounts,
+                    execution,
+                    workspace,
+                    &call.path[super::administration::PREFIX.len()..],
+                    args,
+                    timeout,
+                )
+                .await
+                .map_err(|error| match error {
+                    super::administration::Error::Permission => {
+                        CallError::Blocked(error.to_string())
+                    }
+                    super::administration::Error::Input(_) => CallError::Invalid(error.to_string()),
+                    super::administration::Error::Timeout => CallError::Timeout(timeout.as_secs()),
+                    error => CallError::Upstream(error.to_string()),
+                })
+            }
+            Ok(args) if call.path == SAVE_SCRIPT_PATH => {
+                match tokio::time::timeout(timeout, self.save_script(execution, workspace, args))
+                    .await
+                {
+                    Ok(result) => result,
+                    Err(_) => Err(CallError::Timeout(timeout.as_secs())),
+                }
+            }
             Ok(args) if call.path == MEMO_PATH => {
                 match serde_json::from_value::<super::agent_sessions::memo::Request>(args) {
                     Ok(request) => super::agent_sessions::AgentSessions::new(self.db.clone())

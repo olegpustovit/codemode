@@ -133,7 +133,14 @@ impl Gateway {
             )
             .await
         {
-            Ok(page) => {
+            Ok(mut page) => {
+                if args.cursor.is_none() {
+                    codemode_core::components::administration::discover(
+                        &args.query,
+                        principal.admin,
+                        &mut page.tools,
+                    );
+                }
                 match codemode_core::components::scripts::Scripts::new(self.state.db.clone())
                     .search(principal.workspace_id, &args.query)
                     .await
@@ -158,7 +165,7 @@ impl Gateway {
     }
 
     #[tool(
-        description = "Do the whole task in one execute. Call listed tools directly; invalid arguments raise ToolError with the signature. Provide Python code or a saved scriptId with args.\nDiscover with await tools.search('tool_name') only when needed; use OR between alternatives. print(help(tool)) gives full signatures.\nUse asyncio.gather(*calls) without keyword arguments for independent calls and .all(max_pages=20, _fields=[...]) for rows (for example, await tools.example.list.all(_fields=['id','title'])).\nCompute counts, sums and groupings in code and return the aggregate. Printed lists of 20 or more records are sampled.\nUse pick(rows, name='Backlog') to resolve a row by an exact field value; a miss raises LookupError with available values. Use the returned IDs.\nUse memo.get(key) / memo.set(key, value), not indexing: 64 KiB per session for non-sensitive IDs/small summaries, never datasets. Return only the answer.\nAvoid generators and next(list). Catch ToolError and PermissionError.\nLimits: 60 s, 64 MB, 100 calls, 64 KB source; no inheritance, generators, files, network or secrets."
+        description = "Do the whole task in one execute. Call listed tools directly; invalid arguments raise ToolError with the signature. Provide Python code or a saved scriptId with args.\nDiscover with await tools.search('tool_name') only when needed; use OR between alternatives. print(help(tool)) gives full signatures.\nUse asyncio.gather(*calls) without keyword arguments for independent calls and .all(max_pages=20, _fields=[...]) for rows (for example, await tools.example.list.all(_fields=['id','title'])).\nCompute counts, sums and groupings in code and return the aggregate. Printed lists of 20 or more records are sampled.\nUse pick(rows, name='Backlog') to resolve a row by an exact field value; a miss raises LookupError with available values. Use the returned IDs.\nUse codemode.save_script(name, description, code) to save reusable Python. Use memo.get(key) / memo.set(key, value), not indexing: 64 KiB per session for non-sensitive IDs/small summaries, never datasets. Return only the answer.\nAvoid generators and next(list). Catch ToolError and PermissionError.\nLimits: 60 s, 64 MB, 100 calls, 64 KB source; no inheritance, generators, files, network or secrets."
     )]
     async fn execute(
         &self,
@@ -386,12 +393,7 @@ fn routes(state: State) -> Router {
             "/.well-known/oauth-protected-resource/mcp",
             get(resource_metadata),
         )
-        .route(
-            "/.well-known/oauth-protected-resource/mcp-admin",
-            get(resource_metadata),
-        )
         .merge(mcp)
-        .merge(crate::mcp_admin::routes(state.clone()))
         .with_state(state.clone())
         .merge(state.identity_routes.clone().unwrap_or_default())
         .merge(crate::oauth::router(crate::oauth::State {
@@ -422,18 +424,12 @@ fn routes(state: State) -> Router {
         ))
 }
 
-fn requested_workspace(
-    uri: &axum::http::Uri,
-    admin: bool,
-) -> Result<Option<uuid::Uuid>, StatusCode> {
+fn requested_workspace(uri: &axum::http::Uri) -> Result<Option<uuid::Uuid>, StatusCode> {
     match uri.query() {
         None => Ok(None),
-        Some(query) if !admin => {
-            codemode_core::components::auth::oauth::parse_workspace_query(query)
-                .map(Some)
-                .ok_or(StatusCode::BAD_REQUEST)
-        }
-        Some(_) => Err(StatusCode::BAD_REQUEST),
+        Some(query) => codemode_core::components::auth::oauth::parse_workspace_query(query)
+            .map(Some)
+            .ok_or(StatusCode::BAD_REQUEST),
     }
 }
 
@@ -450,16 +446,14 @@ async fn resource_metadata(
     if host.as_deref() != Some(&state.hostname) {
         return (StatusCode::NOT_FOUND, "unknown resource").into_response();
     }
-    let admin = request.uri().path().ends_with("/mcp-admin");
-    let workspace = match requested_workspace(request.uri(), admin) {
+    let workspace = match requested_workspace(request.uri()) {
         Ok(workspace) => workspace,
         Err(status) => return (status, "invalid workspace resource").into_response(),
     };
-    let resource = if admin { "/mcp-admin" } else { "/mcp" };
     let query = workspace
         .map(|id| format!("?workspace={id}"))
         .unwrap_or_default();
-    Json(serde_json::json!({"resource":format!("https://{}{resource}{query}",state.hostname),"authorization_servers":[format!("https://{}",state.hostname)],"bearer_methods_supported":["header"],"scopes_supported":[if admin {"admin"}else{"mcp"}],"resource_name":if admin {"Codemode Administration"}else{"Codemode Workspace"}})).into_response()
+    Json(serde_json::json!({"resource":format!("https://{}/mcp{query}",state.hostname),"authorization_servers":[format!("https://{}",state.hostname)],"bearer_methods_supported":["header"],"scopes_supported":["mcp"],"resource_name":"Codemode Workspace"})).into_response()
 }
 
 async fn health(AxumState(state): AxumState<State>) -> Response {
@@ -494,7 +488,7 @@ pub(crate) async fn authenticate(
         return (StatusCode::NOT_FOUND, "unknown resource").into_response();
     }
     let resource = request.uri().path().trim_end_matches('/').to_owned();
-    let workspace = match requested_workspace(request.uri(), resource == "/mcp-admin") {
+    let workspace = match requested_workspace(request.uri()) {
         Ok(workspace) => workspace,
         Err(status) => return (status, "invalid workspace resource").into_response(),
     };
@@ -619,12 +613,7 @@ pub(crate) async fn authenticate(
         .unwrap_or_default();
     let mut response = (StatusCode::UNAUTHORIZED, "valid bearer token required").into_response();
     if let Ok(challenge) = axum::http::HeaderValue::from_str(&format!(
-        "Bearer resource_metadata=\"https://{host}/.well-known/oauth-protected-resource{resource}{query}\", scope=\"{}\"",
-        if resource == "/mcp-admin" {
-            "admin"
-        } else {
-            "mcp"
-        }
+        "Bearer resource_metadata=\"https://{host}/.well-known/oauth-protected-resource{resource}{query}\", scope=\"mcp\""
     )) {
         response
             .headers_mut()

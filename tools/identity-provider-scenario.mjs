@@ -183,14 +183,14 @@ export async function lifecycle({ browser, base, certificate, ownedHttps, mail, 
     assert.equal(sql('SELECT count(*) FROM user_identities'), '1');
     assert.equal(sql('SELECT subject FROM user_identities'),subject);
     const saved=await api('/api/workspaces','POST',{name:'eval-native',sourceIds:[]}); assert.equal(saved.status,201); assert(saved.value.id);
-    const token=await api('/api/tokens','POST',{name:'eval-native-pat',workspaceId:saved.value.id,administration:false}); assert.equal(token.status,201); assert(token.value.token);
+    const token=await api('/api/tokens','POST',{name:'eval-native-pat',workspaceId:saved.value.id,admin:false}); assert.equal(token.status,201); assert(token.value.token);
     const pat=token.value.token;
     async function call(bearer,method='tools/list',params={},path='/mcp') {
       return api(path,'POST',{jsonrpc:'2.0',id:1,method,params},{Authorization:'Bearer '+bearer,Accept:'application/json, text/event-stream','MCP-Protocol-Version':'2025-11-25'});
     }
     const tools=await call(pat); assert.equal(tools.status,200); assert.deepEqual(tools.value.result.tools.map(t=>t.name).sort(),['execute','search']);
     const executed=await call(pat,'tools/call',{name:'execute',arguments:{code:'return 42'}}); assert.equal(executed.status,200); assert(!executed.value.result.isError);
-    assert.equal((await call(pat,'tools/list',{},'/mcp-admin')).status,401);
+    assert.equal((await call(pat,'tools/list',{},'/mcp-admin')).status,404);
     stage='native local OAuth consent';
     const appCallback=origin+'/eval-callback'; let callbackCode;
     await person.route('**/eval-callback?**',async route=>{callbackCode=new URL(route.request().url());await route.fulfill({status:200,contentType:'text/plain',body:'Owned Codemode OAuth complete'});});
@@ -199,7 +199,7 @@ export async function lifecycle({ browser, base, certificate, ownedHttps, mail, 
     const query2=new URLSearchParams({response_type:'code',client_id:client,redirect_uri:appCallback,resource:origin+'/mcp',scope:'mcp',code_challenge:createHash('sha256').update(verifier2).digest('base64url'),code_challenge_method:'S256',state:state2});
     await person.goto(origin+'/oauth/authorize?'+query2);
     await person.getByLabel('Workspace',{exact:true}).selectOption(saved.value.id);
-    await person.getByRole('button',{name:'Authorize workspace',exact:true}).click();
+    await person.getByRole('button',{name:/^Authorize /,exact:true}).click();
     await person.getByText('Owned Codemode OAuth complete',{exact:true}).waitFor();
     assert(callbackCode?.searchParams.get('state')===state2&&callbackCode.searchParams.has('code'));
     async function form(data) {

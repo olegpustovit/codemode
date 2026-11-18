@@ -1,5 +1,6 @@
 pub mod access;
 pub mod accounts;
+pub mod administration;
 pub mod agent_sessions;
 pub mod auth;
 pub mod broker;

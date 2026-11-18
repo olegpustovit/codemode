@@ -31,6 +31,7 @@ import {
   tokensQuery,
   agentSessionsQuery,
   scriptsQuery,
+  sourcesQuery,
 } from "@/features/queries"
 const sections = [
   {
@@ -90,6 +91,7 @@ export function AppShell() {
     workspaces.find((w) => w.allSources) ??
     workspaces[0]
   const integrations = useQuery(integrationsQuery).data
+  const sources = useQuery(sourcesQuery).data
   const tokens = useQuery(tokensQuery).data
   const sessions = useQuery(agentSessionsQuery()).data
   const scripts = useQuery({
@@ -221,27 +223,37 @@ export function AppShell() {
                       value={workspace?.id ?? ""}
                       onValueChange={chooseWorkspace}
                     >
-                      {workspaces.map((item) => (
-                        <Menu.RadioItem
-                          key={item.id}
-                          value={item.id}
-                          className="workspace-menu-item"
-                        >
-                          <span>{item.name}</span>
-                          <code>
-                            {
-                              mcpUrl(config.hostname, item.id).split(
-                                config.hostname
-                              )[1]
-                            }
-                          </code>
-                          <small>
-                            {item.allSources
-                              ? "All sources"
-                              : `${item.sourceIds.length} sources`}
-                          </small>
-                        </Menu.RadioItem>
-                      ))}
+                      {workspaces.map((item) => {
+                        const members = sources?.filter(
+                          (source) =>
+                            item.allSources ||
+                            item.sourceIds.includes(source.id)
+                        )
+                        const tools = members?.reduce(
+                          (total, source) => total + source.toolCount,
+                          0
+                        )
+                        return (
+                          <Menu.RadioItem
+                            key={item.id}
+                            value={item.id}
+                            className="workspace-menu-item"
+                          >
+                            <span>{item.name}</span>
+                            <code>
+                              {
+                                mcpUrl(config.hostname, item.id).split(
+                                  config.hostname
+                                )[1]
+                              }
+                            </code>
+                            <small>
+                              {members?.length ?? item.sourceIds.length} sources
+                              {tools !== undefined && ` · ${tools} tools`}
+                            </small>
+                          </Menu.RadioItem>
+                        )
+                      })}
                     </Menu.RadioGroup>
                     <Menu.Separator className="workspace-menu-divider" />
                     <div className="workspace-menu-footer">

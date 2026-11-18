@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE saved_scripts SET description=$2,code=$3,saved_by=$4,from_execution=$5,revision=revision+1,updated_at=now() WHERE id=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c598e3877a7a08244962f56a16b6d82eceaf288cd10ec1e6168971c817ef9341"
+}

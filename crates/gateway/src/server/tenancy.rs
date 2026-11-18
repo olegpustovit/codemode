@@ -81,7 +81,7 @@ async fn select(
                 .map(|u| u.map(|u| u.tenant_id)),
             None => Ok(None),
         }
-    } else if matches!(path, "/mcp" | "/mcp/" | "/mcp-admin" | "/mcp-admin/") {
+    } else if matches!(path, "/mcp" | "/mcp/") {
         let headers = request.headers();
         let host = headers
             .get(header::HOST)

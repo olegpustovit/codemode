@@ -438,10 +438,9 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
         .unwrap();
     assert_eq!(response.status(), 401);
 
-    // Separate OAuth resource, with no workspace selection or global administrator bypass.
     let mut management = authorization.clone();
-    management["resource"] = serde_json::json!("https://test.example/mcp-admin");
-    management["scope"] = serde_json::json!("admin");
+    management["workspaceId"] = serde_json::json!(workspace);
+    management["admin"] = serde_json::json!(true);
     management["allow"] = serde_json::json!(true);
     let approved = request(reqwest::Method::POST, "/api/oauth/authorize")
         .header("cookie", &cookie)
@@ -459,232 +458,122 @@ async fn oauth_browser_consent_issues_tokens_for_both_mcp_eras_and_refresh_reuse
         .unwrap()
         .1
         .into_owned();
-    let body = form(&[
-        ("client_id", id),
-        ("grant_type", "authorization_code"),
-        ("code", &code),
-        ("redirect_uri", "https://client.example/callback"),
-        ("resource", "https://test.example/mcp-admin"),
-        (
-            "code_verifier",
-            "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
-        ),
-    ]);
     let granted = request(reqwest::Method::POST, "/oauth/token")
         .header("content-type", "application/x-www-form-urlencoded")
-        .body(body)
+        .body(form(&[
+            ("client_id", id),
+            ("grant_type", "authorization_code"),
+            ("code", &code),
+            ("redirect_uri", "https://client.example/callback"),
+            ("resource", "https://test.example/mcp"),
+            (
+                "code_verifier",
+                "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+            ),
+        ]))
         .send()
         .await
         .unwrap();
     assert_eq!(granted.status(), 200);
     let granted = granted.json::<serde_json::Value>().await.unwrap();
-    assert_eq!(granted["scope"], "admin");
+    assert_eq!(granted["scope"], "mcp");
     let management_token = granted["access_token"].as_str().unwrap();
-    for (path, bearer) in [("/mcp", management_token), ("/mcp-admin", agent.as_str())] {
-        let denied = request(reqwest::Method::POST, path)
-            .bearer_auth(bearer)
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(denied.status(), 401);
-        assert!(
-            denied.headers()["www-authenticate"]
-                .to_str()
+
+    for path in [
+        "/mcp-admin",
+        "/.well-known/oauth-protected-resource/mcp-admin",
+    ] {
+        assert_eq!(
+            request(reqwest::Method::GET, path)
+                .send()
+                .await
                 .unwrap()
-                .contains(&format!("oauth-protected-resource{path}"))
+                .status(),
+            404
         );
     }
-    let metadata = request(
-        reqwest::Method::GET,
-        "/.well-known/oauth-protected-resource/mcp-admin",
-    )
-    .send()
-    .await
-    .unwrap()
-    .json::<serde_json::Value>()
-    .await
-    .unwrap();
-    assert_eq!(metadata["resource"], "https://test.example/mcp-admin");
-    assert_eq!(metadata["scopes_supported"], serde_json::json!(["admin"]));
-    let admin_rpc = |token: String, method: &str, params: serde_json::Value| {
-        request(reqwest::Method::POST, "/mcp-admin")
-            .bearer_auth(token)
-            .header("accept", "application/json, text/event-stream")
-            .header("MCP-Protocol-Version", "2025-11-25")
-            .json(&serde_json::json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}))
+    for (bearer, count) in [(management_token, 10), (agent.as_str(), 0)] {
+        let result = tool_result(
+            rpc(
+                &client,
+                &url,
+                "test.example",
+                bearer,
+                "2025-11-25",
+                "tools/call",
+                serde_json::json!({"name":"search","arguments":{"query":"codemode.admin"}}),
+            )
+            .await,
+        );
+        assert_eq!(result["tools"].as_array().unwrap().len(), count);
+    }
+    let invoke = |bearer: String, name: &str, args: serde_json::Value| {
+        let encoded = serde_json::to_string(&args.to_string()).unwrap();
+        let code = format!("return codemode.admin.{name}(**json.loads({encoded}))");
+        let client = &client;
+        let url = &url;
+        async move {
+            tool_result(
+                rpc(
+                    client,
+                    url,
+                    "test.example",
+                    &bearer,
+                    "2025-11-25",
+                    "tools/call",
+                    serde_json::json!({"name":"execute","arguments":{"code":code}}),
+                )
+                .await,
+            )
+        }
     };
-    let list = admin_rpc(management_token.into(), "tools/list", serde_json::json!({}))
-        .send()
-        .await
-        .unwrap()
-        .json::<serde_json::Value>()
-        .await
-        .unwrap();
-    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 10);
-    let invoke = |token: String, name: &str, args: serde_json::Value| {
-        admin_rpc(
-            token,
-            "tools/call",
-            serde_json::json!({"name":name,"arguments":args}),
-        )
-    };
-    let registry = invoke(
-        management_token.into(),
-        "list_integrations",
-        serde_json::json!({}),
-    )
-    .send()
-    .await
-    .unwrap()
-    .json::<serde_json::Value>()
-    .await
-    .unwrap();
-    let registry = tool_result(registry["result"].clone());
+    let denied = invoke(agent.clone(), "list_sources", serde_json::json!({})).await;
+    assert_eq!(denied["status"], "failed");
     assert!(
-        registry
-            .as_array()
+        denied["error"]
+            .as_str()
             .unwrap()
-            .iter()
-            .any(|entry| entry["slug"] == "github" && entry["sourceId"].is_null())
+            .contains("PermissionError")
     );
-    let saved=invoke(management_token.into(),"save_source",serde_json::json!({"source":{"slug":"admin-private","kind":"mcp_http","url":"https://fixture.example/mcp","requiresAccount":true}})).send().await.unwrap().json::<serde_json::Value>().await.unwrap();
-    let source = tool_result(saved["result"].clone());
-    let source_id = source.as_str().unwrap();
-    let saved = invoke(
-        management_token.into(),
-        "save_workspace",
-        serde_json::json!({"name":"Admin managed workspace","sourceIds":[source_id]}),
-    )
-    .send()
-    .await
-    .unwrap()
-    .json::<serde_json::Value>()
-    .await
-    .unwrap();
-    let saved = tool_result(saved["result"].clone());
-    let saved_id = saved.as_str().unwrap();
-    let list = invoke(
+    let saved = invoke(management_token.into(), "save_source", serde_json::json!({"source":{"slug":"admin-private","kind":"mcp_http","url":"https://fixture.example/mcp","requiresAccount":true}})).await;
+    assert_eq!(saved["status"], "completed", "{saved}");
+    let source_id = saved["result"].as_str().unwrap();
+    let listed = invoke(
         management_token.into(),
         "list_sources",
         serde_json::json!({}),
     )
-    .send()
-    .await
-    .unwrap()
-    .json::<serde_json::Value>()
-    .await
-    .unwrap();
-    let list = tool_result(list["result"].clone());
-    assert_eq!(list[0]["id"], source);
+    .await;
+    let source = listed["result"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["id"] == source_id)
+        .unwrap();
     for hidden in ["url", "config", "credential", "bearer_env"] {
-        assert!(list[0].get(hidden).is_none());
+        assert!(source.get(hidden).is_none());
     }
-    let bad = invoke(
-        management_token.into(),
-        "save_source",
-        serde_json::json!({"source":{"slug":"unsafe","kind":"mcp_stdio","command":"/bin/sh"}}),
-    )
-    .send()
-    .await
-    .unwrap()
-    .json::<serde_json::Value>()
-    .await
-    .unwrap();
-    assert_eq!(bad["result"]["isError"], true);
     let connection = invoke(
         management_token.into(),
         "source_connection_url",
         serde_json::json!({"id":source_id}),
     )
-    .send()
-    .await
-    .unwrap()
-    .json::<serde_json::Value>()
-    .await
-    .unwrap();
+    .await;
     assert_eq!(
-        tool_result(connection["result"].clone())["url"],
+        connection["result"]["url"],
         format!("https://test.example/sources/{source_id}/accounts")
     );
-    // A later user has the same management surface, restricted by immutable tenant RLS.
-    let second=request(reqwest::Method::POST,"/api/register").header("origin","https://test.example")
-        .json(&serde_json::json!({"email":"admin-check@olegpustovit.com","password":"fixture-browser-password"})).send().await.unwrap();
-    assert!(second.status().is_success());
-    let second_cookie = second.headers()["set-cookie"]
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_owned();
-    let second = request(reqwest::Method::POST, "/api/tokens")
-        .header("origin", "https://test.example")
-        .header("cookie", second_cookie)
-        .json(&serde_json::json!({"name":"second management","administration":true}))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(second.status(), 201);
-    let second = second.json::<serde_json::Value>().await.unwrap();
-    let second_token = second["token"].as_str().unwrap();
-    let list = invoke(second_token.into(), "list_sources", serde_json::json!({}))
-        .send()
-        .await
-        .unwrap()
-        .json::<serde_json::Value>()
-        .await
-        .unwrap();
-    assert_eq!(tool_result(list["result"].clone()), serde_json::json!([]));
-    let bad = invoke(
-        second_token.into(),
-        "save_workspace",
-        serde_json::json!({"id":saved_id,"name":"Stolen","sourceIds":[]}),
-    )
-    .send()
-    .await
-    .unwrap()
-    .json::<serde_json::Value>()
-    .await
-    .unwrap();
-    assert_eq!(bad["result"]["isError"], true);
-    let bad = invoke(
-        second_token.into(),
-        "source_connection_url",
-        serde_json::json!({"id":source_id}),
-    )
-    .send()
-    .await
-    .unwrap()
-    .json::<serde_json::Value>()
-    .await
-    .unwrap();
-    assert_eq!(bad["result"]["isError"], true);
-    let removed = invoke(
-        management_token.into(),
-        "delete_workspace",
-        serde_json::json!({"id":saved_id}),
-    )
-    .send()
-    .await
-    .unwrap()
-    .json::<serde_json::Value>()
-    .await
-    .unwrap();
-    assert_ne!(removed["result"]["isError"], true);
     let rows: Vec<(String, serde_json::Value, String)> = sqlx::query_as(
         "SELECT tool,args_redacted,outcome FROM administration_calls ORDER BY started_at",
     )
     .fetch_all(&pool)
     .await
     .unwrap();
-    assert_eq!(rows.len(), 10);
-    assert!(rows.iter().all(|(_, _, outcome)| outcome != "running"));
-    let args = &rows
-        .iter()
-        .find(|(tool, _, _)| tool == "save_source")
-        .unwrap()
-        .1;
-    assert_eq!(args["source"], "[redacted]");
+    assert_eq!(rows.len(), 4);
+    assert!(
+        rows.iter()
+            .all(|(_, args, outcome)| args["arguments"] == "[REDACTED]" && outcome != "running")
+    );
     stop.cancel();
     tasks.close();
     tasks.wait().await;

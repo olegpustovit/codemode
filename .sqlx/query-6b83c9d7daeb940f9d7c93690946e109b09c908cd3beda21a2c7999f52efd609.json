@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id,token_hash,audience,tenant_id,workspace_id AS \"workspace_id!\",resource FROM access_tokens WHERE workspace_id IS NOT NULL AND token_hash=$1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",
+  "query": "SELECT id,token_hash,audience,tenant_id,workspace_id AS \"workspace_id!\",resource,admin FROM access_tokens WHERE workspace_id IS NOT NULL AND token_hash=$1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",
   "describe": {
     "columns": [
       {
@@ -68,6 +68,17 @@
             "name": "resource"
           }
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "admin",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "admin"
+          }
+        }
       }
     ],
     "parameters": {
@@ -81,8 +92,9 @@
       false,
       false,
       true,
+      false,
       false
     ]
   },
-  "hash": "129310c026c544106598a4673e0baa281f7bb866cb283dcd6065c482578abc42"
+  "hash": "6b83c9d7daeb940f9d7c93690946e109b09c908cd3beda21a2c7999f52efd609"
 }

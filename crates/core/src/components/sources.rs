@@ -186,6 +186,13 @@ struct Connected {
     revision: i64,
 }
 
+pub fn user_source(source: &Source) -> Result<(), &'static str> {
+    if matches!(source.transport, Transport::McpStdio { .. }) {
+        return Err("local MCP commands must be installed by the server operator");
+    }
+    Ok(())
+}
+
 #[derive(Clone)]
 pub struct Sources {
     access: super::access::Access,
@@ -292,16 +299,19 @@ impl Sources {
                 Some(tool) => Ok(tool),
                 None if matches!(
                     call.path.as_str(),
-                    super::broker::SEARCH_PATH | super::broker::MEMO_PATH
+                    super::broker::SEARCH_PATH
+                        | super::broker::MEMO_PATH
+                        | super::broker::SAVE_SCRIPT_PATH
                 ) =>
                 {
                     Err(String::new())
                 }
+                None if call.path.starts_with(super::administration::PREFIX) => Err(String::new()),
                 None => Err(self.unknown(&call.path, workspace).await),
             }
         };
         self.broker
-            .dispatch(execution, seq, call, tool, timeout, workspace)
+            .dispatch(self, execution, seq, call, tool, timeout, workspace)
             .await
     }
 

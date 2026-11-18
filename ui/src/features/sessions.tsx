@@ -595,6 +595,12 @@ export function SessionsPage() {
         >
           <span className="kbd">↵</span>Open
         </button>
+        {openedExecution && (
+          <span className="rail-key">
+            <kbd className="kbd">J</kbd>
+            <kbd className="kbd">K</kbd> Runs
+          </span>
+        )}
         <button onClick={back}>
           <span className="kbd">Esc</span>Back
         </button>

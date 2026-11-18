@@ -52,7 +52,8 @@ export const tokenSchema = z.object({
   name: z.string(),
   audience: z.string(),
   workspaceId: z.uuid().nullable(),
-  resource: z.enum(["/mcp", "/mcp-admin"]),
+  resource: z.string(),
+  admin: z.boolean(),
   revoked: z.boolean(),
 })
 const summary = z.object({
@@ -162,6 +163,9 @@ export const scriptSummarySchema = z.object({
   description: z.string(),
   revision: z.number(),
   updatedAt: z.string(),
+  workspaceId: z.uuid().nullable(),
+  savedBy: z.string().nullable(),
+  fromExecution: z.uuid().nullable(),
 })
 export const scriptSchema = scriptSummarySchema.extend({ code: z.string() })
 export type Script = z.infer<typeof scriptSchema>

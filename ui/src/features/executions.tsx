@@ -2,7 +2,6 @@ import { useRef, useState, type ReactNode } from "react"
 import { prettyJson } from "@/lib/pretty-json"
 import { PythonCode } from "@/components/python-code"
 import { useStatus } from "@/components/status-bar"
-import { Button } from "@/components/ui/button"
 import type { ExecutionDetail } from "./queries"
 import { StateBadge, date } from "@/components/common"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
@@ -116,6 +115,11 @@ export function ExecutionContent({
     call.scrollIntoView({ block: "nearest" })
   }
   const { report } = useStatus()
+  const copyCode = () =>
+    void navigator.clipboard
+      .writeText(execution.code)
+      .then(() => report("Code copied"))
+      .catch(() => report("Copy failed. Select the code and copy it.", "error"))
   return (
     <>
       <header className="trace-header">
@@ -202,7 +206,18 @@ export function ExecutionContent({
       </section>
       <section className="trace-section">
         <h3>
-          Python <span>{execution.code.split("\n").length} lines</span>
+          Python{" "}
+          <span>
+            {execution.code.split("\n").length} lines ·{" "}
+            <button
+              type="button"
+              className="trace-more"
+              aria-label="Copy code"
+              onClick={copyCode}
+            >
+              Copy
+            </button>
+          </span>
         </h3>
         <pre className="code-panel" tabIndex={0} aria-label="Python code">
           <PythonCode code={execution.code} onTool={jumpToCall} />
@@ -222,22 +237,7 @@ export function ExecutionContent({
         </dl>
         {execution.output && <PrintedOutput output={execution.output} />}
       </section>
-      <div className="detail-actions">
-        <Button
-          variant="outline"
-          onClick={() =>
-            void navigator.clipboard
-              .writeText(execution.code)
-              .then(() => report("Code copied"))
-              .catch(() =>
-                report("Copy failed. Select the code and copy it.", "error")
-              )
-          }
-        >
-          Copy code
-        </Button>
-        {action}
-      </div>
+      {action && <div className="detail-actions">{action}</div>}
     </>
   )
 }

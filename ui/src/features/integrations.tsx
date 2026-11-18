@@ -644,30 +644,6 @@ function IntegrationDetails({
       <div className="pane-body">
         <h2>{entry.name}</h2>
         <p className="pane-meta">{integrationState(entry)}</p>
-        <VendorGlyph name={entry.icon} label={entry.name} large />
-        <p>{entry.description}</p>
-        <Facts
-          items={[
-            {
-              label: "Connection",
-              value: entry.methods
-                .map((method) => methodNames[method])
-                .join(" / "),
-            },
-            {
-              label: "Tools",
-              value: <code>{linked ? entry.toolCount : "—"}</code>,
-            },
-            ...(source
-              ? [
-                  {
-                    label: "Namespace",
-                    value: <code>tools.{source.pythonName}</code>,
-                  },
-                ]
-              : []),
-          ]}
-        />
         {(entry.error || connect.error || oauthError) && (
           <p className="connection-error" role="alert">
             {connect.error
@@ -760,6 +736,34 @@ function IntegrationDetails({
               )}
           </form>
         )}
+        <VendorGlyph name={entry.icon} label={entry.name} large />
+        <p>{entry.description}</p>
+        <Facts
+          items={[
+            {
+              label: "Connection",
+              value: entry.methods
+                .map((method) => methodNames[method])
+                .join(" / "),
+            },
+            {
+              label: "Tools",
+              value: (
+                <code>
+                  {linked || entry.state === "ready" ? entry.toolCount : "—"}
+                </code>
+              ),
+            },
+            ...(source
+              ? [
+                  {
+                    label: "Namespace",
+                    value: <code>tools.{source.pythonName}</code>,
+                  },
+                ]
+              : []),
+          ]}
+        />
         {entry.connections.length > 0 && entry.url && (
           <section className="integration-logins" aria-label="Logins">
             <h3>Logins</h3>
@@ -772,7 +776,7 @@ function IntegrationDetails({
                   >
                     {login.name}
                   </Link>
-                  <code>{login.slug}</code>
+                  <code>tools.{login.slug}</code>
                   <span>
                     {login.state === "ready"
                       ? "Linked"

@@ -1,3 +1,4 @@
+import { relativeTime } from "@/lib/time"
 import { move as transitionPane } from "@/lib/motion"
 import { BulkPane } from "@/components/bulk-pane"
 import { useStatus } from "@/components/status-bar"
@@ -208,7 +209,17 @@ export function TokensPage() {
                       : "Personal token",
                   workspaces.find((w) => w.id === t.workspaceId)?.name ??
                     "Deleted workspace",
-                  t.lastUsedAt ? date(t.lastUsedAt) : "Never",
+                  t.lastUsedAt ? (
+                    <time
+                      key="used"
+                      dateTime={t.lastUsedAt}
+                      title={date(t.lastUsedAt)}
+                    >
+                      {relativeTime(t.lastUsedAt)}
+                    </time>
+                  ) : (
+                    "Never"
+                  ),
                 ],
               }))
               .sort((a, b) => a.group.localeCompare(b.group))}

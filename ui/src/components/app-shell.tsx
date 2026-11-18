@@ -1,3 +1,5 @@
+import { Menu } from "@base-ui/react/menu"
+import { mcpUrl } from "@/lib/workspace-url"
 import { navigationMotion } from "@/lib/motion"
 import { useEffect, useState } from "react"
 import {
@@ -83,9 +85,8 @@ export function AppShell() {
       // The rail still works when storage is disabled.
     }
   }, [railCollapsed])
-  const [pickedWorkspace, setPickedWorkspace] = useState<string>()
   const workspace =
-    workspaces.find((w) => w.id === (search.workspace ?? pickedWorkspace)) ??
+    workspaces.find((w) => w.id === search.workspace) ??
     workspaces.find((w) => w.allSources) ??
     workspaces[0]
   const integrations = useQuery(integrationsQuery).data
@@ -139,17 +140,13 @@ export function AppShell() {
       const section = sections[Number(event.key) - 1]
       if (section) {
         event.preventDefault()
-        setPickedWorkspace(workspace?.id)
         void router.navigate({
           to: section.to,
           viewTransition: sectionTransition(
             currentSection,
             sections.indexOf(section)
           ),
-          search:
-            section.to === "/scripts" || section.to === "/workspaces"
-              ? { workspace: workspace?.id }
-              : undefined,
+          search: { workspace: workspace?.id },
         })
       }
     }
@@ -157,11 +154,20 @@ export function AppShell() {
     return () => document.removeEventListener("keydown", keys)
   }, [router, workspace?.id, currentSection])
   const chooseWorkspace = (id: string) => {
-    setPickedWorkspace(id)
-    if (path === "/scripts")
-      void router.navigate({ to: "/scripts", search: { workspace: id } })
-    else if (path.startsWith("/workspaces"))
-      void router.navigate({ to: "/workspaces", search: { workspace: id } })
+    if (path === "/scripts" || path === "/workspaces") {
+      void router.navigate({
+        to: path,
+        search: { workspace: id },
+        viewTransition: navigationMotion("ws"),
+      })
+    } else {
+      const url = new URL(router.state.location.href, window.location.origin)
+      url.searchParams.set("workspace", id)
+      void router.navigate({
+        href: url.pathname + url.search + url.hash,
+        viewTransition: navigationMotion("ws"),
+      })
+    }
     report(
       `Workspace: ${workspaces.find((w) => w.id === id)?.name ?? "All sources"}`
     )
@@ -190,21 +196,75 @@ export function AppShell() {
               <i aria-hidden="true" />
               <span>Codemode</span>
             </Link>
-            <button
-              className="workspace-switch"
-              aria-label="Switch workspace"
-              title="Switch workspace"
-              onClick={() => {
-                const index = workspaces.findIndex(
-                  (w) => w.id === workspace?.id
-                )
-                const next = workspaces[(index + 1) % workspaces.length]
-                if (next) chooseWorkspace(next.id)
-              }}
-            >
-              Workspace <b>{workspace?.name}</b>
-              <ChevronDown aria-hidden="true" />
-            </button>
+            <Menu.Root>
+              <Menu.Trigger
+                className="workspace-switch"
+                aria-label="Switch workspace"
+              >
+                Workspace <b>{workspace?.name}</b>
+                <ChevronDown aria-hidden="true" />
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Positioner
+                  align="start"
+                  sideOffset={6}
+                  className="workspace-menu-positioner"
+                >
+                  <Menu.Popup
+                    className="workspace-menu"
+                    aria-label="Workspaces"
+                  >
+                    <div className="workspace-menu-heading">
+                      Switch workspace
+                    </div>
+                    <Menu.RadioGroup
+                      value={workspace?.id ?? ""}
+                      onValueChange={chooseWorkspace}
+                    >
+                      {workspaces.map((item) => (
+                        <Menu.RadioItem
+                          key={item.id}
+                          value={item.id}
+                          className="workspace-menu-item"
+                        >
+                          <span>{item.name}</span>
+                          <code>
+                            {
+                              mcpUrl(config.hostname, item.id).split(
+                                config.hostname
+                              )[1]
+                            }
+                          </code>
+                          <small>
+                            {item.allSources
+                              ? "All sources"
+                              : `${item.sourceIds.length} sources`}
+                          </small>
+                        </Menu.RadioItem>
+                      ))}
+                    </Menu.RadioGroup>
+                    <Menu.Separator className="workspace-menu-divider" />
+                    <div className="workspace-menu-footer">
+                      <Menu.Item render={<Link to="/workspaces/new" />}>
+                        New workspace
+                      </Menu.Item>
+                      {workspace && (
+                        <Menu.Item
+                          render={
+                            <Link
+                              to="/workspaces/$workspaceId"
+                              params={{ workspaceId: workspace.id }}
+                            />
+                          }
+                        >
+                          Manage {workspace.name}
+                        </Menu.Item>
+                      )}
+                    </div>
+                  </Menu.Popup>
+                </Menu.Positioner>
+              </Menu.Portal>
+            </Menu.Root>
             <div
               id="shell-search"
               className="shell-search"
@@ -215,11 +275,11 @@ export function AppShell() {
               className="agent-url"
               onClick={() => {
                 void navigator.clipboard
-                  .writeText(`https://${config.hostname}/mcp`)
+                  .writeText(mcpUrl(config.hostname, workspace?.id))
                   .then(() => report("MCP URL copied"))
                   .catch(() =>
                     report(
-                      `Copy failed. Select and copy https://${config.hostname}/mcp`,
+                      `Copy failed. Select and copy ${mcpUrl(config.hostname, workspace?.id)}`,
                       "error"
                     )
                   )
@@ -240,11 +300,7 @@ export function AppShell() {
                 <Link
                   key={section.to}
                   to={section.to}
-                  search={
-                    section.to === "/scripts" || section.to === "/workspaces"
-                      ? { workspace: workspace?.id }
-                      : undefined
-                  }
+                  search={{ workspace: workspace?.id }}
                   className="section-link"
                   aria-label={section.label}
                   title={section.label}
@@ -253,9 +309,6 @@ export function AppShell() {
                     currentSection,
                     sections.indexOf(section)
                   )}
-                  onClick={() => {
-                    setPickedWorkspace(workspace?.id)
-                  }}
                 >
                   {isActive(section.to) && (
                     <span className="rail-mark" aria-hidden="true" />

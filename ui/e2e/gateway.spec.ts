@@ -2961,3 +2961,40 @@ test("bulk panes: custom sync, revision-safe script deletion and token revocatio
     }, owned)
   }
 })
+
+test("workspace URL survives section changes and copies the workspace MCP address", async ({
+  page,
+}) => {
+  await login(page, "/sessions")
+  const workspace = await page.evaluate(async () => {
+    const response = await fetch("/api/workspaces", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Workspace URL fixture", sourceIds: [] }),
+    })
+    return (await response.json()).id as string
+  })
+  await page.reload()
+  const trigger = page.getByRole("button", {
+    name: "Switch workspace",
+    exact: true,
+  })
+  await trigger.click()
+  await page
+    .getByRole("menuitemradio", { name: /Workspace URL fixture/ })
+    .click()
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("workspace"))
+    .toBe(workspace)
+  await page.getByRole("link", { name: "Integrations", exact: true }).click()
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("workspace"))
+    .toBe(workspace)
+  await page.reload()
+  await expect(trigger).toContainText("Workspace URL fixture")
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
+  await page.getByRole("button", { name: "Copy MCP URL", exact: true }).click()
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(`${origin}/mcp?workspace=${workspace}`)
+})

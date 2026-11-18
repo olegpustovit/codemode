@@ -213,8 +213,9 @@ export function ScriptLibraryPage() {
           />
           <h1>Scripts</h1>
           <p>
-            Python saved from sessions or written by hand. Agents can run them
-            by name.
+            Python saved by you or by agents. Workspace scripts run only in{" "}
+            {workspace?.name ?? "this workspace"}. Global scripts run in every
+            workspace under that workspace’s tool policies.
           </p>
         </div>
         {workspace && (

@@ -418,6 +418,7 @@
 .data-grid .data-body { position: relative; flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; padding-bottom: var(--s-5); }
 .data-cursor td { display: block; padding: 0; }
 .data-list:has(.list-empty) .data-grid { flex: none; }
+.data-list:has(.list-empty) .data-body { padding-bottom: 0; }
 code, pre, kbd, .font-mono { font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
 .code-panel:has(.python-code) { padding-inline: 0; white-space: pre; overflow-x: auto; overflow-wrap: normal; tab-size: 4; line-height: 1.65; }
 .python-code { counter-reset: line; }

@@ -3460,6 +3460,15 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await expect(
     page.getByText("No integrations need attention", { exact: true })
   ).toBeVisible()
+  expect(
+    await page
+      .locator(".list-empty")
+      .evaluate(
+        (empty) =>
+          empty.getBoundingClientRect().top -
+          empty.parentElement!.getBoundingClientRect().top
+      )
+  ).toBeLessThan(1)
   await capture(page, "ux-prototype-empty-1440x900.png")
   await page.getByRole("link", { name: "Workspaces", exact: true }).click()
   await expect(
@@ -3539,6 +3548,15 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await expect(
     page.getByText("No integrations need attention", { exact: true })
   ).toBeVisible()
+  expect(
+    await page
+      .locator(".list-empty")
+      .evaluate(
+        (empty) =>
+          empty.getBoundingClientRect().top -
+          empty.parentElement!.getBoundingClientRect().top
+      )
+  ).toBeLessThan(1)
   await capture(page, "ux-prototype-empty-390x844.png")
   await page.setViewportSize({ width: 1440, height: 900 })
   await page

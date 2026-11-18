@@ -3565,6 +3565,9 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     duration: 320,
     initial: { opacity: "0", transform: "translateY(-4px)" },
   })
+  await expect(workspaceMenu.locator(".workspace-menu-note")).toHaveText(
+    "Agents that open this URL are asked to authorize All sources."
+  )
   await capture(page, "ux-prototype-workspace-menu-1440x900.png")
   expect(await workspaceMenu.boundingBox()).toMatchObject({
     x: 240,

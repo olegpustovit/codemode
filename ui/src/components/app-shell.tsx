@@ -255,6 +255,12 @@ export function AppShell() {
                       })}
                     </Menu.RadioGroup>
                     <Menu.Separator className="workspace-menu-divider" />
+                    {workspace && (
+                      <p className="workspace-menu-note">
+                        Agents that open this URL are asked to authorize{" "}
+                        <strong>{workspace.name}</strong>.
+                      </p>
+                    )}
                     <div className="workspace-menu-footer">
                       <Menu.Item render={<Link to="/workspaces/new" />}>
                         New workspace

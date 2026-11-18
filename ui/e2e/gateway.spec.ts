@@ -2112,6 +2112,7 @@ test("OAuth apps: write-only setup, static PKCE redirect and guarded removal", a
 test("sessions: real execution grouping, rename, two panes and mobile focus", async ({
   page,
 }) => {
+  await observeViewTransitions(page)
   const errors: string[] = []
   page.on("pageerror", (error) => errors.push(error.message))
   await page.goto("/login?redirect=%2Fsessions")
@@ -2210,6 +2211,7 @@ test("sessions: real execution grouping, rename, two panes and mobile focus", as
         exact: true,
       })
     ).toBeVisible()
+    await expectPlayedTransition(page, "push", "codemode-settle-left")
     await execution.getByRole("button", { name: /Close/ }).focus()
     const beforeArrow = page.url()
     await page.keyboard.press("j")
@@ -2343,6 +2345,7 @@ test("sessions: real execution grouping, rename, two panes and mobile focus", as
       )
     ).toBe(false)
     await execution.getByRole("button", { name: /Close/ }).click()
+    await expectPlayedTransition(page, "pop", "codemode-settle-right")
     await expect(
       page.getByRole("heading", {
         name: "Renamed browser session",
@@ -3171,10 +3174,7 @@ test("script scope promotion exposes a global script in a second workspace", asy
   await capture(page, "ux-prototype-script-scope-390x844.png")
 })
 
-test("prototype motion carries transition types and honors reduced motion", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+async function observeViewTransitions(page: Page) {
   await page.addInitScript(() => {
     const record = (
       options?: ViewTransitionUpdateCallback | StartViewTransitionOptions
@@ -3188,11 +3188,61 @@ test("prototype motion carries transition types and honors reduced motion", asyn
           .join(" ")
       }
     }
+    const observe = (
+      transition: ViewTransition,
+      options?: ViewTransitionUpdateCallback | StartViewTransitionOptions
+    ) => {
+      record(options)
+      if (!options || typeof options !== "object" || !options.types)
+        return transition
+      void transition.ready.then(
+        () => {
+          const animations = document
+            .getAnimations()
+            .filter(
+              (animation): animation is CSSAnimation =>
+                animation instanceof CSSAnimation
+            )
+          const names = animations.map(({ animationName }) => animationName)
+          const drift = animations
+            .filter(({ animationName }) =>
+              animationName.startsWith("codemode-settle-")
+            )
+            .flatMap(({ effect }) =>
+              effect instanceof KeyframeEffect ? effect.getKeyframes() : []
+            )
+          const validDrift = drift.every(({ transform, filter }) => {
+            const matrix = new DOMMatrixReadOnly(
+              typeof transform === "string" && transform !== "none"
+                ? transform
+                : undefined
+            )
+            return (
+              matrix.is2D &&
+              matrix.a === 1 &&
+              matrix.b === 0 &&
+              matrix.c === 0 &&
+              matrix.d === 1 &&
+              Math.abs(matrix.e) <= 12 &&
+              Math.abs(matrix.f) <= 8 &&
+              (!filter || filter === "none")
+            )
+          })
+          for (const type of options.types ?? []) {
+            document.documentElement.setAttribute(
+              `data-played-${type}`,
+              validDrift ? names.join(" ") : "invalid-drift"
+            )
+          }
+        },
+        () => {}
+      )
+      return transition
+    }
     const documentStart = document.startViewTransition?.bind(document)
     if (documentStart)
       document.startViewTransition = (options) => {
-        record(options)
-        return documentStart(options)
+        return observe(documentStart(options), options)
       }
     const prototype = Element.prototype as Element & {
       startViewTransition?: Document["startViewTransition"]
@@ -3200,10 +3250,22 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     const scopedStart = prototype.startViewTransition
     if (scopedStart)
       prototype.startViewTransition = function (options) {
-        record(options)
-        return scopedStart.call(this, options)
+        return observe(scopedStart.call(this, options), options)
       }
   })
+}
+
+const expectPlayedTransition = (page: Page, type: string, animation: string) =>
+  expect(page.locator("html")).toHaveAttribute(
+    `data-played-${type}`,
+    new RegExp(`(?:^| )${animation}(?: |$)`)
+  )
+
+test("prototype motion carries transition types and honors reduced motion", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await observeViewTransitions(page)
   await login(page, "/sessions")
   await page.evaluate(() =>
     fetch("/api/workspaces", {
@@ -3216,17 +3278,22 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   const types = () => page.locator("html").getAttribute("data-transition-types")
   await page.getByRole("link", { name: "Integrations", exact: true }).click()
   await expect.poll(types).toContain("down")
+  await expectPlayedTransition(page, "down", "codemode-settle-up")
   await page.getByRole("row", { name: "Linear", exact: true }).click()
   await expect(
     page.getByRole("heading", { name: "Linear", exact: true })
   ).toBeVisible()
   await expect.poll(types).toContain("open")
+  await expectPlayedTransition(page, "open", "codemode-settle-left")
   await page.getByRole("row", { name: "Notion", exact: true }).click()
   await expect.poll(types).toContain("swap")
+  await expectPlayedTransition(page, "swap", "codemode-settle-up")
   await page.getByRole("button", { name: /^Close/ }).click()
   await expect.poll(types).toContain("close")
+  await expectPlayedTransition(page, "close", "codemode-fade-out")
   await page.getByRole("tab", { name: /^Needs attention/ }).click()
   await expect.poll(types).toContain("filter")
+  await expectPlayedTransition(page, "filter", "codemode-fade-in")
   await capture(page, "ux-prototype-empty-1440x900.png")
   await page.getByRole("link", { name: "Workspaces", exact: true }).click()
   await expect(
@@ -3241,6 +3308,7 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.getByRole("menuitemradio", { name: /Motion workspace/ }).click()
   await expect.poll(types).toContain("ws")
+  await expectPlayedTransition(page, "ws", "codemode-fade-in")
   await page
     .getByRole("button", { name: "Collapse sidebar", exact: true })
     .click()
@@ -3261,6 +3329,7 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     .click()
   await page.getByRole("link", { name: "Sessions", exact: true }).click()
   await expect.poll(types).toContain("up")
+  await expectPlayedTransition(page, "up", "codemode-settle-down")
   await page.emulateMedia({ reducedMotion: "reduce" })
   const before = await types()
   await page.getByRole("link", { name: "Integrations", exact: true }).click()

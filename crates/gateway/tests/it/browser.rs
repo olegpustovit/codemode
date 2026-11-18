@@ -184,7 +184,7 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
     assert_eq!(response.status(), StatusCode::OK);
     let page = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(page["sessions"].as_array().unwrap().len(), 1);
-    assert_eq!(page["sessions"][0]["title"], "API history");
+    assert_eq!(page["sessions"][0]["title"], "fixture");
     let response = request(reqwest::Method::GET, &format!("/api/sessions/{session_id}"))
         .header("cookie", &cookie)
         .send()

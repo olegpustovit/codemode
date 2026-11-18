@@ -3485,7 +3485,20 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     duration: 3200,
     midpoint: { opacity: "0.55", boxShadow: expect.stringContaining("2px") },
   })
-  await page.getByRole("row", { name: "Linear", exact: true }).click()
+  const linearRow = page.getByRole("row", { name: "Linear", exact: true })
+  await linearRow.click()
+  await expect
+    .poll(() =>
+      linearRow.evaluate((row) =>
+        row.getAnimations().some(({ effect }) =>
+          effect instanceof KeyframeEffect &&
+          effect.getTiming().duration === 700 &&
+          effect.getKeyframes()[0]?.backgroundPosition === "100% 0px" &&
+          effect.getKeyframes()[1]?.backgroundPosition === "0px 0px"
+        )
+      )
+    )
+    .toBe(true)
   await expect(
     page.getByRole("heading", { name: "Linear", exact: true })
   ).toBeVisible()

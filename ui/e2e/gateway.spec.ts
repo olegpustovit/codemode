@@ -3467,6 +3467,24 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page.getByRole("link", { name: "Integrations", exact: true }).click()
   await expect.poll(types).toContain("down")
   await expectPlayedTransition(page, "down", "codemode-settle-up")
+  const integrationsGrid = page.getByRole("grid", { name: "Integrations", exact: true })
+  await integrationsGrid.focus()
+  const cursorPulse = await integrationsGrid.evaluate((grid) => {
+    const pulse = grid.getAnimations({ subtree: true }).find(
+      (animation) =>
+        animation instanceof CSSAnimation &&
+        animation.animationName === "codemode-breathe"
+    )
+    const effect = pulse?.effect as KeyframeEffect | undefined
+    return {
+      duration: effect?.getTiming().duration,
+      midpoint: effect?.getKeyframes().find(({ offset }) => offset === 0.5),
+    }
+  })
+  expect(cursorPulse).toMatchObject({
+    duration: 3200,
+    midpoint: { opacity: "0.55", boxShadow: expect.stringContaining("2px") },
+  })
   await page.getByRole("row", { name: "Linear", exact: true }).click()
   await expect(
     page.getByRole("heading", { name: "Linear", exact: true })

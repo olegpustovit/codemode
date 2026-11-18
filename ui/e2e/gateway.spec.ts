@@ -3346,7 +3346,11 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page.setViewportSize({ width: 390, height: 844 })
   await capture(page, "ux-prototype-workspace-menu-390x844.png")
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.getByRole("menuitemradio", { name: /Motion workspace/ }).click()
+  const workspaceOption = page.getByRole("menuitemradio", {
+    name: /Motion workspace/,
+  })
+  await workspaceOption.click()
+  await expect(workspaceOption).toBeHidden()
   await expect.poll(types).toContain("ws")
   await expectPlayedTransition(page, "ws", "codemode-fade-in")
   await page
@@ -3372,18 +3376,61 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await expectPlayedTransition(page, "up", "codemode-settle-down")
   await page.emulateMedia({ reducedMotion: "reduce" })
   const before = await types()
+  const expectReducedMotion = async () => {
+    expect(await types()).toBe(before)
+    expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
+  }
   await page.getByRole("link", { name: "Integrations", exact: true }).click()
+  await expect(
+    page.getByRole("heading", { name: "Integrations", exact: true })
+  ).toBeVisible()
+  await expectReducedMotion()
   await page.getByRole("row", { name: "Linear", exact: true }).click()
   await expect(
     page.getByRole("heading", { name: "Linear", exact: true })
   ).toBeVisible()
-  expect(await types()).toBe(before)
-  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
+  await expectReducedMotion()
+  await page.getByRole("row", { name: "Notion", exact: true }).click()
+  await expect(
+    page.getByRole("heading", { name: "Notion", exact: true })
+  ).toBeVisible()
+  await expectReducedMotion()
+  await page.getByRole("row", { name: "Linear", exact: true }).click()
+  await expect(
+    page.getByRole("heading", { name: "Linear", exact: true })
+  ).toBeVisible()
+  await expectReducedMotion()
   await page.setViewportSize({ width: 390, height: 844 })
   await expectBackdropFrame(390, 844)
   await noOverflow(page)
   await capture(page, "ux-prototype-integration-390x844.png")
   await page.getByRole("button", { name: /^Close/ }).click()
-  await page.getByRole("tab", { name: /^Needs attention/ }).click()
+  await expectReducedMotion()
+  const attention = page.getByRole("tab", { name: /^Needs attention/ })
+  await attention.click()
+  await expect(attention).toHaveAttribute("aria-selected", "true")
+  await expectReducedMotion()
   await capture(page, "ux-prototype-empty-390x844.png")
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page
+    .getByRole("button", { name: "Switch workspace", exact: true })
+    .click()
+  const allSources = page.getByRole("menuitemradio", { name: /All sources/ })
+  await expect(allSources).toBeVisible()
+  await expectReducedMotion()
+  await allSources.click()
+  await expect(allSources).toBeHidden()
+  await expectReducedMotion()
+  await page
+    .getByRole("button", { name: "Collapse sidebar", exact: true })
+    .click()
+  await expect(page.locator(".app-shell")).toHaveAttribute(
+    "data-rail",
+    "collapsed"
+  )
+  await expectReducedMotion()
+  await page
+    .getByRole("button", { name: "Expand sidebar", exact: true })
+    .click()
+  await expectReducedMotion()
 })

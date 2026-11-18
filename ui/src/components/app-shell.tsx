@@ -237,6 +237,7 @@ export function AppShell() {
                           <Menu.RadioItem
                             key={item.id}
                             value={item.id}
+                            closeOnClick
                             className="workspace-menu-item"
                           >
                             <span>{item.name}</span>

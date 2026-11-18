@@ -905,7 +905,7 @@ mark {
 .trace-call-body h4 span { margin-left: var(--s-3); text-transform: none; letter-spacing: normal; font-weight: var(--w-reg); }
 
 .workspace-menu-positioner { z-index: 30; }
-.workspace-menu { width: min(440px, calc(100vw - 24px)); padding-block: var(--s-2); border: 1px solid var(--c-line-2); background: var(--c-bg); }
+.workspace-menu { view-transition-name: ws-menu; width: min(440px, calc(100vw - 24px)); padding-block: var(--s-2); border: 1px solid var(--c-line-2); background: var(--c-bg); }
 .workspace-menu[data-open] { animation: workspace-menu-enter var(--t-3) var(--e-soft) both; }
 .workspace-menu[data-ending-style] { opacity: 0; transition: opacity var(--exit) linear; }
 .workspace-menu-heading { padding: var(--s-2) var(--s-4); color: var(--c-text-3); font-size: var(--fs-1); letter-spacing: .08em; text-transform: uppercase; }

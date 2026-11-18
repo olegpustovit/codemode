@@ -6,6 +6,8 @@ Implementation plan: https://artifacts.microapps.space/a/saqdh2xm7jcd (revision 
 
 ## Active replacement proposal
 
+The owner requested the v7 discovery recovery at https://artifacts.microapps.space/a/nfnvpkejdb81. Its implementation and Codex-only comparison are in `docs/discovery-recovery/implementation.md`.
+
 The owner requested full implementation of https://artifacts.microapps.space/a/7m9atvt6k7xa. W1 and W2 are deployed. The full W3 measurements, report and archive links are in `docs/next-iteration/implementation.md`. Use Codex only for current model evals at the owner's direction.
 
 The earlier agent-efficiency proposal at https://artifacts.microapps.space/a/npta97dqvf6a shipped in PR #4, including schema 23 for session memo and schema 24 for source recipe receipts. Its ledger is `docs/agent-efficiency/implementation.md`.
@@ -20,7 +22,7 @@ OAuth-app client settings are encrypted, tenant-private and write-only. The regi
 
 ## Status
 
-Current release (2026-11-17): Codemode v6, schema **24**, source **4845aabf3bcc45cbad6a7d58daff59c3ed260c28**, ARM SHA-256 `9ec1fae425d6bbdb2d4f6c394a67b6fa3ff9bcae5bbd85b1ef39f9ae4bab8a01`, UI **5dd5ac2e52f0**. Restored-backup preflight preserved 28 tables. Live eval gate, 84 public UI file checks, and desktop/mobile sign-in pass. See `docs/status.md` and `docs/measurements/next-iteration-release.json`. The schema-20 release below is historical.
+Current release (2026-11-18) is Codemode v7, schema **25**, source **26624ffbf59273cd5912fd9bd5cccd21b2d823ac**, ARM SHA-256 `f6c06c02107a9d7e6bd7f45ec9dc2998b8abda49593976c1f08cb5abfc5469bf`, UI **5dd5ac2e52f0**. Restored-backup preflight preserved 28 tables. Live eval gate, 84 public UI file checks and desktop/mobile sign-in pass. The 120-run standard research cohort scored 119/120. See `docs/status.md`, `docs/discovery-recovery/implementation.md` and `docs/measurements/v7-release.json`.
 
 The final-v5 proposal and all twelve control-plane fixes are implemented and deployed on `oracle-vm` under smdctl, loopback `127.0.0.1:2093`, at `https://codemode.microapps.space`. Historical schema: **20**. Release build: **d45e6106a3a6**, [source commit d45e610](https://github.com/olegpustovit/codemode/commit/d45e6106a3a67a1456975f8421f814cfdb316d70). Release SHA-256: `f03d44a766ad41da3f0f1128a61eb7a26be44c14814f040a9958af4e8e7093f2`. UI fingerprint: **e16dc707d79d**. The React frontend is embedded in this Rust binary.
 

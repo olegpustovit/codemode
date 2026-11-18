@@ -1,6 +1,12 @@
 # Implementation status
 
-## Current release — Codemode v6, schema 24
+## Current release — Codemode v7, schema 25
+
+Deployed on 2026-11-18 at https://codemode.microapps.space from source **26624ffbf59273cd5912fd9bd5cccd21b2d823ac**. Its running ARM SHA-256 is `f6c06c02107a9d7e6bd7f45ec9dc2998b8abda49593976c1f08cb5abfc5469bf` and embedded UI fingerprint is `5dd5ac2e52f0`. The restored-backup preflight preserved 28 tables. The live eval gate passed, all 84 public UI files match staging and desktop/mobile sign-in checks pass. Native and hardened ARM each passed all 157 checks.
+
+In the pinned Codex standard cohort, v7 reduced median MCP calls from v6's 3 to 2, median input from 50,128.5 to 44,235.5 tokens and median wall time from 18.85 to 13.75 s. V7 scored 119/120. One Nudge answer undercounted an issue after receiving the complete data. See [the report](https://artifacts.microapps.space/a/8a6ctgwz8w38), [research archive](https://artifacts.microapps.space/a/e424g392xpcr), [implementation ledger](discovery-recovery/implementation.md) and [release receipt](measurements/v7-release.json).
+
+## Previous release — Codemode v6, schema 24
 
 Deployed on 2026-11-17 at https://codemode.microapps.space from source **4845aabf3bcc45cbad6a7d58daff59c3ed260c28**. Running ARM SHA-256 **9ec1fae425d6bbdb2d4f6c394a67b6fa3ff9bcae5bbd85b1ef39f9ae4bab8a01** and embedded UI **5dd5ac2e52f0** match the staged release. The restored-backup check preserved **28 tables**. Live L1/L2 and **8/8 smoke** passed. Public HTTPS serves **84 matching UI files** and desktop/mobile sign-in passed. Service hardening and the backup timer are active.
 

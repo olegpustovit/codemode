@@ -1,0 +1,60 @@
+{
+  "correctness_pass": false,
+  "failures": [
+    {
+      "task": "nudge-priority-histogram",
+      "repeat": 2,
+      "detail": "truth={'1': 5, '3': 7, '2': 6, '4': 5} got={'1': 5, '2': 6, '3': 6, '4': 5}"
+    }
+  ],
+  "runs": 120,
+  "metrics": {
+    "discovery_executes": 33,
+    "probe_executes": 52,
+    "work_executes": 214,
+    "execute_calls": 299,
+    "discovery_rate": 0.11036789297658862,
+    "probe_rate": 0.17391304347826086,
+    "execute_errors": 13,
+    "execute_errors_followed_by_success": 13,
+    "fresh_after_first_median": 3556.0,
+    "fresh_after_first_coverage": 120,
+    "mcp_calls": 2.0,
+    "wall_s": 13.75,
+    "input_tokens": 44235.5,
+    "uncached_input_tokens": 12858.0,
+    "execute_error_rate": 0.043478260869565216
+  },
+  "targets": {
+    "mcp_calls": {
+      "target": 2,
+      "actual": 2.0,
+      "passed": true
+    },
+    "discovery_rate": {
+      "target": 0.1,
+      "actual": 0.11036789297658862,
+      "passed": false
+    },
+    "probe_rate": {
+      "target": 0.05,
+      "actual": 0.17391304347826086,
+      "passed": false
+    },
+    "wall_s": {
+      "target": 13,
+      "actual": 13.75,
+      "passed": false
+    },
+    "input_tokens": {
+      "target": 40000,
+      "actual": 44235.5,
+      "passed": false
+    },
+    "execute_error_rate": {
+      "target": 0.05,
+      "actual": 0.043478260869565216,
+      "passed": true
+    }
+  }
+}

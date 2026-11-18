@@ -1,0 +1,29 @@
+{
+  "files": 9,
+  "members": 10744,
+  "transcripts": 293,
+  "receipts": 4,
+  "rows": 293,
+  "redactions": 599,
+  "cutoff": "2026-11-18T00:24:38.102871+00:00",
+  "artifact": "https://artifacts.microapps.space/a/e424g392xpcr",
+  "version": 1,
+  "scored_runs": 290,
+  "excluded_warmups": 3,
+  "archives": [
+    {
+      "file": "results-part-001.zip",
+      "stored_file": "results-part-001.zip.txt",
+      "encoding": "base64",
+      "bytes": 1059338,
+      "sha256": "d762a96102319a1f957f6cf8466d111898b21e8c50d298fabb3f0925642fa41a"
+    },
+    {
+      "file": "source-history.zip",
+      "stored_file": "source-history.zip.txt",
+      "encoding": "base64",
+      "bytes": 507420,
+      "sha256": "3584a681c9bfe35108bbcd1059b9183b0878de2b89e9606434d791f2f8f9865c"
+    }
+  ]
+}

@@ -366,7 +366,7 @@ except ToolError:
         outcomes,
         vec![
             ("invalid_args".into(), 6),
-            ("ok".into(), 105),
+            ("ok".into(), 106),
             ("tool_error".into(), 2)
         ]
     );

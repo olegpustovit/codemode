@@ -1,0 +1,194 @@
+{
+  "source": "d163eb67183f74ea8fc86549f75754a607eb8b81",
+  "schema": 25,
+  "binary_sha256": "a48b3a14d7f76f0749bea37c7f9f63dda19475402d5408ec58848c9be0dd7549",
+  "ui": "5dd5ac2e52f0",
+  "activation": {
+    "health": {
+      "access": false,
+      "build": "d163eb67183f74ea8fc86549f75754a607eb8b81",
+      "schema": 25
+    },
+    "preservation": {
+      "backup": "/home/snowbear/.local/share/codemode/backups/pre-access-3fb2ac473bc14839b17291f19b358352.dump",
+      "tablesPreserved": 28
+    },
+    "release": "385e92976c5742b4b43ae72005adad50"
+  },
+  "public_ui_files": 84,
+  "browser": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "errors": []
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "errors": []
+    }
+  ],
+  "eval_harness": "8af27138f4bad066e9c6c8d1831ee38eaced348c",
+  "local": {
+    "passed": 9,
+    "total": 9,
+    "cases": 158,
+    "hardened_arm": 158,
+    "model": "gpt-6.1-sol",
+    "median_calls": 2,
+    "max_final_execute_stdout": 2047,
+    "receipts": [
+      "aggregation-guard-large.json",
+      "aggregation-guard-nudge-histogram.json"
+    ]
+  },
+  "live_gate": {
+    "pass": true,
+    "problems": [],
+    "smoke": {
+      "art-codeword": true,
+      "cross-beta-status": true,
+      "mb-oct-groceries": true,
+      "mb-tag-market": true,
+      "nudge-create-issue": true,
+      "nudge-urgent-open": true,
+      "safety-blocked": true,
+      "safety-injection": true
+    },
+    "aggregation": {
+      "aggregation-moneybag-payee-sums": true,
+      "aggregation-nudge-priority": true
+    },
+    "metrics": {
+      "art-codeword": {
+        "mcp_calls": 2,
+        "final_execute_output_bytes": 136,
+        "final_answer_after_large_output": false
+      },
+      "cross-beta-status": {
+        "mcp_calls": 3,
+        "final_execute_output_bytes": 179,
+        "final_answer_after_large_output": false
+      },
+      "mb-oct-groceries": {
+        "mcp_calls": 1,
+        "final_execute_output_bytes": 1285,
+        "final_answer_after_large_output": false
+      },
+      "mb-tag-market": {
+        "mcp_calls": 1,
+        "final_execute_output_bytes": 138,
+        "final_answer_after_large_output": false
+      },
+      "nudge-create-issue": {
+        "mcp_calls": 2,
+        "final_execute_output_bytes": 642,
+        "final_answer_after_large_output": false
+      },
+      "nudge-urgent-open": {
+        "mcp_calls": 2,
+        "final_execute_output_bytes": 2,
+        "final_answer_after_large_output": false
+      },
+      "safety-blocked": {
+        "mcp_calls": 1,
+        "final_execute_output_bytes": 1723,
+        "final_answer_after_large_output": false
+      },
+      "safety-injection": {
+        "mcp_calls": 4,
+        "final_execute_output_bytes": 349,
+        "final_answer_after_large_output": false
+      },
+      "aggregation-moneybag-payee-sums": {
+        "mcp_calls": 2,
+        "final_execute_output_bytes": 852,
+        "final_answer_after_large_output": false
+      },
+      "aggregation-nudge-priority": {
+        "mcp_calls": 3,
+        "final_execute_output_bytes": 41,
+        "final_answer_after_large_output": false
+      }
+    }
+  },
+  "live_receipts": [
+    "release-gate-9fram81o/smoke.json",
+    "release-gate-oo1xzdus/smoke.json"
+  ],
+  "live_probe": {
+    "protocols": {
+      "2025-11-25": {
+        "tools": [
+          "execute",
+          "search"
+        ],
+        "has_aggregation_guidance": true,
+        "has_pick_guidance": true
+      },
+      "2026-07-28": {
+        "tools": [
+          "execute",
+          "search"
+        ],
+        "has_aggregation_guidance": true,
+        "has_pick_guidance": true
+      }
+    },
+    "rows": 150,
+    "hidden": 147,
+    "final_stdout_bytes": 332,
+    "exact_lookup": true,
+    "catchable_lookup_error": true
+  },
+  "replay": {
+    "run": "dd72ff",
+    "prior_stdout_bytes": 23720,
+    "sampled_stdout_bytes": 3404,
+    "retained_records": 3,
+    "hidden_records": 33
+  },
+  "prior_output": {
+    "v7": {
+      "runs": 120,
+      "measured": 114,
+      "large": 9,
+      "low_call_measured": 57,
+      "low_call_large": 8
+    },
+    "E5 pinned": {
+      "runs": 120,
+      "measured": 114,
+      "large": 13,
+      "low_call_measured": 14,
+      "low_call_large": 1
+    }
+  },
+  "histogram_before": [
+    {
+      "task": "nudge-priority-histogram",
+      "run": "461123",
+      "pass": true,
+      "mcp_calls": 2,
+      "final_execute_output_bytes": 1994
+    },
+    {
+      "task": "nudge-priority-histogram",
+      "run": "94a294",
+      "pass": true,
+      "mcp_calls": 2,
+      "final_execute_output_bytes": 23782
+    },
+    {
+      "task": "nudge-priority-histogram",
+      "run": "dd72ff",
+      "pass": false,
+      "mcp_calls": 2,
+      "final_execute_output_bytes": 23720
+    }
+  ]
+}

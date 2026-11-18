@@ -22,7 +22,7 @@ OAuth-app client settings are encrypted, tenant-private and write-only. The regi
 
 ## Status
 
-Current release (2026-11-18) is Codemode v7, schema **25**, source **26624ffbf59273cd5912fd9bd5cccd21b2d823ac**, ARM SHA-256 `f6c06c02107a9d7e6bd7f45ec9dc2998b8abda49593976c1f08cb5abfc5469bf`, UI **5dd5ac2e52f0**. Restored-backup preflight preserved 28 tables. Live eval gate, 84 public UI file checks and desktop/mobile sign-in pass. The 120-run standard research cohort scored 119/120. See `docs/status.md`, `docs/discovery-recovery/implementation.md` and `docs/measurements/v7-release.json`.
+Current release (2026-11-18) is the Codemode v7 aggregation update, schema **25**, source **d163eb67183f74ea8fc86549f75754a607eb8b81**, ARM SHA-256 `a48b3a14d7f76f0749bea37c7f9f63dda19475402d5408ec58848c9be0dd7549`, UI **5dd5ac2e52f0**. Restored-backup preflight preserved 28 tables. The live eval gate passes 8 standard smoke tasks and 2 first-attempt large aggregation tasks. See `docs/status.md` and `docs/measurements/aggregation-guard-release.json`.
 
 The final-v5 proposal and all twelve control-plane fixes are implemented and deployed on `oracle-vm` under smdctl, loopback `127.0.0.1:2093`, at `https://codemode.microapps.space`. Historical schema: **20**. Release build: **d45e6106a3a6**, [source commit d45e610](https://github.com/olegpustovit/codemode/commit/d45e6106a3a67a1456975f8421f814cfdb316d70). Release SHA-256: `f03d44a766ad41da3f0f1128a61eb7a26be44c14814f040a9958af4e8e7093f2`. UI fingerprint: **e16dc707d79d**. The React frontend is embedded in this Rust binary.
 

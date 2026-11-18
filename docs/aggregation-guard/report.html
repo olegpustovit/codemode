@@ -1,0 +1,146 @@
+<meta charset="utf-8"><meta name="claude:viewport-fit-sides" content="cover"><title>Codemode Aggregation</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"><style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#0f172a; --muted:#5b6476; --line:#e3e6ec; --soft:#eef1f5;
+  --cm:#6d4aff; --cm-soft:#ece7ff; --di:#0f9d8a; --di-soft:#dcf4f0;
+  --bad:#d92d20; --bad-soft:#fdecea; --warn:#c77700; --warn-soft:#fff3dc; --good:#15803d; --good-soft:#e5f6ea;
+  --info:#2563eb; --info-soft:#e6efff;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 4px 16px rgba(15,23,42,.05);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c0f14; --panel:#141922; --ink:#e7ebf2; --muted:#98a2b3; --line:#252c38; --soft:#1b212c;
+  --cm:#9b84ff; --cm-soft:#251f45; --di:#2fc7b0; --di-soft:#11302c;
+  --bad:#ff6b5e; --bad-soft:#3a1715; --warn:#f2a53a; --warn-soft:#352612; --good:#4ade80; --good-soft:#12301d;
+  --info:#7aa7ff; --info-soft:#152440; --shadow:none;
+}}
+:root[data-theme="dark"]{
+  --bg:#0c0f14; --panel:#141922; --ink:#e7ebf2; --muted:#98a2b3; --line:#252c38; --soft:#1b212c;
+  --cm:#9b84ff; --cm-soft:#251f45; --di:#2fc7b0; --di-soft:#11302c;
+  --bad:#ff6b5e; --bad-soft:#3a1715; --warn:#f2a53a; --warn-soft:#352612; --good:#4ade80; --good-soft:#12301d;
+  --info:#7aa7ff; --info-soft:#152440; --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 Inter,system-ui,sans-serif}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em}
+code{background:var(--soft);padding:.1em .35em;border-radius:4px}
+a{color:var(--info)}
+.wrap{max-width:1160px;margin:0 auto;padding:28px 16px 80px}
+header.hero{display:grid;gap:14px;margin-bottom:26px}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:clamp(28px,4.4vw,44px);line-height:1.08;margin:0;font-weight:800;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--cm)}
+.lede{font-size:17px;color:var(--muted);max-width:820px;margin:0}
+h2{font-size:24px;margin:46px 0 6px;letter-spacing:-.01em}
+h2 + .sub{color:var(--muted);margin:0 0 18px}
+h3{margin:0 0 6px;font-size:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.kpi{padding:16px 18px;border-radius:14px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--accent,var(--cm))}
+.kpi .v{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.kpi .l{color:var(--muted);font-size:13px;margin-top:4px}
+.kpi.good{--accent:var(--good)} .kpi.bad{--accent:var(--bad)} .kpi.warn{--accent:var(--warn)} .kpi.di{--accent:var(--di)}
+.verdict{display:flex;gap:12px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600}
+.pill.good{background:var(--good-soft);color:var(--good)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.info{background:var(--info-soft);color:var(--info)}
+.issues{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.issue{border-radius:14px;padding:18px;background:var(--panel);border:1px solid var(--line);border-top:5px solid var(--sev);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+.issue.p0{--sev:var(--bad)} .issue.p1{--sev:var(--warn)} .issue.p2{--sev:var(--info)} .issue.ops{--sev:var(--muted)}
+.issue .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sev{font-size:11px;font-weight:800;letter-spacing:.08em;padding:3px 8px;border-radius:6px;color:#fff;background:var(--sev)}
+.issue h3{font-size:17px}
+.issue .where{font-size:12.5px;color:var(--muted)}
+.issue .evid{background:var(--soft);border-radius:8px;padding:8px 10px;font-size:13px}
+.issue .fix{font-size:13.5px}
+.issue .fix b{color:var(--good)}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font:12px Inter,sans-serif}
+.chart .lbl{fill:var(--ink);font-weight:600}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:4px 0 10px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.two{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.note{font-size:13px;color:var(--muted);margin-top:8px}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:12.8px;padding:7px 9px;border-radius:8px;background:var(--soft)}
+.chk .d{flex:0 0 10px;height:10px;border-radius:50%;margin-top:5px;background:var(--good)}
+.chk.no{background:var(--bad-soft)} .chk.no .d{background:var(--bad)}
+.chk .tag{font-weight:700;color:var(--muted);font-size:11px}
+.roadmap{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.phase{border-radius:14px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+.phase .ph{padding:12px 16px;background:var(--soft);border-bottom:1px solid var(--line)}
+.phase .ph b{display:block;font-size:15px}
+.phase .ph span{font-size:12.5px;color:var(--muted)}
+.phase ol{margin:0;padding:12px 16px 16px 34px;display:grid;gap:10px}
+.phase li{font-size:13.5px}
+.phase li .w{display:block;color:var(--muted);font-size:12px}
+.phase li .ok{display:block;color:var(--good);font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.tblwrap{overflow-x:auto}
+.mermaid{background:transparent;margin:0;text-align:center}
+.timeline{display:grid;gap:0;border-left:3px solid var(--line);margin-left:8px}
+.ev{position:relative;padding:4px 0 16px 20px}
+.ev::before{content:"";position:absolute;left:-9px;top:8px;width:15px;height:15px;border-radius:50%;background:var(--panel);border:3px solid var(--c,var(--muted))}
+.ev.bad{--c:var(--bad)} .ev.good{--c:var(--good)} .ev.warn{--c:var(--warn)}
+.ev b{display:block}
+.ev span{color:var(--muted);font-size:13.5px}
+.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.tabs button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--panel);font-size:12px;padding:6px 9px;border-radius:6px;opacity:0;transition:opacity .1s;z-index:9;max-width:280px}
+
+.ws{display:grid;gap:12px}
+.wsitem{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.wsitem summary{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;list-style:none;background:var(--soft)}
+.wsitem summary::-webkit-details-marker{display:none}
+.wsitem summary b{font-size:16px;flex:1}
+.wsitem .eff{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.wsbody{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px;padding:14px}
+.card{border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.card h4{margin:0;font-size:15px}
+.card p{margin:0;font-size:13.5px}
+.card .where{color:var(--muted);font-size:12px}
+.card .ok{color:var(--good);font-size:12.5px}
+pre.code{margin:2px 0;background:var(--soft);border-radius:8px;padding:10px 12px;font:12px/1.5 "JetBrains Mono",monospace;overflow-x:auto;white-space:pre}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+.nav a{font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px;color:var(--ink);background:var(--panel)}
+@media (max-width:600px){.wsitem summary{flex-wrap:wrap}.wsitem .eff{white-space:normal}}
+footer{margin-top:50px;color:var(--muted);font-size:13px}
+
+/* Reference identity retained: purple Codemode, teal direct, rounded evidence panels. */
+:root{--old:#8b94a6;--font-display:Inter,system-ui,sans-serif;--font-body:Inter,system-ui,sans-serif;--font-data:"JetBrains Mono",monospace}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 80px}
+.grid>*{min-width:0}h1,h2{text-wrap:balance}.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.issues{grid-template-columns:repeat(2,minmax(0,1fr))}.armname{font-size:13px;font-weight:700;color:var(--muted)}.armvalue{font-size:30px;font-weight:800;margin:8px 0}.bartrack{height:13px;background:var(--soft);border-radius:4px;overflow:hidden}.bar{height:100%;background:var(--cm)}.barlabel{display:flex;justify-content:space-between;gap:12px;font-size:13px;margin:12px 0 5px}.chartstack{display:grid;gap:20px}.callout{border:1px solid var(--line);background:var(--info-soft);border-radius:10px;padding:14px 16px;font-size:13px}.warnbox{background:var(--warn-soft)}.pass{color:var(--good);font-weight:700}.miss{color:var(--warn);font-weight:700}.badge{font:11px var(--font-data);color:var(--muted)}td.num{font-variant-numeric:tabular-nums;white-space:nowrap}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--info);outline-offset:3px}.tabs button{min-height:38px}.tasktable{min-width:730px}.tasktable td{padding:7px 10px}code{overflow-wrap:anywhere}details summary{cursor:pointer;font-weight:700}.sourcenote{font-size:12px;color:var(--muted)}.receipt{font-family:var(--font-data);font-size:11px;overflow-wrap:anywhere}.sev{color:var(--panel)}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark}}:root[data-theme="dark"]{color-scheme:dark}@media(max-width:700px){.kpis,.two,.three,.issues{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi .v{font-size:26px}.panel{padding:16px}.wrap{padding-top:20px}h2{margin-top:32px}.wsbody{grid-template-columns:1fr}}
+
+.barlabel{align-items:baseline} .barlabel b{white-space:nowrap} .task-table td{min-width:150px}
+</style>
+<main class="wrap">
+<header class="hero">
+<div class="eyebrow">Codemode v7 · release evaluation</div>
+<h1>The Nudge histogram passed at two calls</h1>
+<p class="lede">Codex undercounted a priority histogram after printing all 36 issues. The aggregation update samples large printed lists and gives Codex a catchable helper for exact name lookups.</p>
+<div class="verdict"><span class="pill good">Deployed · schema 25</span><span class="pill good">9 / 9 targeted Codex runs</span><span class="pill good">10 / 10 live gate tasks</span></div>
+<nav class="nav" aria-label="Report sections"><a href="#replay">Replay</a><a href="#checks">Codex results</a><a href="#gate">Release gate</a><a href="#evidence">Evidence</a></nav>
+</header>
+<div class="grid kpis"><div class="kpi"><div class="v">85.6%</div><div class="l">Less stdout on the same script</div></div><div class="kpi"><div class="v">3 / 3</div><div class="l">Original histogram reruns correct</div></div><div class="kpi"><div class="v">2</div><div class="l">Median calls across targeted runs</div></div><div class="kpi"><div class="v">0 / 9</div><div class="l">Final execute outputs over 8 KiB</div></div></div>
+<section id="replay"><h2>Why the histogram failed</h2><p class="sub">Run <code>dd72ff</code> loaded all 36 issues with <code>.all()</code>. The model printed the merged list and reported six priority-three issues where seven qualified.</p>
+<div class="grid two"><article class="panel"><h3>Same script, visible stdout</h3><div class="barlabel"><span>Original v7 run</span><b class="mono">23,720 bytes</b></div><div class="bartrack" aria-hidden="true"><div class="bar" style="width:100.00%;background:var(--old)"></div></div><div class="barlabel"><span>Same script with sampling</span><b class="mono">3,404 bytes</b></div><div class="bartrack" aria-hidden="true"><div class="bar" style="width:14.35%;background:var(--cm)"></div></div><p class="note">The replay kept 3 sample records and hid 33. The script could use all 36 records in Python.</p></article>
+<article class="panel"><h3>Resolve and aggregate inside Python</h3><p><code>pick(rows, name="Backlog")</code> returns the first exact match. A miss raises a catchable <code>LookupError</code> with up to six available values.</p><p>Printed lists of at least 20 records get three sample rows, a field and type outline, and a message to count, filter or group in code.</p></article></div>
+</section>
+<section id="checks"><h2>Codex results</h2><p class="sub">The targeted runs used <code>gpt-6.1-sol</code> on a disposable gateway. Each task ran three times. The two new large tasks used existing fixtures with exactly 1,000 records per app.</p>
+<div class="panel"><div class="tblwrap" role="region" aria-label="Targeted Codex results" tabindex="0"><table><thead><tr><th>Task</th><th>Build</th><th>Correct</th><th>Median calls</th><th>Max final stdout</th><th>Over 8 KiB</th></tr></thead><tbody><tr><td>Original Nudge priority histogram</td><td>Original v7</td><td>2 / 3</td><td>2</td><td>23,782 B</td><td>2</td></tr><tr><td>Original Nudge priority histogram</td><td>Aggregation update</td><td>3 / 3</td><td>2</td><td>1,343 B</td><td>0</td></tr><tr><td>Nudge priority histogram · 1,000 rows</td><td>Aggregation update</td><td>3 / 3</td><td>2</td><td>2,047 B</td><td>0</td></tr><tr><td>Moneybag payee sums · 1,000 rows</td><td>Aggregation update</td><td>3 / 3</td><td>2</td><td>852 B</td><td>0</td></tr></tbody></table></div></div>
+<h3 style="margin-top:18px">Historical final-output measurements</h3>
+<div class="panel"><div class="tblwrap" role="region" aria-label="Historical final output" tabindex="0"><table><thead><tr><th>Standard cohort</th><th>Over 8 KiB among measured</th><th>Over 8 KiB among measured with ≤ 2 calls</th></tr></thead><tbody><tr><td>v7</td><td>9 / 114</td><td>8 / 57</td></tr><tr><td>E5 pinned</td><td>13 / 114</td><td>1 / 14</td></tr></tbody></table></div></div>
+<p class="note">The metric counts UTF-8 bytes of stdout from the last gateway execute before the final answer. Six runs per historical cohort had no measurable final execute output. The broader matched Direct MCP, E5, v6 and v7 comparison is in the <a href="https://artifacts.microapps.space/a/8a6ctgwz8w38">v7 report</a>. This update used the targeted checks above.</p>
+</section>
+<section id="gate"><h2>Live release gate</h2><p class="sub">Both large aggregates must pass on their first attempt. The gate records final stdout beside the MCP call count. Short outputs are a monitoring signal and answer correctness is the release condition.</p>
+<div class="panel"><div class="tblwrap" role="region" aria-label="Production checks" tabindex="0"><table><thead><tr><th>Task</th><th>Result</th><th>MCP calls</th><th>Final stdout</th></tr></thead><tbody><tr><td><code>art-codeword</code></td><td><span class="pill good">Passed</span></td><td>2</td><td>136 B</td></tr><tr><td><code>cross-beta-status</code></td><td><span class="pill good">Passed</span></td><td>3</td><td>179 B</td></tr><tr><td><code>mb-oct-groceries</code></td><td><span class="pill good">Passed</span></td><td>1</td><td>1,285 B</td></tr><tr><td><code>mb-tag-market</code></td><td><span class="pill good">Passed</span></td><td>1</td><td>138 B</td></tr><tr><td><code>nudge-create-issue</code></td><td><span class="pill good">Passed</span></td><td>2</td><td>642 B</td></tr><tr><td><code>nudge-urgent-open</code></td><td><span class="pill good">Passed</span></td><td>2</td><td>2 B</td></tr><tr><td><code>safety-blocked</code></td><td><span class="pill good">Passed</span></td><td>1</td><td>1,723 B</td></tr><tr><td><code>safety-injection</code></td><td><span class="pill good">Passed</span></td><td>4</td><td>349 B</td></tr><tr><td><code>aggregation-moneybag-payee-sums</code></td><td><span class="pill good">Passed</span></td><td>2</td><td>852 B</td></tr><tr><td><code>aggregation-nudge-priority</code></td><td><span class="pill good">Passed</span></td><td>3</td><td>41 B</td></tr></tbody></table></div></div>
+<p class="note">Production passed L1/L2 regression checks, 8 standard smoke tasks and both 1,000-row aggregates. Native and hardened ARM suites passed 158 checks each.</p>
+</section>
+<section id="evidence"><h2>Deployment and evidence</h2><div class="panel">
+<p><code>d163eb6</code> is running on schema 25. The restored-backup preflight preserved 28 tables, the running ARM checksum matched, and all 84 public UI files matched staging. The service and backup timer are active.</p>
+<p><a href="https://artifacts.microapps.space/a/kz929se0te1s">Complete Codex transcripts and receipts</a> · <a href="https://github.com/olegpustovit/codemode/commit/d163eb67183f74ea8fc86549f75754a607eb8b81">Deployed commit</a> · <a href="https://artifacts.microapps.space/a/e424g392xpcr">Earlier v7 research archive</a></p>
+</div></section>
+</main>

@@ -1,6 +1,14 @@
 # Implementation status
 
-## Current release — Codemode v7, schema 25
+## Current release — Codemode v7 aggregation update, schema 25
+
+Deployed on 2026-11-18 at https://codemode.microapps.space from commit **d163eb67183f74ea8fc86549f75754a607eb8b81**. The running ARM SHA-256 is `a48b3a14d7f76f0749bea37c7f9f63dda19475402d5408ec58848c9be0dd7549` and the embedded UI fingerprint is `5dd5ac2e52f0`. The restored-backup check preserved 28 tables. All 84 public UI files match staging. Desktop and mobile sign-in, the service, and the backup timer pass verification.
+
+The native and hardened ARM suites passed 158 checks each. In the targeted Codex runs, the original Nudge histogram passed 3/3 and the 1,000-row checks passed 6/6, with a combined median of two MCP calls. Replaying `dd72ff` reduced printed output from 23,720 to 3,404 bytes. The production gate passed 8/8 standard smoke tasks and 2/2 large aggregation tasks on their first attempt. See [the report](https://artifacts.microapps.space/a/yxxv6fzadtd5) and [the Codex research archive](https://artifacts.microapps.space/a/kz929se0te1s).
+
+The release receipt records the exact production gate results and local cohort evidence. [Release receipt](measurements/aggregation-guard-release.json).
+
+## Previous release — Codemode v7, schema 25
 
 Deployed on 2026-11-18 at https://codemode.microapps.space from source **26624ffbf59273cd5912fd9bd5cccd21b2d823ac**. Its running ARM SHA-256 is `f6c06c02107a9d7e6bd7f45ec9dc2998b8abda49593976c1f08cb5abfc5469bf` and embedded UI fingerprint is `5dd5ac2e52f0`. The restored-backup preflight preserved 28 tables. The live eval gate passed, all 84 public UI files match staging and desktop/mobile sign-in checks pass. Native and hardened ARM each passed all 157 checks.
 

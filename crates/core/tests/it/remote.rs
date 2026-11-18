@@ -27,6 +27,12 @@ impl Upstream {
         CallToolResult::error(vec![ContentBlock::text("deliberate upstream failure")])
     }
 
+    #[tool(description = "Fixture result with an undeclared object shape")]
+    async fn records(&self) -> CallToolResult {
+        let body = serde_json::json!({"artifacts":[{"id":"sample-id","title":"x".repeat(3000)}]});
+        CallToolResult::success(vec![ContentBlock::text(body.to_string())])
+    }
+
     #[tool(description = "Echo a value", annotations(read_only_hint = true))]
     async fn echo(&self, Parameters(args): Parameters<EchoArgs>) -> CallToolResult {
         CallToolResult::success(vec![ContentBlock::text(
@@ -175,6 +181,25 @@ async fn remote_source_sync_dispatch_and_audit(pool: sqlx::PgPool) {
             .output
             .contains("# prefix: Prefix text; defaults to an empty string.")
     );
+    let printed = execution
+        .execute(
+            principal.clone(),
+            "print(await tools.fixture.records())".into(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(printed.status, "completed", "{:?}", printed.error);
+    let shape = printed.output_shape.as_deref().unwrap();
+    assert!(printed.output.contains("sample-id"));
+    assert!(shape.contains(r#"{"artifacts":[1× (first: "#));
+    assert!(!shape.contains("sample-id"));
+    let scoped = catalogue
+        .search("fixture.records", false, None, None)
+        .await
+        .unwrap();
+    let signature = &scoped.tools[0].signature;
+    assert!(signature.contains(r#"Observed result shape: {"artifacts":[{"id":str,"title":str}]}"#));
+    assert!(!signature.contains("sample-id"));
     let discovery_audit: Vec<(String, String)> =
         sqlx::query_as("SELECT path,outcome FROM tool_calls WHERE execution_id=$1 ORDER BY seq")
             .bind(discovered.execution_id)

@@ -1,5 +1,5 @@
 pub mod log;
-mod shape;
+pub(crate) mod shape;
 pub(crate) mod title;
 use super::{auth::Principal, sources::Sources};
 use crate::infrastructure::{
@@ -41,6 +41,8 @@ pub struct ResultValue {
     pub status: &'static str,
     pub result: Box<RawValue>,
     pub output: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_shape: Option<String>,
     pub result_truncated: bool,
     pub result_dropped_bytes: usize,
     pub output_truncated: bool,
@@ -208,7 +210,8 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
     ) -> Result<ResultValue, Error> {
         use crate::infrastructure::sandbox::Error as SandboxError;
         let mut count = 0;
-        let mut last_reply = None;
+        let mut last_reply = None::<Box<RawValue>>;
+        let mut printed_shape = None;
         let capture = self.sandbox.capture();
         let future = async {
             let allowed = self
@@ -269,6 +272,23 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                             .collect()
                             .await;
                         let next = self.sandbox.resume(run, &results).await;
+                        if printed_shape.is_none() {
+                            let printed = |output: &str| {
+                                results
+                                    .iter()
+                                    .filter(|(id, _)| !internal.contains(id))
+                                    .filter_map(|(_, reply)| reply.as_ref().ok())
+                                    .chain(last_reply.iter())
+                                    .find(|reply| shape::printed_reply(output, reply.get()))
+                            };
+                            let reply = match &next {
+                                Ok((_, Step::Done { output, .. })) => printed(output),
+                                _ => Capture::inspect(&capture, printed),
+                            };
+                            if let Some(reply) = reply {
+                                printed_shape = Some(shape::summarize(reply.get()));
+                            }
+                        }
                         if !matches!(next, Ok((_, Step::Done { .. }))) {
                             // Keep one successful upstream reply, without cloning or parsing it.
                             if let Some(index) = results
@@ -312,6 +332,9 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
                 (RawValue::NULL.to_owned(), output, dropped)
             }
         };
+        if let Some(shape) = &mut printed_shape {
+            shape.truncate(shape.floor_char_boundary(480));
+        }
         let mut tx = self.db.0.begin().await.map_err(DbError::from)?;
         let paths = sqlx::query_scalar!(
             "SELECT path FROM tool_calls WHERE execution_id=$1 ORDER BY seq",
@@ -333,6 +356,7 @@ impl<S: Sandbox + Send + Sync + 'static> Execution<S> {
             status,
             result,
             output,
+            output_shape: printed_shape,
             result_truncated: result_dropped_bytes > 0,
             result_dropped_bytes,
             output_truncated: output_dropped_bytes > 0,

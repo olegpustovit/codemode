@@ -54,7 +54,7 @@ async fn database(pool: &sqlx::PgPool) -> Database {
     let db = Database::connect(pool.connect_options().to_url_lossy().as_str())
         .await
         .unwrap();
-    assert_eq!(db.schema_version(), 24);
+    assert_eq!(db.schema_version(), 25);
     db
 }
 
@@ -362,6 +362,53 @@ mod remote;
 mod stdio;
 
 mod pool;
+
+#[sqlx::test(migrations = "./migrations")]
+async fn discovery_finds_status_prefixes_and_scopes_typo_suggestions(pool: sqlx::PgPool) {
+    let db = database(&pool).await;
+    let workspaces =
+        codemode_core::components::workspaces::Workspaces::new(db.clone(), "test.example".into())
+            .unwrap();
+    workspaces.initialize().await.unwrap();
+    let source: Uuid = sqlx::query_scalar("INSERT INTO sources(slug,python_name,kind,config) VALUES('nudge','nudge','mcp_http','{}') RETURNING id").fetch_one(&pool).await.unwrap();
+    let workspace = workspaces.create("Nudge", &[source]).await.unwrap();
+    let catalogue = Catalogue::new(db);
+    let definitions = [
+        ("list_issue_statuses", "List workflow states for a team."),
+        ("create_issue", "Create an issue with a status ID."),
+    ]
+    .map(|(name, description)| Definition {
+        upstream_name: name.into(),
+        path: format!("nudge.{name}"),
+        description: description.into(),
+        input_schema: serde_json::json!({"type":"object"}),
+        output_schema: None,
+        read_only: true,
+        destructive: false,
+    });
+    catalogue.replace(source, &definitions, 0).await.unwrap();
+    for query in ["nudge status", "nudge list_statuses", "nudge listStatus"] {
+        let page = catalogue
+            .search_scoped(query, false, None, None, Some(workspace))
+            .await
+            .unwrap();
+        assert_eq!(page.tools[0].path, "nudge.list_issue_statuses", "{query}");
+        assert!(page.suggestions.is_empty(), "{query}");
+    }
+    let empty = workspaces.create("Empty", &[]).await.unwrap();
+    for (id, expected) in [
+        (workspace, Some("nudge.list_issue_statuses")),
+        (empty, None),
+    ] {
+        let page = catalogue
+            .search_scoped("nudge.list_isssue_statuses", false, None, None, Some(id))
+            .await
+            .unwrap();
+        assert!(page.tools.is_empty());
+        assert_eq!(page.suggestions.first().map(|m| m.path.as_str()), expected);
+        assert!(page.suggestions.iter().all(|m| m.suggested && !m.blocked));
+    }
+}
 
 #[sqlx::test(migrations = "./migrations")]
 async fn discovery_manifest_prioritizes_useful_entry_points_over_alphabetical_noise(

@@ -97,7 +97,7 @@ fn success(value: &impl serde::Serialize) -> CallToolResult {
 #[tool_router]
 impl Gateway {
     #[tool(
-        description = "Prefer execute for tool lookup and work in one step, using await tools.search('tool_name') inside Python. This search browses tools and saved scripts in the selected workspace. Query one tool name, or join alternatives with OR; other words must all match. Run a saved script with execute(scriptId=its id, args={...}). Each page has ten tool hits; brief gives compact signatures and output keys, full adds complete stubs for the top three. Use the cursor for more tools or refine the query for more than 20 script matches. Blocked tools are marked and cannot be dispatched.",
+        description = "Prefer execute for tool lookup and work in one step, using await tools.search('tool_name') inside Python. This search browses tools and saved scripts in the selected workspace. Search accepts prefixes and split tool names. Join alternatives with OR; other words must all match. Close names are marked as suggestions. Run a saved script with execute(scriptId=its id, args={...}). Each page has ten tool hits; brief gives compact signatures and output keys, full adds complete stubs for the top three. Use the cursor for more tools or refine the query for more than 20 script matches. Blocked tools are marked and cannot be dispatched.",
         annotations(read_only_hint = true)
     )]
     async fn search(

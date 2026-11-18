@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Why v6 Stalled</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f6f3;--fg:#17181a;--mut:#5d6168;--line:#d9dad5;--panel:#fff;--new:#6d4fd8;--old:#8a8d93;--bad:#c2410c;--ok:#15803d;--warn:#b45309;--code:#efefea}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121315;--fg:#e9e9e6;--mut:#9a9ea6;--line:#2b2d31;--panel:#1a1b1e;--new:#9d86ff;--old:#7d8188;--bad:#fb7d4b;--ok:#4ade80;--warn:#f5b545;--code:#202226}}
+:root[data-theme="dark"]{--bg:#121315;--fg:#e9e9e6;--mut:#9a9ea6;--line:#2b2d31;--panel:#1a1b1e;--new:#9d86ff;--old:#7d8188;--bad:#fb7d4b;--ok:#4ade80;--warn:#f5b545;--code:#202226}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 "IBM Plex Sans",system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:40px 16px 80px}
+h1{font-size:clamp(28px,4.4vw,40px);line-height:1.12;margin:8px 0 14px;letter-spacing:-.02em}
+h2{font-size:23px;margin:50px 0 8px}h3{font-size:16px;margin:0 0 6px}
+.kick{font:600 12px/1 "IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.lede{font-size:18px;color:var(--mut);max-width:780px}.mut{color:var(--mut)}
+code{font-family:"IBM Plex Mono",monospace;font-size:.88em;background:var(--code);padding:1px 5px}
+pre{background:var(--code);padding:14px;overflow-x:auto;font:13px/1.5 "IBM Plex Mono",monospace;border-left:3px solid var(--line)}
+.grid{display:grid;gap:14px}.g2{grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}.g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.box{background:var(--panel);border:1px solid var(--line);padding:18px}
+.rc{border-left:4px solid var(--bad)}.win{border-left:4px solid var(--ok)}
+.stat{font:600 30px/1.1 "IBM Plex Mono",monospace}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.05em}.tw{overflow-x:auto}
+.num{font-family:"IBM Plex Mono",monospace;text-align:right}
+.up{color:var(--bad);font-weight:600}.dn{color:var(--ok);font-weight:600}
+svg text{fill:var(--fg);font-family:"IBM Plex Mono",monospace}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--mut);flex-wrap:wrap}.legend i{display:inline-block;width:11px;height:11px;margin-right:6px}
+.budget{display:flex;height:40px;margin:10px 0}.budget span{display:flex;align-items:center;justify-content:center;color:#fff;font:600 12px "IBM Plex Mono",monospace;overflow:hidden;white-space:nowrap}
+footer{margin-top:56px;color:var(--mut);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body><main>
+<div class="kick">Codemode v6 · post-mortem · 17 Nov 2026</div>
+<h1>v6 worked on Moneybag and broke on Nudge. The cause is one starved manifest plus a search that can't find "status".</h1>
+<p class="lede">The headline medians hide a split. Tasks whose tools fit in the new signature manifest got much cheaper. Nudge and cross-app tasks lost their status tool from the manifest. The model then guessed names that full-text search cannot match, and looped.</p>
+
+<h2>The split, by app</h2>
+<p class="mut">Codemode arm medians per task. E5 = previous release (deferral off), v6 = W2 standard cohort.</p>
+<div class="tw"><table>
+<tr><th>App tasks</th><th class="num">Calls E5 → v6</th><th class="num">Input tokens E5 → v6</th><th class="num">Wall s E5 → v6</th></tr>
+<tr><td>Moneybag (27 runs)</td><td class="num">3 → <span class="dn">2</span></td><td class="num">49.2k → <span class="dn">37.0k</span></td><td class="num">17.9 → <span class="dn">14.4</span></td></tr>
+<tr><td>Artifacts (24)</td><td class="num">3.5 → 3</td><td class="num">52.0k → 49.0k</td><td class="num">16.3 → 17.8</td></tr>
+<tr><td>Nudge (42)</td><td class="num">3.5 → <span class="up">5</span></td><td class="num">56.6k → <span class="up">83.7k</span></td><td class="num">18.7 → <span class="up">24.4</span></td></tr>
+<tr><td>Cross-app (12)</td><td class="num">3.5 → <span class="up">6.5</span></td><td class="num">61.1k → <span class="up">110.4k</span></td><td class="num">17.5 → <span class="up">27.0</span></td></tr>
+</table></div>
+<p>Moneybag shows the design works: <code>mb-oct-groceries</code>, <code>mb-sept-groceries</code>, <code>mb-create-account</code> and <code>mb-bulk-payees</code> are now <b>one call</b>. Nudge and cross-app make up 54 of the 120 runs, so their regression cancels the gain in the pooled median.</p>
+
+<h2>Root cause 1: the manifest budget is first come, first served</h2>
+<div class="grid g2">
+<div class="box rc">
+<p><code>catalogue.rs manifest()</code> walks sources <b>alphabetically</b>, and each source may take whatever remains of the 3,072-byte budget. Artifacts and Moneybag go first and get 5 signatures each. Nudge comes last and its signatures are long (<code>create_issue</code> has about 10 args), so it gets only 3: <code>list_issues</code>, <code>get_issue</code>, <code>list_teams</code>.</p>
+<p><code>list_issue_statuses</code> and <code>create_issue</code> are cut. Yet almost every Nudge task needs a status ID.</p>
+</div>
+<div class="box">
+<h3>Manifest bytes, v6 (measured 2,784 B)</h3>
+<div class="budget"><span style="width:40%;background:var(--old)">artifacts · 5</span><span style="width:37%;background:var(--new)">moneybag · 5</span><span style="width:23%;background:var(--bad)">nudge · 3</span></div>
+<p class="mut" style="font-size:14px">Split is illustrative; source and tool counts are from the v6 report. E5 listed <b>names only</b>, five per source, so <code>list_issue_statuses</code> was visible and the model searched for it by its exact name.</p>
+</div>
+</div>
+
+<h2>Root cause 2: search has no stemming, so guessed names miss</h2>
+<p>With the tool gone from view, the model guessed. The catalogue uses <code>websearch_to_tsquery('simple', …)</code>, which matches whole tokens only. <code>status</code> never matches <code>statuses</code>, and made-up names like <code>list_statuses</code> match nothing.</p>
+<div class="grid g2">
+<div class="box">
+<h3>Status searches in v6, and whether the result contained <code>list_issue_statuses</code></h3>
+<svg id="hits" viewBox="0 0 460 250" width="100%" role="img" aria-label="Search hit rates"></svg>
+<div class="legend"><span><i style="background:var(--bad)"></i>miss</span><span><i style="background:var(--ok)"></i>hit</span></div>
+</div>
+<div class="box">
+<h3>Searches per Nudge run: E5 1.1 → v6 2.8</h3>
+<p>The top v6 query, <code>nudge status</code>, was sent 35 times and found the tool <b>0 times</b>. A miss doesn't end with an error. The model gets back a plausible-looking list (<code>create_issue</code> first, because its description says "status") and tries again.</p>
+<p>A typical run, <code>nudge-backlog-count</code>, took 7 executes and 145k tokens, against 4 calls and 59k in E5: list teams → search "nudge status" → probe issues → search "nudge" → get_team → search 3 invented names → work.</p>
+</div>
+</div>
+
+<h2>Root cause 3: probes didn't go away</h2>
+<p>Raw <code>print(...)</code> executes per run barely moved: Artifacts 2.9 → 2.8, Nudge 2.1 → 2.1, cross-app 2.0 → 4.1. W2's shape feedback only fires <b>after</b> a key, type or index error, and models print before they index. Artifacts' list tool declares a generic object, so its skeleton just says <code>dict</code> and gives the model nothing to go on.</p>
+
+<h2>Confounders: why wall time looks worse than the mechanism suggests</h2>
+<ul>
+<li><b>The model changed.</b> E5 ran "codex default". v6 pins <code>gpt-6.1-sol</code>. The time and token deltas are not a same-model comparison.</li>
+<li><b>Jobs and cache setup changed.</b> v6 adds warm-up and blocked arms, and the cache ratio rose from 73.2% to 78.2%. Uncached comparisons are not like for like.</li>
+<li>The new direct arm is the Codex host, now at 19.8 s. v6 at 19.3 s is roughly level with it, not behind.</li>
+</ul>
+
+<h2>What actually won (worth saying out loud)</h2>
+<div class="grid g4">
+<div class="box win"><div class="kick">vs raw MCP · 1k rows</div><div class="stat">13× cheaper</div><p class="mut">$0.036 vs $0.47–0.92, 30/30 correct. This is the first time raw MCP has been measured.</p></div>
+<div class="box win"><div class="kick">vs Codex host · 1k</div><div class="stat">0.56×</div><p class="mut">Cheaper than client-side code mode, with 3 calls vs 7.</p></div>
+<div class="box win"><div class="kick">raw MCP · 5k Nudge</div><div class="stat">0/15</div><p class="mut">Raw MCP can't do it at all; Codemode got 29/30.</p></div>
+<div class="box win"><div class="kick">Moneybag standard</div><div class="stat">−25% tokens</div><p class="mut">Calls 3 → 2, with several tasks at 1 call.</p></div>
+</div>
+
+<h2>Fixes, smallest first</h2>
+<div class="tw"><table>
+<tr><th>#</th><th>Change</th><th>Where</th><th>Size</th></tr>
+<tr><td>1</td><td><b>Fair manifest budget.</b> Split 3,072 B evenly across sources, or fill round-robin by rank, so every source gets its top tools. Add <b>bare names</b> for ranked tools that miss the cut ("also: list_issue_statuses, create_issue"). Names are cheap and were enough in E5.</td><td><code>catalogue.rs:226–250</code></td><td>~20 lines + test asserting every source gets ≥ its rank-0–2 tools</td></tr>
+<tr><td>2</td><td><b>Forgiving search.</b> Match terms as prefixes (<code>status:*</code>), and split identifiers so <code>list_statuses</code> → <code>list &amp; status:*</code>. When nothing matches, return nearest-name suggestions (trigram on <code>path</code>, already used for unknown-tool errors) instead of an unrelated list.</td><td><code>catalogue.rs:167–168</code>, <code>stubs.rs search_words</code></td><td>query builder + 2 regression cases (<code>nudge status</code>, <code>nudge list_statuses</code>)</td></tr>
+<tr><td>3</td><td><b>Shape before the model asks.</b> When an execute prints a raw tool reply over ~2 KB, append its shape skeleton. Learn skeletons for generic-<code>dict</code> tools from the first live reply.</td><td><code>execution/shape.rs</code>, output path</td><td>small; reuses <code>summarize()</code></td></tr>
+<tr><td>4</td><td><b>Same-model A/B.</b> Rerun E5's binary with pinned <code>gpt-6.1-sol</code>, blocked arms and warm-up before judging time.</td><td><code>codemode-evals</code></td><td>config only</td></tr>
+</table></div>
+<p class="mut">Expected if 1 and 2 land: Nudge and cross-app move back to at least E5 levels while Moneybag keeps its gains. That alone should bring the pooled medians to about 2–2.5 calls and well under 50k tokens. This is an estimate; check it with a Nudge-only 42-run cohort first, since that is a cheap signal.</p>
+
+<footer>Evidence: <code>codemode-evals/results/next-w2-codex-standard.json</code> (20261117T210531Z, all 120 codemode transcripts read), <code>next-w1-codex-standard.json</code>, <code>agent-efficiency-e5-matched-full.json</code>; gateway <code>4845aab</code> <code>catalogue.rs</code>. The search hit/miss counts check whether the tool path appeared in that execute's output. Report: <a href="https://artifacts.microapps.space/a/ny3vep8ck2c7">ny3vep8ck2c7</a> · Proposal: <a href="https://artifacts.microapps.space/a/7m9atvt6k7xa">7m9atvt6k7xa</a>.</footer>
+</main>
+<script>
+(function(){var d=[['nudge status',35,0],['nudge list_issue_statuses',8,8],['nudge create_issue OR nudge list_statuses',8,0],['list_issue_statuses',7,7],['nudge list_statuses',6,0],['nudge list_statuses OR nudge list_issues',5,0],['nudge statuses',5,5],['nudge list_status',4,0]],s='';
+d.forEach(function(r,i){var y=6+i*30,w=r[1]/35*170,h=r[2]/35*170;s+='<text x="0" y="'+(y+14)+'" font-size="10.5">'+r[0].slice(0,34)+'</text><rect x="250" y="'+y+'" width="'+w+'" height="20" fill="var(--bad)"/><rect x="250" y="'+y+'" width="'+h+'" height="20" fill="var(--ok)"/><text x="'+(256+w)+'" y="'+(y+14)+'" font-size="11">'+r[2]+'/'+r[1]+'</text>'});
+document.getElementById('hits').innerHTML=s})();
+</script>
+</body></html>

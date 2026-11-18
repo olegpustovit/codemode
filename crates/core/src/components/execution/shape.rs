@@ -3,10 +3,23 @@ use serde::de::{DeserializeSeed, Deserializer, IgnoredAny, MapAccess, SeqAccess,
 use std::fmt;
 
 pub(super) fn summarize(raw: &str) -> String {
+    describe(raw, false)
+}
+
+pub(crate) fn learned(raw: &str) -> Option<String> {
+    if !raw.starts_with('{') {
+        return None;
+    }
+    let shape = describe(raw, true);
+    (shape != "{}" && shape != "unknown" && shape.len() <= 512).then_some(shape)
+}
+
+fn describe(raw: &str, learned: bool) -> String {
     let mut nodes = 0;
     Shape {
         depth: 0,
         nodes: &mut nodes,
+        learned,
     }
     .deserialize(&mut serde_json::Deserializer::from_str(raw))
     .unwrap_or_else(|_| "unknown".into())
@@ -15,6 +28,7 @@ pub(super) fn summarize(raw: &str) -> String {
 struct Shape<'a> {
     depth: usize,
     nodes: &'a mut usize,
+    learned: bool,
 }
 impl<'de> DeserializeSeed<'de> for Shape<'_> {
     type Value = String;
@@ -54,6 +68,7 @@ impl<'de> Visitor<'de> for Shape<'_> {
         let first = seq.next_element_seed(Shape {
             depth: self.depth + 1,
             nodes: self.nodes,
+            learned: self.learned,
         })?;
         let Some(first) = first else {
             return Ok("[]".into());
@@ -62,17 +77,22 @@ impl<'de> Visitor<'de> for Shape<'_> {
         while seq.next_element::<IgnoredAny>()?.is_some() {
             count += 1;
         }
-        Ok(format!("[{count}× (first: {first})]"))
+        Ok(if self.learned {
+            format!("[{first}]")
+        } else {
+            format!("[{count}× (first: {first})]")
+        })
     }
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<String, A::Error> {
         let mut fields = Vec::new();
         while fields.len() < 6 && *self.nodes < 32 {
-            let Some(key) = map.next_key_seed(Key)? else {
+            let Some(key) = map.next_key_seed(Key(self.learned))? else {
                 return Ok(format!("{{{}}}", fields.join(",")));
             };
             let value = map.next_value_seed(Shape {
                 depth: self.depth + 1,
                 nodes: self.nodes,
+                learned: self.learned,
             })?;
             fields.push(format!("{key}:{value}"));
         }
@@ -88,7 +108,7 @@ impl<'de> Visitor<'de> for Shape<'_> {
     }
 }
 
-struct Key;
+struct Key(bool);
 impl<'de> DeserializeSeed<'de> for Key {
     type Value = String;
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<String, D::Error> {
@@ -101,9 +121,46 @@ impl Visitor<'_> for Key {
         f.write_str("object key")
     }
     fn visit_str<E>(self, key: &str) -> Result<String, E> {
+        if self.0
+            && (key.len() > 32
+                || !key.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+                || !key.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_'))
+        {
+            return Ok("…".into());
+        }
         let short: String = key.chars().take(32).collect();
         Ok(serde_json::to_string(&short).unwrap_or_else(|_| "?".into()))
     }
+}
+
+pub(super) fn printed_reply(output: &str, raw: &str) -> bool {
+    const MIN_REPLY_BYTES: usize = 2048;
+    const PREFIX: usize = 64;
+    if output.len() < MIN_REPLY_BYTES || raw.len() < MIN_REPLY_BYTES || !raw.starts_with(['{', '['])
+    {
+        return false;
+    }
+    fn significant(text: &str) -> impl Iterator<Item = u8> + '_ {
+        text.bytes()
+            .filter(|byte| !byte.is_ascii_whitespace())
+            .map(|byte| {
+                if byte == b'\'' {
+                    b'"'
+                } else {
+                    byte.to_ascii_lowercase()
+                }
+            })
+    }
+    // shortcut: recognize verbatim JSON and normal Python container prints
+    // by their prefix; extend only if clients format the same payload differently.
+    output
+        .lines()
+        .filter(|line| line.len() >= MIN_REPLY_BYTES)
+        .any(|line| {
+            significant(line)
+                .take(PREFIX)
+                .eq(significant(raw).take(PREFIX))
+        })
 }
 
 #[cfg(test)]

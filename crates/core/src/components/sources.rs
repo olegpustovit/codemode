@@ -616,7 +616,7 @@ impl Sources {
                     let server=server_url.as_ref().ok_or(Error::Config("OpenAPI server is not pinned".into()))?;
                     let loaded=self.load_openapi(url.clone(),Some(server.clone()),alias.clone()).await?;
                     let compiled=loaded.operations.into_iter().map(|operation| {Ok(Tool {
-                        source_id:record.id,revision:record.revision,definition:operation.definition.clone(),validator:operation.validator.clone(),
+                        source_id:record.id,revision:record.revision,observed:Arc::default(),definition:operation.definition.clone(),validator:operation.validator.clone(),
                         omit_null:Arc::new(super::broker::optional_nonnullable(&operation.definition.input_schema).map_err(|_|Error::Upstream)?),
                         target:Target::OpenApi {operation:Arc::new(operation),client:loaded.client.clone(),server:loaded.server.clone(),required:record.source.requires_account},
                     })}).collect::<Result<Vec<_>,Error>>()?;
@@ -628,7 +628,7 @@ impl Sources {
                         let definition=kind.definition(&alias);
                         let omit_null=Arc::new(super::broker::optional_nonnullable(&definition.input_schema).map_err(|_|Error::Upstream)?);
                         let validator=jsonschema::validator_for(&definition.input_schema).map_err(|_|Error::Config("invalid GraphQL input schema".into()))?;
-                        Ok(Tool {source_id:record.id,revision:record.revision,definition,validator:Arc::new(validator),omit_null,target:Target::Graphql {kind,client:client.clone(),url:url.clone(),required:record.source.requires_account}})
+                        Ok(Tool {source_id:record.id,revision:record.revision,observed:Arc::default(),definition,validator:Arc::new(validator),omit_null,target:Target::Graphql {kind,client:client.clone(),url:url.clone(),required:record.source.requires_account}})
                     }).collect::<Result<Vec<_>,Error>>()?;
                     return self.publish(&record,compiled).await;
                 }
@@ -768,6 +768,7 @@ impl Sources {
             compiled.push(Tool {
                 source_id: record.id,
                 revision: record.revision,
+                observed: Arc::default(),
                 definition,
                 validator: Arc::new(validator),
                 omit_null,

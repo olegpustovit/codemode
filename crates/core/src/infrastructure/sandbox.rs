@@ -734,6 +734,12 @@ impl Capture {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .append(text);
     }
+    pub(crate) fn inspect<T>(output: &Arc<Mutex<Self>>, read: impl FnOnce(&str) -> T) -> T {
+        let capture = output
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        read(&capture.text)
+    }
     pub(crate) fn snapshot(output: &Arc<Mutex<Self>>) -> (String, usize) {
         let output = output
             .lock()

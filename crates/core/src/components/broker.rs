@@ -4,7 +4,7 @@ pub(crate) const MEMO_PATH: &str = "@codemode/memo";
 pub(crate) const UNKNOWN_PATH: &str = "@codemode/unknown";
 use super::{
     accounts::Accounts,
-    catalogue::Definition,
+    catalogue::{Catalogue, Definition},
     policies::{Action, Policies},
     workspaces::Workspaces,
 };
@@ -19,7 +19,10 @@ use rmcp::{
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::{Value, value::RawValue};
 use std::{
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 use uuid::Uuid;
@@ -50,6 +53,7 @@ pub struct Tool {
     pub(crate) validator: Arc<jsonschema::Validator>,
     pub(crate) omit_null: Arc<std::collections::BTreeSet<String>>,
     pub(crate) target: Target,
+    pub(crate) observed: Arc<AtomicBool>,
 }
 #[derive(Clone)]
 pub(crate) enum Target {
@@ -141,8 +145,35 @@ impl Broker {
             )
             .await
             .map_err(|error| CallError::Invalid(error.to_string()))?;
-        serde_json::value::to_raw_value(&page.tools)
-            .map_err(|_| CallError::Upstream("could not encode search results".into()))
+        serde_json::value::to_raw_value(if page.tools.is_empty() {
+            &page.suggestions
+        } else {
+            &page.tools
+        })
+        .map_err(|_| CallError::Upstream("could not encode search results".into()))
+    }
+
+    async fn observe_shape(&self, tool: &Tool, reply: &RawValue) {
+        let generic = tool.definition.output_schema.as_ref().is_none_or(|schema| {
+            schema
+                .get("properties")
+                .and_then(Value::as_object)
+                .is_none_or(|keys| keys.is_empty())
+                && schema.get("$ref").is_none()
+                && schema.get("anyOf").is_none()
+        });
+        if !generic || tool.observed.load(Ordering::Relaxed) {
+            return;
+        }
+        if let Some(shape) = super::execution::shape::learned(reply.get())
+            && !tool.observed.swap(true, Ordering::Relaxed)
+            && let Err(error) = Catalogue::new(self.db.clone())
+                .remember_shape(tool.source_id, tool.revision, &tool.definition.path, &shape)
+                .await
+        {
+            tool.observed.store(false, Ordering::Relaxed);
+            tracing::warn!(?error, "could not save observed tool shape");
+        }
     }
 
     pub async fn dispatch(
@@ -239,13 +270,18 @@ impl Broker {
                                         Err(CallError::Blocked(unavailable(&call.path, workspace)))
                                     }
                                     Ok(Action::Allow) => {
-                                        tool.call(
-                                            args,
-                                            timeout,
-                                            &self.account_link(tool.source_id),
-                                            &self.accounts,
-                                        )
-                                        .await
+                                        let reply = tool
+                                            .call(
+                                                args,
+                                                timeout,
+                                                &self.account_link(tool.source_id),
+                                                &self.accounts,
+                                            )
+                                            .await;
+                                        if let Ok(value) = &reply {
+                                            self.observe_shape(&tool, value).await;
+                                        }
+                                        reply
                                     }
                                     Err(_) => Err(CallError::Blocked(
                                         "policy unavailable; tool was not called".into(),

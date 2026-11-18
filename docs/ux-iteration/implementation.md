@@ -43,6 +43,7 @@ Wave 4 adds migration 0027 for global scripts, provenance, and explicit per-toke
 | Workspace menu close | [#8](https://github.com/olegpustovit/codemode/pull/8) | `0cc97086970c23acd99f68e0463f4f79bbfbff92` | 27 |
 | Named motion markers | [#8](https://github.com/olegpustovit/codemode/pull/8) | `cdc5d9bf9fd7d198efc6c2e0848f491e0ef0b801` | 27 |
 | Layout follow-up | [#8](https://github.com/olegpustovit/codemode/pull/8) | `fca4df1112c03811692b3b83e73c0a511777a41e` | 27 |
+| Mobile rail | [#8](https://github.com/olegpustovit/codemode/pull/8) | `c147bb0fc1278d76710e538868f24bd9477107c4` | 27 |
 
 All four restored-backup checks preserved 28 pre-existing tables. Each live Codex gate passed eight smoke tasks and two large aggregation tasks. Wave 4 additionally passed the live agent save and replay task in three MCP calls. Local qualification passed 163 native cases, 39 UI tests and seven targeted optimized-binary Chromium workflows. All 83 public UI files match staging. The initial Wave 4 release used UI fingerprint `19fb5b05d5e3`.
 
@@ -69,3 +70,5 @@ The fixture capture suite measured app and prototype boxes at both requested siz
 The layout follow-up fills the empty grid body and updates the Scripts description to explain workspace and global scope. The desktop empty-state box matches the prototype at 1440×900. The prototype motion and script scope promotion workflows both passed against the debug gateway with the production UI bundle. The mobile rail follows the written plan, leaving a 32 px difference from the prototype. The remaining visual qualification limits are listed above.
 
 The layout release preserved 28 tables in the restored-backup preflight, matched all 84 public UI assets to staging and passed all 11 live Codex cases. UI fingerprint `3069a6b05606`, ARM SHA-256 `ef3ac8704ceb28d61c84d179fe43d97940d73fa1efc16e8eff68b5281fe44361`.
+
+The mobile rail release restores the prototype’s collapse control and Backslash shortcut in the horizontal layout. The rail measures 85 px in both states at 390×844. All eight measured boxes in the empty scene match at 390×844 and 1440×900. The production UI bundle passed all 40 UI tests and all 15 Chromium workflows against the debug gateway, including reduced motion and keyboard expansion on mobile. The restored-backup preflight preserved 28 tables, all 84 public UI assets matched staging and all 11 live Codex cases passed. UI fingerprint `d6a55dc2f4a9`, ARM SHA-256 `ad43ff2f55262458587d3ad6685c7d09f75e43deb4ffbc4592b154476a59c7e9`.

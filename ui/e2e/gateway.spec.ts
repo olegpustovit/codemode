@@ -3473,6 +3473,10 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page.getByRole("link", { name: "Integrations", exact: true }).click()
   await expect.poll(types).toContain("down")
   await expectPlayedTransition(page, "down", "codemode-settle-up")
+  // The heading must travel in the page snapshot so it enters with its content.
+  await expect(
+    page.getByRole("heading", { name: "Integrations", exact: true })
+  ).toHaveCSS("view-transition-name", "none")
   const integrationsGrid = page.getByRole("grid", { name: "Integrations", exact: true })
   await integrationsGrid.focus()
   const cursorPulse = await integrationsGrid.evaluate((grid) => {

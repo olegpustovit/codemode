@@ -841,7 +841,6 @@ mark {
 
 :root { --enter: .42s; --exit: .16s; --e-soft: cubic-bezier(.22, 1, .36, 1); --drift: 8px; }
 .app-shell .work-area { view-transition-name: main; }
-.app-shell .work-area .list-heading h1 { view-transition-name: page-title; }
 .section-link { isolation: isolate; }
 .section-link[aria-current="page"] { background: transparent; }
 .section-link[aria-current="page"]::before { display: none; }
@@ -855,15 +854,10 @@ mark {
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
 :active-view-transition-type(down)::view-transition-new(main) { animation: codemode-settle-up var(--enter) var(--e-soft) 50ms both; }
 :active-view-transition-type(up)::view-transition-new(main) { animation: codemode-settle-down var(--enter) var(--e-soft) 50ms both; }
-:active-view-transition-type(down)::view-transition-new(page-title),
-:active-view-transition-type(up)::view-transition-new(page-title) { animation: codemode-title-in var(--enter) var(--e-soft) both; }
-:active-view-transition-type(down)::view-transition-group(page-title),
-:active-view-transition-type(up)::view-transition-group(page-title) { animation: none; }
 @keyframes codemode-fade-out { to { opacity: 0; } }
 @keyframes codemode-fade-in { from { opacity: 0; } }
 @keyframes codemode-settle-up { from { opacity: 0; transform: translateY(var(--drift)); } }
 @keyframes codemode-settle-down { from { opacity: 0; transform: translateY(calc(-1 * var(--drift))); } }
-@keyframes codemode-title-in { from { opacity: 0; letter-spacing: .03em; } }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

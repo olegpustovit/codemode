@@ -13,7 +13,11 @@ export function renderBackdrop(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   initial: BackdropState,
   paintHue: (hue: string) => void,
-  limitSoftware: boolean
+  limitSoftware: boolean,
+  softwareScheduler?: {
+    request(callback: FrameRequestCallback): number
+    cancel(id: number): void
+  }
 ) {
   let state = initial
   const gl = canvas.getContext("webgl", {
@@ -25,8 +29,13 @@ export function renderBackdrop(
   const program = gl.createProgram()
   const buffer = gl.createBuffer()
   let raf = 0
+  let scheduler = {
+    request: (callback: FrameRequestCallback) =>
+      requestAnimationFrame(callback),
+    cancel: (id: number) => cancelAnimationFrame(id),
+  }
   const release = () => {
-    cancelAnimationFrame(raf)
+    scheduler.cancel(raf)
     shaders.forEach((shader) => gl.deleteShader(shader))
     gl.deleteBuffer(buffer)
     gl.deleteProgram(program)
@@ -81,12 +90,14 @@ export function renderBackdrop(
     ? String(gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL))
     : ""
   const software = /swiftshader|llvmpipe|software rasterizer/i.test(renderer)
+  if (software && softwareScheduler) scheduler = softwareScheduler
+  const frameInterval = 1000 / 24
   let paintedAt = -Infinity
   const frame = (now: number) => {
     raf = 0
     if (!state.visible) return
-    if (software && !state.reduced && now - paintedAt < 1000 / 24) {
-      raf = requestAnimationFrame(frame)
+    if (software && !state.reduced && now - paintedAt < frameInterval) {
+      raf = scheduler.request(frame)
       return
     }
     paintedAt = now
@@ -105,10 +116,10 @@ export function renderBackdrop(
     gl.uniform1f(time, state.reduced ? 20 : (now - started) / 1000)
     gl.uniform3f(hue, current[0], current[1], current[2])
     gl.drawArrays(gl.TRIANGLES, 0, 3)
-    if (!state.reduced) raf = requestAnimationFrame(frame)
+    if (!state.reduced) raf = scheduler.request(frame)
   }
   const kick = () => {
-    if (!raf && state.visible) raf = requestAnimationFrame(frame)
+    if (!raf && state.visible) raf = scheduler.request(frame)
   }
   const size = () => {
     const scale = software && limitSoftware ? 0.4 : state.scale
@@ -119,7 +130,7 @@ export function renderBackdrop(
     kick()
   }
   const visibility = () => {
-    cancelAnimationFrame(raf)
+    scheduler.cancel(raf)
     raf = 0
     previous = performance.now()
     paintedAt = -Infinity

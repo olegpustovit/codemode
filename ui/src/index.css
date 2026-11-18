@@ -83,7 +83,7 @@
   /* space */
   --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px; --s-8:72px;
   /* layout */
-  --bar:48px; --status:30px; --side:228px; --detail:392px; --row:40px;
+  --bar:48px; --status:30px; --side:228px; --detail:392px; --row:40px; --data-group-height:34px;
   /* light */
   --glow-1:0 0 6px rgba(var(--hue), 0.45);
   --glow-2:0 0 16px rgba(var(--hue), 0.4);
@@ -274,8 +274,8 @@
 .data-name span { overflow: hidden; text-overflow: ellipsis; }
 .data-row:hover { background: var(--c-hover); }
 .data-row[aria-selected="true"] .data-name span { text-shadow: var(--glow-1); }
-.data-group { height: 34px; display: flex; align-items: flex-end; padding: 0 var(--s-5) 6px; border-bottom: 1px solid var(--c-line); font: var(--w-med) var(--fs-1)/1 var(--f-ui); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--c-text-3); }
-.data-cursor { position: absolute; left: 0; right: 0; top: 0; pointer-events: none; background: linear-gradient(90deg,rgba(var(--hue), 0.12), transparent 70%);
+.data-group { height: var(--data-group-height); display: flex; align-items: flex-end; padding: 0 var(--s-5) 6px; border-bottom: 1px solid var(--c-line); font: var(--w-med) var(--fs-1)/1 var(--f-ui); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--c-text-3); }
+.data-cursor { height: var(--row); position: absolute; left: 0; right: 0; top: 0; pointer-events: none; background: linear-gradient(90deg,rgba(var(--hue), 0.12), transparent 70%);
 }
 .data-grid:focus .data-cursor::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--c-accent-text); box-shadow: var(--glow-1); }
 .vendor-glyph { width: 16px; height: 16px; flex: none; }

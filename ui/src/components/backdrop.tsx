@@ -2,6 +2,10 @@ import { useEffect, useRef } from "react"
 import { useRouterState } from "@tanstack/react-router"
 import { renderBackdrop } from "./backdrop-renderer"
 import type { BackdropState } from "./backdrop-renderer"
+import type {
+  BackdropWorkerReply,
+  BackdropWorkerRequest,
+} from "./backdrop.worker"
 
 const hues = {
   sessions: [0.12, 0.26, 0.8],
@@ -52,6 +56,23 @@ export function Backdrop() {
     const paintHue = (hue: string) =>
       document.documentElement.style.setProperty("--hue", hue)
     let worker: Worker | undefined
+    let admission: number | undefined
+    const cancelAdmission = () => {
+      if (admission !== undefined) cancelIdleCallback(admission)
+      admission = undefined
+    }
+    const send = (
+      message: BackdropWorkerRequest,
+      transfer: Transferable[] = []
+    ) => worker?.postMessage(message, transfer)
+    const admitFrame = (frame: number) => {
+      cancelAdmission()
+      admission = requestIdleCallback((deadline) => {
+        admission = undefined
+        if (deadline.timeRemaining() < 8) admitFrame(frame)
+        else send({ frame })
+      })
+    }
     let local: ReturnType<typeof renderBackdrop> = null
     const loseLocalContext = () => {
       local?.dispose()
@@ -71,6 +92,7 @@ export function Backdrop() {
       })
     }
     const fallback = () => {
+      cancelAdmission()
       worker?.terminate()
       worker = undefined
       const replacement = document.createElement("canvas")
@@ -80,7 +102,7 @@ export function Backdrop() {
     }
     const sync = () => {
       const next = state()
-      if (worker) worker.postMessage({ state: next })
+      if (worker) send({ state: next })
       else local?.update(next)
     }
     wake.current = sync
@@ -92,9 +114,10 @@ export function Backdrop() {
         worker = new Worker(new URL("./backdrop.worker.ts", import.meta.url), {
           type: "module",
         })
-        worker.onmessage = ({ data }: MessageEvent<string | null>) => {
+        worker.onmessage = ({ data }: MessageEvent<BackdropWorkerReply>) => {
           if (data === null) fallback()
-          else paintHue(data)
+          else if (typeof data === "string") paintHue(data)
+          else admitFrame(data.frame)
         }
         worker.onerror = (event) => {
           event.preventDefault()
@@ -104,7 +127,14 @@ export function Backdrop() {
         canvas.width = Math.max(1, Math.round(initial.width * initial.scale))
         canvas.height = Math.max(1, Math.round(initial.height * initial.scale))
         const offscreen = canvas.transferControlToOffscreen()
-        worker.postMessage({ canvas: offscreen, state: initial }, [offscreen])
+        send(
+          {
+            canvas: offscreen,
+            state: initial,
+            idleAdmission: typeof requestIdleCallback === "function",
+          },
+          [offscreen]
+        )
       } catch {
         fallback()
       }
@@ -120,6 +150,7 @@ export function Backdrop() {
       document.removeEventListener("visibilitychange", sync)
       motion.removeEventListener("change", sync)
       canvas.removeEventListener("webglcontextlost", loseLocalContext)
+      cancelAdmission()
       worker?.terminate()
       local?.dispose()
       canvas.remove()

@@ -2714,6 +2714,20 @@ test("control-plane fixes: case, icons, stable scripts, desktop bulk editing, 30
       resolve(output, "large-list-latency.json"),
       baseline.largeListKeyScriptMs.p95
     )
+    await expect
+      .poll(() =>
+        tools.evaluate((grid) => {
+          const activeId = grid.getAttribute("aria-activedescendant")
+          const active = activeId && document.getElementById(activeId)
+          const cursor = grid.querySelector(".data-cursor")
+          if (!active || !cursor) return Number.POSITIVE_INFINITY
+          return Math.abs(
+            active.getBoundingClientRect().top -
+              cursor.getBoundingClientRect().top
+          )
+        })
+      )
+      .toBeLessThan(1)
     await expect(
       page.getByRole("button", { name: "Next page", exact: true })
     ).toHaveCount(0)
@@ -3274,13 +3288,25 @@ test("prototype motion carries transition types and honors reduced motion", asyn
         .some((worker) => worker.url().includes("/backdrop.worker-"))
     )
     .toBe(true)
-  await expect
-    .poll(() =>
-      page
-        .locator(".backdrop canvas")
-        .evaluate((canvas: HTMLCanvasElement) => canvas.width)
-    )
-    .toBe(1440)
+  const expectBackdropFrame = (width: number, height: number) =>
+    expect
+      .poll(() =>
+        page
+          .locator(".backdrop canvas")
+          .evaluate((canvas: HTMLCanvasElement) => {
+            const sample = document.createElement("canvas")
+            sample.width = sample.height = 1
+            const context = sample.getContext("2d")!
+            context.drawImage(canvas, 0, 0, 1, 1, 0, 0, 1, 1)
+            return [
+              canvas.width,
+              canvas.height,
+              context.getImageData(0, 0, 1, 1).data[3],
+            ]
+          })
+      )
+      .toEqual([width, height, 255])
+  await expectBackdropFrame(1440, 900)
   await page.evaluate(() =>
     fetch("/api/workspaces", {
       method: "POST",
@@ -3354,13 +3380,7 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   expect(await types()).toBe(before)
   expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect
-    .poll(() =>
-      page
-        .locator(".backdrop canvas")
-        .evaluate((canvas: HTMLCanvasElement) => canvas.width)
-    )
-    .toBe(390)
+  await expectBackdropFrame(390, 844)
   await noOverflow(page)
   await capture(page, "ux-prototype-integration-390x844.png")
   await page.getByRole("button", { name: /^Close/ }).click()

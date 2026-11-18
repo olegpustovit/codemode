@@ -126,7 +126,13 @@ export function DataList({
   const prefix = useId()
   const ownRef = useRef<HTMLTableElement>(null)
   const root = listRef ?? ownRef
-  const cursor = useRef<HTMLTableRowElement>(null)
+  const body = useRef<HTMLTableSectionElement>(null)
+  const viewport = useRef({
+    height: 0,
+    rowHeight: 0,
+    groupHeight: 0,
+    scrollTop: 0,
+  })
   const selected = rows.findIndex((row) => row.id === selectedId)
   const active = selected < 0 ? 0 : selected
   const ownSelection = useListSelection(selectionScope)
@@ -193,26 +199,53 @@ export function DataList({
     }
   }, [rows, choose])
   useLayoutEffect(() => {
-    const place = () => {
-      const row = document.getElementById(`${prefix}-${active}`)
-      const body = row?.parentElement
-      if (!row || !body || !cursor.current) return
-      const top = row.offsetTop
-      const height = row.offsetHeight
-      if (
-        document.activeElement === root.current &&
-        (top < body.scrollTop ||
-          top + height > body.scrollTop + body.clientHeight)
-      ) {
-        row.scrollIntoView?.({ block: "nearest" })
+    const element = body.current
+    if (!element) return
+    const measure = () => {
+      const style = getComputedStyle(element)
+      viewport.current = {
+        height: element.clientHeight,
+        rowHeight: Number.parseFloat(style.getPropertyValue("--row")),
+        groupHeight: Number.parseFloat(
+          style.getPropertyValue("--data-group-height")
+        ),
+        scrollTop: element.scrollTop,
       }
-      cursor.current.style.transform = `translateY(${top}px)`
-      cursor.current.style.height = `${height}px`
     }
-    place()
-    window.addEventListener("resize", place)
-    return () => window.removeEventListener("resize", place)
-  }, [rows, active, prefix, root])
+    measure()
+    const observer =
+      typeof ResizeObserver === "function"
+        ? new ResizeObserver(measure)
+        : undefined
+    observer?.observe(element)
+    if (!observer) window.addEventListener("resize", measure)
+    return () => {
+      observer?.disconnect()
+      if (!observer) window.removeEventListener("resize", measure)
+    }
+  }, [])
+  let groupsBeforeActive = 0
+  for (let index = 0; index < rows.length && index <= active; index++) {
+    if (index === 0 || rows[index - 1].group !== rows[index].group)
+      groupsBeforeActive++
+  }
+  useLayoutEffect(() => {
+    const element = body.current
+    const bounds = viewport.current
+    if (!element || !bounds.height || document.activeElement !== root.current)
+      return
+    const top =
+      active * bounds.rowHeight + groupsBeforeActive * bounds.groupHeight
+    const bottom = top + bounds.rowHeight
+    const scrollTop = Math.min(
+      top,
+      Math.max(bounds.scrollTop, bottom - bounds.height)
+    )
+    if (Number.isFinite(scrollTop) && scrollTop !== bounds.scrollTop) {
+      bounds.scrollTop = scrollTop
+      element.scrollTop = scrollTop
+    }
+  }, [active, groupsBeforeActive, root])
   return (
     <div className={`data-list ${className}`}>
       {!!rows.length && (
@@ -283,13 +316,15 @@ export function DataList({
           }
         }}
         onScrollCapture={(event) => {
-          const body = event.target
+          const element = body.current
+          if (!element || event.target !== element) return
+          viewport.current.scrollTop = element.scrollTop
           if (
-            body instanceof HTMLElement &&
-            body.classList.contains("data-body") &&
-            body.scrollHeight - body.scrollTop - body.clientHeight < 120
+            onLoadMore &&
+            element.scrollHeight - element.scrollTop - element.clientHeight <
+              120
           )
-            onLoadMore?.()
+            onLoadMore()
         }}
       >
         {rows.length > 0 && (
@@ -307,9 +342,15 @@ export function DataList({
             </tr>
           </thead>
         )}
-        <tbody className="data-body">
+        <tbody className="data-body" ref={body}>
           {rows.length ? (
-            <tr className="data-cursor" ref={cursor} aria-hidden="true">
+            <tr
+              className="data-cursor"
+              aria-hidden="true"
+              style={{
+                transform: `translateY(calc(var(--row) * ${active} + var(--data-group-height) * ${groupsBeforeActive}))`,
+              }}
+            >
               <td aria-hidden="true" colSpan={columns.length} />
             </tr>
           ) : null}

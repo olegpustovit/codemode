@@ -3602,6 +3602,11 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await expect(workspaceOption).toBeHidden()
   await expect.poll(types).toContain("ws")
   await expectPlayedTransition(page, "ws", "codemode-fade-in")
+  const workspaceNotice = page.locator(".status-copy").filter({
+    hasText: "Workspace: Acme",
+  })
+  await expect(workspaceNotice).toHaveCSS("animation-name", "codemode-fade-in")
+  await expect(workspaceNotice).toHaveCSS("animation-duration", "0.42s")
   await page
     .getByRole("button", { name: "Collapse sidebar", exact: true })
     .click()

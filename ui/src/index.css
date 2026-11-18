@@ -179,6 +179,7 @@
 
 .status-bar { position: sticky; bottom: 0; z-index: 10; display: flex; align-items: center; gap: var(--s-4); height: var(--status); min-height: var(--status); padding: 0 var(--s-6); background: rgba(0,0,0, 0.85); border-top: 1px solid var(--c-line); font-size: var(--fs-2); color: var(--c-text-3); }
 .status-message { display: block; min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-text); }
+.status-message[data-tone] .status-copy { animation: codemode-fade-in var(--enter) var(--e-soft); }
 .status-message[data-tone="attention"] { color: var(--c-warn); }
 .status-message[data-tone="error"] { color: var(--c-bad); }
 .status-message button { cursor: pointer; text-align: left; }
@@ -197,7 +198,7 @@
 .navigation-toggle { display: none; }
 .section-rail { grid-row: 2/4; display: flex; flex-direction: column; min-height: 0; overflow: auto; padding: var(--s-4) var(--s-3); background: linear-gradient(90deg,rgba(0,0,0, 0.38),rgba(0,0,0, 0.18)); text-shadow: var(--lift); }
 .section-nav { display: flex; flex-direction: column; gap: 2px; }
-.section-link { position: relative; display: grid; grid-template-columns: 20px 1fr; align-items: center; gap: var(--s-3); min-height: 36px; padding: 0 var(--s-3); color: var(--c-text-2); font-size: var(--fs-4); font-weight: var(--w-med); transition: color var(--t-1), background var(--t-1); }
+.section-link { position: relative; display: grid; grid-template-columns: 20px 1fr; align-items: center; gap: var(--s-3); min-height: 36px; padding: 0 var(--s-3); color: var(--c-text-2); font-size: var(--fs-4); font-weight: var(--w-med); transition: color var(--t-2), background var(--t-2), padding var(--enter) var(--e-soft); }
 .section-link svg { width: 18px; height: 18px; stroke-width: 1.5; }
 .section-link:hover { color: var(--c-text); background: var(--c-hover); }
 .section-link[aria-current="page"] { color: var(--c-text); background: linear-gradient(90deg,rgba(var(--hue), 0.26),rgba(var(--hue), 0.04)); }
@@ -248,7 +249,7 @@
 .list-heading p { margin-top: var(--s-1); font-size: var(--fs-3); color: var(--c-text-3); }
 .list-crumbs { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-1); font-size: var(--fs-2); color: var(--c-text-3); min-height: 18px; }
 .tab-bar { position: relative; display: flex; align-items: center; gap: var(--s-5); padding: 0 var(--s-6); flex: none; border-bottom: 1px solid var(--c-line); }
-.tab-bar > button { height: 38px; font-size: var(--fs-3); font-weight: var(--w-med); color: var(--c-text-3); white-space: nowrap; cursor: pointer; }
+.tab-bar > button { height: 38px; transition: color var(--t-2); font-size: var(--fs-3); font-weight: var(--w-med); color: var(--c-text-3); white-space: nowrap; cursor: pointer; }
 .tab-bar > button[aria-selected="true"] { color: var(--c-text); }
 .tab-bar sup { margin-left: 4px; font: var(--w-reg) 10px var(--f-mono); vertical-align: 1px; color: var(--c-text-3); }
 .tab-underline { position: absolute; bottom: -1px; left: 0; height: 2px; background: var(--c-accent-text); box-shadow: var(--glow-1); transition: transform var(--t-2) var(--e-out), width var(--t-2) var(--e-out); }
@@ -267,7 +268,7 @@
 .integration-screen { --list-columns: minmax(0,1fr) 140px 180px; }
 .data-head, .data-row { display: grid; grid-template-columns: var(--list-columns); align-items: center; gap: var(--s-4); padding: 0 var(--s-5); }
 .data-head { height: 32px; border-bottom: 1px solid var(--c-line); font: var(--w-med) var(--fs-1)/1 var(--f-ui); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--c-text-3); }
-.data-row { position: relative; z-index: 1; height: var(--row); border-bottom: 1px solid rgba(200,215,255, 0.05); color: var(--c-text-2); font-size: var(--fs-4); cursor: pointer; }
+.data-row { transition: background var(--t-2), color var(--t-2); position: relative; z-index: 1; height: var(--row); border-bottom: 1px solid rgba(200,215,255, 0.05); color: var(--c-text-2); font-size: var(--fs-4); cursor: pointer; }
 .data-row { content-visibility: auto; contain-intrinsic-size: auto var(--row); }
 .data-row > * { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .data-name { display: flex; align-items: center; gap: var(--s-3); color: var(--c-text); }
@@ -816,10 +817,10 @@ mark {
 }
 .app-shell[data-rail="collapsed"] .rail-collapse svg { transform: rotate(180deg); }
 @media (min-width: 768px) {
-  .app-shell { transition: grid-template-columns .42s cubic-bezier(.22,1,.36,1); }
+  .app-shell { transition: grid-template-columns var(--enter) var(--e-soft); }
   .app-shell[data-rail="collapsed"] { --side: 56px; }
   .section-rail { overflow-x: hidden; }
-  .shell-brand { transition: width .42s cubic-bezier(.22,1,.36,1); }
+  .shell-brand { transition: width var(--enter) var(--e-soft), color var(--exit) linear, letter-spacing var(--enter) var(--e-soft); overflow: hidden; white-space: nowrap; }
   .shell-brand i, .rail-collapse svg { flex: none; }
   .shell-brand span, .section-label, .rail-workspaces p, .workspace-label, .workspace-check, .rail-collapse span, .rail-collapse kbd { transition: opacity var(--t-2) linear; white-space: nowrap; }
   .section-label { overflow: hidden; }
@@ -970,7 +971,7 @@ mark {
 .consent-hint { font-size: var(--fs-2); color: var(--c-text-3); }
 .consent-sources { columns: 2; font: var(--fs-3)/1.9 var(--f-mono); color: var(--c-text-2); overflow-wrap: anywhere; }
 .consent-admin { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: var(--s-1) var(--s-3); padding: var(--s-3) 0; border-block: 1px solid var(--c-line); }
-.consent-admin [data-slot="checkbox"] { margin-top: 2px; border-radius: 0; transition: background var(--enter) var(--e-soft), border-color var(--enter) var(--e-soft); }
+.consent-admin [data-slot="checkbox"] { margin-top: 2px; border-radius: 0; transition: background var(--t-2), border-color var(--t-2); }
 .consent-admin label { font-size: var(--fs-4); font-weight: var(--w-med); cursor: pointer; }
 .consent-admin p, .consent-admin ul { grid-column: 2; }
 .consent-admin p { color: var(--c-text-3); font-size: var(--fs-3); }

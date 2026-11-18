@@ -557,7 +557,7 @@ function IntegrationDetails({
           await write(
             `/api/integrations/${entry.slug}`,
             "POST",
-            undefined,
+            {},
             created
           )
         ).id

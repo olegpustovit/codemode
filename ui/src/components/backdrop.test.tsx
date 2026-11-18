@@ -126,7 +126,7 @@ test("uses a smaller backing buffer on software WebGL", () => {
   gl.getExtension.mockReturnValue({ UNMASKED_RENDERER_WEBGL: 1 })
   const view = render(<Backdrop />)
   expect(view.container.querySelector("canvas")?.width).toBe(
-    Math.round(innerWidth / 2)
+    Math.round(innerWidth * 0.4)
   )
   draw()
   expect(gl.drawArrays).toHaveBeenCalledOnce()

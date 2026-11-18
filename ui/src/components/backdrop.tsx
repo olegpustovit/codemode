@@ -126,7 +126,7 @@ export function Backdrop() {
     // A smaller backing buffer keeps the same scene moving on software WebGL.
     const software = /swiftshader|llvmpipe|software rasterizer/i.test(renderer)
     const size = () => {
-      const scale = software ? 0.5 : Math.min(devicePixelRatio || 1, 2)
+      const scale = software ? 0.4 : Math.min(devicePixelRatio || 1, 2)
       cv.width = Math.max(1, Math.round(innerWidth * scale))
       cv.height = Math.max(1, Math.round(innerHeight * scale))
       gl.viewport(0, 0, cv.width, cv.height)

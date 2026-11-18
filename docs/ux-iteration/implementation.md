@@ -21,3 +21,10 @@ Workspace selection carries through authenticated URLs. The shell menu exposes w
 The wave plan anticipated no migration. Schema 25 has no OAuth grant resource field, so this wave adds a nullable resource column in migration 0026. Existing grants retain their plain MCP resource binding. The script and administration migration planned for Wave 4 moves to 0027.
 
 Local UI type checking and 37 unit tests passed before rebasing onto the latest Wave 1 work. Browser, release, and live client verification are pending.
+
+### Wave 2 deployment receipt
+
+- Production build `cdfbf7fbe22414be78c93bd50ea2fb7e26b2a42c`, schema 26, embedded UI `e99faac91da5`.
+- Release `57dcb0b98b7a4d0a886079c10753b614`. Restored-backup preflight preserved all 28 protected tables. The live smoke and aggregation gate passed.
+- Native checks passed 160 cases. Chromium verified section navigation, reload, and the copied MCP URL. Public HTTPS verified protected-resource metadata, the bearer challenge, and rejection of an additional query parameter.
+- External-client consent remains an owner-only check.

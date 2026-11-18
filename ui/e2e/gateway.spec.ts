@@ -3267,6 +3267,20 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page.setViewportSize({ width: 1440, height: 900 })
   await observeViewTransitions(page)
   await login(page, "/sessions")
+  await expect
+    .poll(() =>
+      page
+        .workers()
+        .some((worker) => worker.url().includes("/backdrop.worker-"))
+    )
+    .toBe(true)
+  await expect
+    .poll(() =>
+      page
+        .locator(".backdrop canvas")
+        .evaluate((canvas: HTMLCanvasElement) => canvas.width)
+    )
+    .toBe(1440)
   await page.evaluate(() =>
     fetch("/api/workspaces", {
       method: "POST",
@@ -3340,6 +3354,13 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   expect(await types()).toBe(before)
   expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
   await page.setViewportSize({ width: 390, height: 844 })
+  await expect
+    .poll(() =>
+      page
+        .locator(".backdrop canvas")
+        .evaluate((canvas: HTMLCanvasElement) => canvas.width)
+    )
+    .toBe(390)
   await noOverflow(page)
   await capture(page, "ux-prototype-integration-390x844.png")
   await page.getByRole("button", { name: /^Close/ }).click()

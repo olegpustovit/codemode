@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useRouterState } from "@tanstack/react-router"
-import { fragmentShader } from "./backdrop-shader"
+import { renderBackdrop } from "./backdrop-renderer"
+import type { BackdropState } from "./backdrop-renderer"
 
 const hues = {
   sessions: [0.12, 0.26, 0.8],
@@ -33,151 +34,96 @@ export function Backdrop() {
       )
     }
   }, [path])
-  const canvas = useRef<HTMLCanvasElement>(null)
+  const host = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const cv = canvas.current
-    if (!cv) return
-    const gl = cv.getContext("webgl", {
-      antialias: false,
-      premultipliedAlpha: false,
-    })
-    if (!gl) return
-    const shaders: WebGLShader[] = []
-    const program = gl.createProgram()
-    const buffer = gl.createBuffer()
-    let raf = 0
-    let lost = false
-    const release = () => {
-      cancelAnimationFrame(raf)
-      shaders.forEach((shader) => gl.deleteShader(shader))
-      gl.deleteBuffer(buffer)
-      gl.deleteProgram(program)
-    }
-    const compile = (type: number, source: string) => {
-      const shader = gl.createShader(type)
-      if (!shader) return false
-      shaders.push(shader)
-      gl.shaderSource(shader, source)
-      gl.compileShader(shader)
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS) || !program)
-        return false
-      gl.attachShader(program, shader)
-      return true
-    }
-    if (
-      !program ||
-      !buffer ||
-      !compile(
-        gl.VERTEX_SHADER,
-        "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}"
-      ) ||
-      !compile(gl.FRAGMENT_SHADER, fragmentShader)
-    ) {
-      release()
-      return
-    }
-    gl.linkProgram(program)
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      release()
-      return
-    }
-    gl.useProgram(program)
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array([-1, -1, 3, -1, -1, 3]),
-      gl.STATIC_DRAW
-    )
-    const position = gl.getAttribLocation(program, "p")
-    gl.enableVertexAttribArray(position)
-    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0)
-    const resolution = gl.getUniformLocation(program, "r")
-    const time = gl.getUniformLocation(program, "t")
-    const hue = gl.getUniformLocation(program, "h")
+    const element = host.current
+    if (!element) return
+    let canvas = document.createElement("canvas")
+    element.append(canvas)
     const motion = matchMedia("(prefers-reduced-motion: reduce)")
-    const started = performance.now()
-    const current = [...target.current]
-    let previous = started
-    let paintedHue = ""
-    const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info")
-    const renderer = rendererInfo
-      ? String(gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL))
-      : ""
-    // A smaller backing buffer keeps the same scene moving on software WebGL.
-    const software = /swiftshader|llvmpipe|software rasterizer/i.test(renderer)
-    let paintedAt = -Infinity
-    const frame = (now: number) => {
-      raf = 0
-      if (document.hidden || lost) return
-      if (software && !motion.matches && now - paintedAt < 1000 / 24) {
-        raf = requestAnimationFrame(frame)
+    const state = (): BackdropState => ({
+      hue: target.current,
+      width: innerWidth,
+      height: innerHeight,
+      scale: Math.min(devicePixelRatio || 1, 2),
+      reduced: motion.matches,
+      visible: !document.hidden,
+    })
+    const paintHue = (hue: string) =>
+      document.documentElement.style.setProperty("--hue", hue)
+    let worker: Worker | undefined
+    let local: ReturnType<typeof renderBackdrop> = null
+    const loseLocalContext = () => {
+      local?.dispose()
+      local = null
+      wake.current = null
+      canvas.style.visibility = "hidden"
+      paintHue(target.current.map((value) => Math.round(value * 255)).join(","))
+    }
+    const startLocal = () => {
+      local = renderBackdrop(canvas, state(), paintHue, true)
+      if (!local) {
+        loseLocalContext()
         return
       }
-      paintedAt = now
-      const blend = motion.matches
-        ? 1
-        : 1 - Math.exp(-Math.min(now - previous, 100) / 270)
-      previous = now
-      for (let i = 0; i < 3; i++)
-        current[i] += (target.current[i] - current[i]) * blend
-      const cssHue = current.map((v) => Math.round(v * 255)).join(",")
-      if (cssHue !== paintedHue) {
-        document.documentElement.style.setProperty("--hue", cssHue)
-        paintedHue = cssHue
+      canvas.addEventListener("webglcontextlost", loseLocalContext, {
+        once: true,
+      })
+    }
+    const fallback = () => {
+      worker?.terminate()
+      worker = undefined
+      const replacement = document.createElement("canvas")
+      canvas.replaceWith(replacement)
+      canvas = replacement
+      startLocal()
+    }
+    const sync = () => {
+      const next = state()
+      if (worker) worker.postMessage({ state: next })
+      else local?.update(next)
+    }
+    wake.current = sync
+    if (
+      typeof canvas.transferControlToOffscreen === "function" &&
+      typeof Worker !== "undefined"
+    ) {
+      try {
+        worker = new Worker(new URL("./backdrop.worker.ts", import.meta.url), {
+          type: "module",
+        })
+        worker.onmessage = ({ data }: MessageEvent<string | null>) => {
+          if (data === null) fallback()
+          else paintHue(data)
+        }
+        worker.onerror = (event) => {
+          event.preventDefault()
+          fallback()
+        }
+        const initial = state()
+        canvas.width = Math.max(1, Math.round(initial.width * initial.scale))
+        canvas.height = Math.max(1, Math.round(initial.height * initial.scale))
+        const offscreen = canvas.transferControlToOffscreen()
+        worker.postMessage({ canvas: offscreen, state: initial }, [offscreen])
+      } catch {
+        fallback()
       }
-      gl.uniform2f(resolution, cv.width, cv.height)
-      gl.uniform1f(time, motion.matches ? 20 : (now - started) / 1000)
-      gl.uniform3f(hue, current[0], current[1], current[2])
-      gl.drawArrays(gl.TRIANGLES, 0, 3)
-      if (!motion.matches) raf = requestAnimationFrame(frame)
+    } else {
+      startLocal()
     }
-    const kick = () => {
-      if (!raf && !document.hidden && !lost) raf = requestAnimationFrame(frame)
-    }
-    const size = () => {
-      const scale = software ? 0.4 : Math.min(devicePixelRatio || 1, 2)
-      cv.width = Math.max(1, Math.round(innerWidth * scale))
-      cv.height = Math.max(1, Math.round(innerHeight * scale))
-      gl.viewport(0, 0, cv.width, cv.height)
-      paintedAt = -Infinity
-      kick()
-    }
-    const visibility = () => {
-      cancelAnimationFrame(raf)
-      raf = 0
-      previous = performance.now()
-      paintedAt = -Infinity
-      kick()
-    }
-    const contextLost = () => {
-      lost = true
-      cancelAnimationFrame(raf)
-      raf = 0
-      cv.style.visibility = "hidden"
-      wake.current = null
-      document.documentElement.style.setProperty(
-        "--hue",
-        target.current.map((v) => Math.round(v * 255)).join(",")
-      )
-    }
-    wake.current = kick
-    size()
-    window.addEventListener("resize", size)
-    document.addEventListener("visibilitychange", visibility)
-    motion.addEventListener("change", visibility)
-    cv.addEventListener("webglcontextlost", contextLost)
+    window.addEventListener("resize", sync)
+    document.addEventListener("visibilitychange", sync)
+    motion.addEventListener("change", sync)
     return () => {
       wake.current = null
-      window.removeEventListener("resize", size)
-      document.removeEventListener("visibilitychange", visibility)
-      motion.removeEventListener("change", visibility)
-      cv.removeEventListener("webglcontextlost", contextLost)
-      release()
+      window.removeEventListener("resize", sync)
+      document.removeEventListener("visibilitychange", sync)
+      motion.removeEventListener("change", sync)
+      canvas.removeEventListener("webglcontextlost", loseLocalContext)
+      worker?.terminate()
+      local?.dispose()
+      canvas.remove()
     }
   }, [])
-  return (
-    <div className="backdrop" aria-hidden="true">
-      <canvas ref={canvas} />
-    </div>
-  )
+  return <div className="backdrop" aria-hidden="true" ref={host} />
 }

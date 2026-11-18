@@ -72,10 +72,14 @@ export async function measurePaneLatency(page: Page, destination: string) {
     browser: page.context().browser()?.version(),
     viewport: page.viewportSize(),
     graphics: await page.evaluate(() => {
-      const gl = document.querySelector("canvas")?.getContext("webgl")
+      const backdrop =
+        document.querySelector<HTMLCanvasElement>(".backdrop canvas")
+      const gl = document.createElement("canvas").getContext("webgl")
       const debug = gl?.getExtension("WEBGL_debug_renderer_info")
       return {
         devicePixelRatio,
+        width: backdrop?.width,
+        height: backdrop?.height,
         webgl: !!gl,
         renderer: gl?.getParameter(
           debug?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER

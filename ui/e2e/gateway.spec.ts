@@ -354,6 +354,22 @@ async function login(page: Page, path = "/sources") {
     `${origin}${path === "/sources" ? "/integrations" : path}`
   )
 }
+function backdropFrame(page: Page) {
+  return page
+    .locator(".backdrop canvas")
+    .evaluate((canvas: HTMLCanvasElement) => {
+      const sample = document.createElement("canvas")
+      sample.width = sample.height = 1
+      const context = sample.getContext("2d")!
+      context.drawImage(canvas, 0, 0, 1, 1, 0, 0, 1, 1)
+      return {
+        width: canvas.width,
+        height: canvas.height,
+        painted: context.getImageData(0, 0, 1, 1).data[3] === 255,
+        hue: document.documentElement.style.getPropertyValue("--hue"),
+      }
+    })
+}
 async function capture(page: Page, file: string) {
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
   await page.evaluate(() => scrollTo(0, 0))
@@ -363,6 +379,37 @@ async function capture(page: Page, file: string) {
         requestAnimationFrame(() => requestAnimationFrame(() => done()))
       )
   )
+  if (file.startsWith("ux-prototype-")) {
+    const path = new URL(page.url()).pathname
+    const hue = path.includes("scripts")
+      ? "168,82,20"
+      : path.startsWith("/workspaces")
+        ? "10,102,107"
+        : path.startsWith("/tokens")
+          ? "158,20,56"
+          : path.startsWith("/integrations")
+            ? "92,36,189"
+            : "31,66,204"
+    const target = hue.split(",").map(Number)
+    await expect
+      .poll(async () => {
+        const frame = await backdropFrame(page)
+        const channels = frame.hue.split(",").map(Number)
+        return {
+          ...frame,
+          hueSettled:
+            channels.length === 3 &&
+            channels.every(
+              (value, index) => Math.abs(value - target[index]) <= 1
+            ),
+        }
+      })
+      .toMatchObject({
+        ...page.viewportSize(),
+        painted: true,
+        hueSettled: true,
+      })
+  }
   await page.screenshot({
     path: resolve(output, file),
     fullPage: true,
@@ -3290,22 +3337,12 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     .toBe(true)
   const expectBackdropFrame = (width: number, height: number) =>
     expect
-      .poll(() =>
-        page
-          .locator(".backdrop canvas")
-          .evaluate((canvas: HTMLCanvasElement) => {
-            const sample = document.createElement("canvas")
-            sample.width = sample.height = 1
-            const context = sample.getContext("2d")!
-            context.drawImage(canvas, 0, 0, 1, 1, 0, 0, 1, 1)
-            return [
-              canvas.width,
-              canvas.height,
-              context.getImageData(0, 0, 1, 1).data[3],
-            ]
-          })
-      )
-      .toEqual([width, height, 255])
+      .poll(() => backdropFrame(page))
+      .toMatchObject({
+        width,
+        height,
+        painted: true,
+      })
   await expectBackdropFrame(1440, 900)
   await page.evaluate(() =>
     fetch("/api/workspaces", {
@@ -3334,6 +3371,9 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page.getByRole("tab", { name: /^Needs attention/ }).click()
   await expect.poll(types).toContain("filter")
   await expectPlayedTransition(page, "filter", "codemode-fade-in")
+  await expect(
+    page.getByText("No integrations need attention", { exact: true })
+  ).toBeVisible()
   await capture(page, "ux-prototype-empty-1440x900.png")
   await page.getByRole("link", { name: "Workspaces", exact: true }).click()
   await expect(
@@ -3410,6 +3450,9 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await attention.click()
   await expect(attention).toHaveAttribute("aria-selected", "true")
   await expectReducedMotion()
+  await expect(
+    page.getByText("No integrations need attention", { exact: true })
+  ).toBeVisible()
   await capture(page, "ux-prototype-empty-390x844.png")
   await page.setViewportSize({ width: 1440, height: 900 })
   await page

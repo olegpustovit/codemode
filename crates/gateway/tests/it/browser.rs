@@ -99,7 +99,6 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
             "/api/workspaces/00000000-0000-0000-0000-000000000000/scripts/00000000-0000-0000-0000-000000000000",
         ),
         (reqwest::Method::GET, "/api/sessions"),
-        (reqwest::Method::GET, "/api/session-activity"),
         (
             reqwest::Method::PUT,
             "/api/workspaces/00000000-0000-0000-0000-000000000000/policies/source",

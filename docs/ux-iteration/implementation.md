@@ -92,3 +92,5 @@ The browser captures now include the Linear detail pane at both viewport sizes. 
 | Collapsed rail | 7/7 | 7/7 |
 
 The four shell boxes match in every scene. On mobile, the Linear header is 24.78 px taller, the workspace header is 20.80 px shorter and the Scripts header is 20.79 px taller. These differences carry through to the tabs and pane bounds. Consent is 4.49 px shorter on desktop and 99.94 px taller on mobile. The desktop menu position and width match, with a 15.22 px height difference. The mobile menu uses a 366 px width to fit the viewport. This audit measures boxes. Full screenshot and motion parity remain open.
+
+The follow-up comparison uses the prototype’s Acme workspace name for Linear and Scripts and the prototype’s script title for the Scripts breadcrumb. With those fixture labels in place, both scenes match all eight measured boxes at both sizes. The browser motion and script promotion workflows pass with the aligned fixtures. Twelve of the sixteen scene and viewport combinations now match all measured boxes. The four remaining combinations are the workspace menu and consent at both viewport sizes.

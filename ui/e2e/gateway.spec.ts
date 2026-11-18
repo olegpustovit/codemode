@@ -3176,7 +3176,7 @@ test("script scope promotion exposes a global script in a second workspace", asy
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        name: "Global script fixture",
+        name: "Acme",
         sourceIds: [source.id],
       }),
     }).then((response) => response.json())
@@ -3184,7 +3184,7 @@ test("script scope promotion exposes a global script in a second workspace", asy
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        name: "Scope browser script",
+        name: "moneybag: Monthly account totals",
         description: "",
         code: "try:\n    return await tools.script_policy.echo(value='probe')\nexcept PermissionError as error:\n    return str(error)",
       }),
@@ -3226,14 +3226,14 @@ test("script scope promotion exposes a global script in a second workspace", asy
   await expect(page.getByRole("button", { name: /^Move to / })).toBeVisible()
   await page.goto(`/scripts?workspace=${fixture.other}&scope=global`)
   const row = page.getByRole("row", {
-    name: "Scope browser script",
+    name: "moneybag: Monthly account totals",
     exact: true,
   })
   await expect(row).toContainText("Global")
   await row.click()
   await expect(
     page.getByRole("button", {
-      name: "Move to Global script fixture",
+      name: "Move to Acme",
       exact: true,
     })
   ).toBeVisible()
@@ -3420,7 +3420,7 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     fetch("/api/workspaces", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Motion workspace", sourceIds: [] }),
+      body: JSON.stringify({ name: "Acme", sourceIds: [] }),
     })
   )
   await page.reload()
@@ -3492,7 +3492,7 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   expect(mobileMenu!.x + mobileMenu!.width).toBeLessThanOrEqual(390)
   await page.setViewportSize({ width: 1440, height: 900 })
   const workspaceOption = page.getByRole("menuitemradio", {
-    name: /Motion workspace/,
+    name: /Acme/,
   })
   await workspaceOption.click()
   await expect(workspaceOption).toBeHidden()

@@ -136,9 +136,8 @@ impl Config {
                         || !parsed.username().is_empty()
                         || parsed.password().is_some()
                         || parsed.fragment().is_some()
-                        || parsed.query_pairs().any(|(key, _)| key != "toolset")
                     {
-                        return Err(Error::Config("HTTP source URL needs an HTTP(S) host, no credentials or fragment, and only toolset query parameters".into()));
+                        return Err(Error::Config("HTTP source URL needs an HTTP(S) host and no username, password or fragment".into()));
                     }
                     if parsed.path().ends_with("/sse") {
                         return Err(Error::Config("legacy SSE sources are unsupported; use the Streamable HTTP /mcp endpoint".into()));
@@ -848,7 +847,7 @@ mod tests {
             slug: "fixture".into(),
             requires_account: true,
             transport: Transport::McpHttp {
-                url: "https://nudge.microapps.space/mcp?toolset=documents".into(),
+                url: "https://example.com/mcp?toolset=documents&token=fixture".into(),
                 bearer_env: None,
             },
         };
@@ -871,11 +870,11 @@ mod tests {
         assert_eq!(config.sources.len(), 1);
     }
     #[test]
-    fn rejects_embedded_secrets_and_legacy_sse() {
+    fn rejects_userinfo_fragments_and_legacy_sse() {
         for url in [
             "https://user:secret@example.com/mcp",
             "https://example.com/sse",
-            "https://example.com/mcp?token=secret",
+            "https://example.com/mcp?toolset=documents#fragment",
             "file:///tmp/mcp",
         ] {
             let config = Config {

@@ -206,7 +206,8 @@ export function AppShell() {
               <Menu.Portal>
                 <Menu.Positioner
                   align="start"
-                  sideOffset={6}
+                  sideOffset={4}
+                  alignOffset={-4}
                   className="workspace-menu-positioner"
                 >
                   <Menu.Popup

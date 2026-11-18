@@ -87,12 +87,12 @@ export function AuthorizePage() {
             </NativeSelectOption>
           ))}
         </NativeSelect>
-        <FieldDescription>
+        <FieldDescription className="consent-hint">
           {consent.workspaceNotice ?? "Tokens stay bound to this workspace."}
+          {workspace && scope.length > 0 && " Sources:"}
         </FieldDescription>
         {workspace && (
           <section aria-label="Workspace sources">
-            <p className="consent-hint">Sources</p>
             {scope.length ? (
               <ul className="consent-sources">
                 {scope.map((source) => (

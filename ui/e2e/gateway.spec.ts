@@ -3478,8 +3478,17 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     .getByRole("button", { name: "Switch workspace", exact: true })
     .click()
   await capture(page, "ux-prototype-workspace-menu-1440x900.png")
+  const workspaceMenu = page.getByRole("menu", { name: "Workspaces" })
+  expect(await workspaceMenu.boundingBox()).toMatchObject({
+    x: 240,
+    y: 44,
+    width: 440,
+  })
   await page.setViewportSize({ width: 390, height: 844 })
   await capture(page, "ux-prototype-workspace-menu-390x844.png")
+  const mobileMenu = await workspaceMenu.boundingBox()
+  expect(mobileMenu!.x).toBeGreaterThanOrEqual(0)
+  expect(mobileMenu!.x + mobileMenu!.width).toBeLessThanOrEqual(390)
   await page.setViewportSize({ width: 1440, height: 900 })
   const workspaceOption = page.getByRole("menuitemradio", {
     name: /Motion workspace/,

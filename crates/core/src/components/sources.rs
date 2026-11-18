@@ -136,9 +136,9 @@ impl Config {
                         || !parsed.username().is_empty()
                         || parsed.password().is_some()
                         || parsed.fragment().is_some()
-                        || parsed.query().is_some()
+                        || parsed.query_pairs().any(|(key, _)| key != "toolset")
                     {
-                        return Err(Error::Config("HTTP source URL needs an HTTP(S) host and no credentials, query or fragment; use bearer_env".into()));
+                        return Err(Error::Config("HTTP source URL needs an HTTP(S) host, no credentials or fragment, and only toolset query parameters".into()));
                     }
                     if parsed.path().ends_with("/sse") {
                         return Err(Error::Config("legacy SSE sources are unsupported; use the Streamable HTTP /mcp endpoint".into()));
@@ -848,10 +848,17 @@ mod tests {
             slug: "fixture".into(),
             requires_account: true,
             transport: Transport::McpHttp {
-                url: "https://example.com/mcp".into(),
+                url: "https://nudge.microapps.space/mcp?toolset=documents".into(),
                 bearer_env: None,
             },
         };
+        assert!(
+            Config {
+                sources: vec![source.clone()],
+            }
+            .validate()
+            .is_ok()
+        );
         let value = serde_json::to_value(&source).unwrap();
         assert_eq!(
             serde_json::from_value::<Source>(value.clone()).unwrap(),

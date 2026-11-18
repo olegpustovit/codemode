@@ -1817,12 +1817,21 @@ test("workspace bookmarks, preset connection and opt-in administration authoriza
     .getByRole("grid", { name: "Agents with access", exact: true })
     .getByRole("row", { name: "Management browser check", exact: true })
   await expect(managementRow).toContainText("Admin tools")
+  const workspace = await page.evaluate(async () => {
+    const response = await fetch("/api/workspaces", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Acme", sourceIds: [] }),
+    })
+    if (!response.ok) throw new Error("Could not create consent workspace")
+    return (await response.json()).id as string
+  })
   const registration = await page.evaluate(() =>
     fetch("/oauth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        client_name: "Workspace manager",
+        client_name: "Codex",
         redirect_uris: ["https://client.example/callback"],
         token_endpoint_auth_method: "none",
       }),
@@ -1832,7 +1841,7 @@ test("workspace bookmarks, preset connection and opt-in administration authoriza
     response_type: "code",
     client_id: registration.client_id,
     redirect_uri: "https://client.example/callback",
-    resource: `${origin}/mcp`,
+    resource: `${origin}/mcp?workspace=${workspace}`,
     scope: "mcp",
     code_challenge: createHash("sha256")
       .update("browser-verifier-123456789012345678901234567890123456789")
@@ -1841,11 +1850,12 @@ test("workspace bookmarks, preset connection and opt-in administration authoriza
   })
   await page.goto(`/oauth/authorize?${query}`)
   await expect(
-    page.getByRole("heading", { name: "Authorize Workspace manager?" })
+    page.getByRole("heading", { name: "Authorize Codex?" })
   ).toBeVisible()
-  await page
-    .getByLabel("Workspace", { exact: true })
-    .selectOption({ label: "All sources" })
+  await expect(page.getByLabel("Workspace", { exact: true })).toHaveValue(
+    workspace
+  )
+  await expect(page.locator(".consent-lead")).toContainText("Codex asked for Acme")
   await page
     .getByRole("checkbox", { name: "Also allow administration tools" })
     .click()
@@ -1856,11 +1866,18 @@ test("workspace bookmarks, preset connection and opt-in administration authoriza
   await capture(page, "ux-prototype-consent-390x844.png")
   await page
     .getByRole("button", {
-      name: "Authorize All sources with administration",
+      name: "Authorize Acme with administration",
       exact: true,
     })
     .click()
   await expect(page).toHaveURL(/client\.example\/callback\?.*code=/)
+  await page.goto("/workspaces")
+  expect(
+    await page.evaluate(async (id) => {
+      const response = await fetch(`/api/workspaces/${id}`, { method: "DELETE" })
+      return response.ok
+    }, workspace)
+  ).toBe(true)
 })
 
 test("integrations: real catalogue search, URL-backed panes and keyboard focus", async ({

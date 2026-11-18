@@ -2,6 +2,81 @@ import asyncio
 import json
 ToolError = RuntimeError
 
+def pick(rows, **match):
+    if len(match) != 1:
+        raise TypeError('pick requires one field, for example pick(rows, name="Backlog")')
+    field = list(match)[0]
+    wanted = match[field]
+    choices = []
+    more = False
+    for row in rows:
+        if not isinstance(row, dict) or field not in row:
+            continue
+        value = row[field]
+        if value == wanted:
+            return row
+        if not isinstance(value, (str, int, float, bool)) and value is not None:
+            continue
+        label = repr(value[:40] if isinstance(value, str) else value)
+        if len(label) > 48:
+            label = label[:48] + '…'
+        if label not in choices:
+            if len(choices) < 6:
+                choices.append(label)
+            else:
+                more = True
+    if more:
+        choices.append('…')
+    raise LookupError(f'No match for {field[:40]}. Available values: ' + (', '.join(choices) or '(none)'))
+
+
+_print = print
+
+def _sample_output(value, depth=0):
+    # shortcut: ordinary stdout and nested containers up to six levels; keep unusually deep diagnostics intact.
+    if depth == 6:
+        return value
+    if isinstance(value, list):
+        if len(value) >= 20:
+            for row in value:
+                if not isinstance(row, dict):
+                    break
+            else:
+                fields = ', '.join([f'{str(key)[:32]}: {type(value[0][key]).__name__}' for key in list(value[0])[:6]])
+                return [_sample_output(row, depth + 1) for row in value[:3]] + [
+                    f'… {len(value) - 3} more rows hidden. Count, filter or group these in code and print only the result. Row shape: {{{fields}}}'
+                ]
+        children = enumerate(value)
+    elif isinstance(value, dict):
+        children = value.items()
+    else:
+        return value
+    preview = value
+    for key, item in children:
+        sampled = _sample_output(item, depth + 1)
+        if sampled is not item:
+            if preview is value:
+                preview = value.copy()
+            preview[key] = sampled
+    return preview
+
+
+def _printed_value(value):
+    # shortcut: parse JSON container strings up to 256 KiB; use structured values for bigger dumps or Python repr strings.
+    if isinstance(value, str) and 40 <= len(value) <= 262144 and value.lstrip().startswith(('[', '{')):
+        try:
+            parsed = json.loads(value)
+        except ValueError:
+            return value
+        sampled = _sample_output(parsed)
+        return value if sampled is parsed else json.dumps(sampled)
+    return _sample_output(value)
+
+
+def print(*values, **kwargs):
+    _print(*[_printed_value(value) for value in values], **kwargs)
+
+
 class _Tool:
     def __init__(self, path, aliases, full, pagination):
         self.path = path

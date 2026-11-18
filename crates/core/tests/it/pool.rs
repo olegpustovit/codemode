@@ -22,6 +22,67 @@ async fn sandbox(deadline: Duration) -> MontySandbox {
     MontySandbox::new(&binary(), deadline, 32768).await.unwrap()
 }
 
+#[tokio::test]
+async fn sandbox_picks_rows_and_samples_merged_record_prints() {
+    let sb = sandbox(Duration::from_secs(1)).await;
+    let prelude = format!(
+        "{}\nissues = _Tool('fixture.issues', {{}}, '', {{'items':['items'],'cursor':['cursor'],'optional':True,'extras':[]}})\n",
+        include_str!("../../src/components/sources/prelude.py")
+    );
+    let code = r#"
+rows = await issues.all()
+try:
+    pick(rows, name='Missing')
+except LookupError as err:
+    print(str(err))
+print(pick(rows, name='Status-22')['id'])
+print(rows)
+print(json.dumps({'items': rows}))
+print(rows[:19])
+print('A document', 'λ', sep=': ', end='!\n')
+print(['title'] * 20)
+return rows
+"#;
+    let (mut run, mut step) = sb.start(code, &prelude).await.unwrap();
+    for start in [0, 12] {
+        let Step::Calls(pending) = step else {
+            panic!("expected a page request")
+        };
+        let rows = (start..start + 12)
+            .map(|id| json!({"name":format!("Status-{id}"),"id":id}))
+            .collect::<Vec<_>>();
+        let page = json!({"items":rows,"cursor":if start == 0 { Some(12) } else { None }});
+        (run, step) = sb
+            .resume(
+                run,
+                &[(
+                    pending[0].id,
+                    Ok(serde_json::value::to_raw_value(&page).unwrap()),
+                )],
+            )
+            .await
+            .unwrap();
+    }
+    let Step::Done { result, output, .. } = step else {
+        panic!("expected completed output")
+    };
+    let rows: Vec<serde_json::Value> = serde_json::from_str(result.get()).unwrap();
+    assert_eq!(rows.len(), 24);
+    let lines: Vec<_> = output.lines().collect();
+    assert!(lines[0].contains("Available values: 'Status-0', 'Status-1'"));
+    assert!(!lines[0].contains("Status-6"));
+    assert_eq!(lines[1], "22");
+    for line in &lines[2..4] {
+        assert!(line.contains("21 more rows hidden"), "{line}");
+        assert!(line.contains("Row shape: {id: int, name: str}"), "{line}");
+        assert!(line.contains("Status-2") && !line.contains("Status-3"));
+    }
+    assert!(lines[4].contains("Status-18") && !lines[4].contains("rows hidden"));
+    assert_eq!(lines[5], "A document: λ!");
+    assert_eq!(lines[6].matches("'title'").count(), 20);
+    sb.pool.close().await;
+}
+
 fn record(name: &str, value: serde_json::Value) {
     if let Some(dir) = std::env::var_os("CODEMODE_RESULTS_DIR") {
         std::fs::create_dir_all(&dir).unwrap();

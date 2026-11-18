@@ -252,7 +252,7 @@ export function IntegrationsPage() {
             }
             ref={mountSearch}
             type="search"
-            aria-describedby="list-search-hint"
+            aria-describedby={/[*?]/.test(q) ? "list-search-hint" : undefined}
             aria-label="Search this list"
             placeholder="Search vendors and tools"
             value={q}
@@ -263,7 +263,7 @@ export function IntegrationsPage() {
               })
             }
           />
-          <SearchHint />
+          {/[*?]/.test(q) && <SearchHint />}
           <span className="kbd">/</span>
         </label>
       </ShellSlot>
@@ -581,7 +581,10 @@ function IntegrationDetails({
                 .map((method) => methodNames[method])
                 .join(" / "),
             },
-            { label: "Tools", value: <code>{entry.toolCount}</code> },
+            {
+              label: "Tools",
+              value: <code>{linked ? entry.toolCount : "—"}</code>,
+            },
             ...(source
               ? [
                   {

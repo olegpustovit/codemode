@@ -117,7 +117,9 @@ export function TokensPage() {
             id="tokens-search"
             ref={input}
             type="search"
-            aria-describedby="list-search-hint"
+            aria-describedby={
+              /[*?]/.test(search.q ?? "") ? "list-search-hint" : undefined
+            }
             aria-label="Search agents"
             placeholder="Search agents"
             value={search.q ?? ""}
@@ -139,7 +141,7 @@ export function TokensPage() {
               )
             }
           />
-          <SearchHint />
+          {/[*?]/.test(search.q ?? "") && <SearchHint />}
           <span className="kbd">/</span>
         </label>
       </ShellSlot>

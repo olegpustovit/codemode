@@ -99,7 +99,6 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
             "/api/workspaces/00000000-0000-0000-0000-000000000000/scripts/00000000-0000-0000-0000-000000000000",
         ),
         (reqwest::Method::GET, "/api/sessions"),
-        (reqwest::Method::GET, "/api/session-activity"),
         (
             reqwest::Method::PUT,
             "/api/workspaces/00000000-0000-0000-0000-000000000000/policies/source",
@@ -185,7 +184,7 @@ async fn browser_api_requires_its_own_session_and_rejects_cross_origin_writes(po
     assert_eq!(response.status(), StatusCode::OK);
     let page = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(page["sessions"].as_array().unwrap().len(), 1);
-    assert_eq!(page["sessions"][0]["title"], "API history");
+    assert_eq!(page["sessions"][0]["title"], "fixture");
     let response = request(reqwest::Method::GET, &format!("/api/sessions/{session_id}"))
         .header("cookie", &cookie)
         .send()

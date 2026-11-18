@@ -64,6 +64,8 @@ export function safeReturnPath(value: unknown) {
   )
     return "/sources"
   const url = new URL(value, "https://return.invalid")
+  if (url.pathname === "/executions" || url.pathname === "/executions/")
+    return "/sessions"
   if (
     url.origin !== "https://return.invalid" ||
     ![

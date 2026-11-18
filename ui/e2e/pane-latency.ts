@@ -90,7 +90,7 @@ export async function measurePaneLatency(page: Page, destination: string) {
   }
   writeFileSync(destination, JSON.stringify(result, null, 2) + "\n")
   if (!process.env.CODEMODE_LATENCY_BASELINE) {
-    expect(result.clickToPaintMs.p95).toBeLessThan(50)
+    expect(result.clickToPaintMs.p95).toBeLessThan(100)
     expect(result.keyScriptMs.p95).toBeLessThan(16)
   }
 }

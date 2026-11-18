@@ -1,14 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { ExecutionPage } from "@/features/executions"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { executionQuery } from "@/features/queries"
+
 export const Route = createFileRoute("/_authenticated/executions/$executionId")(
   {
-    loader: ({ context, params }) =>
-      context.queryClient.query({
-        ...executionQuery(params.executionId),
-        staleTime: "static",
-      }),
-    head: () => ({ meta: [{ title: "Executions · Codemode" }] }),
-    component: ExecutionPage,
+    loader: async ({ context, params }) => {
+      const execution = await context.queryClient.ensureQueryData(
+        executionQuery(params.executionId)
+      )
+      throw redirect({
+        to: "/sessions",
+        search: execution.sessionId
+          ? { selected: execution.sessionId, execution: execution.id }
+          : {},
+        replace: true,
+      })
+    },
   }
 )

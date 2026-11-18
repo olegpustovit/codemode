@@ -156,7 +156,9 @@ export function ScriptLibraryPage() {
             id="scripts-search"
             ref={input}
             type="search"
-            aria-describedby="list-search-hint"
+            aria-describedby={
+              /[*?]/.test(search.q ?? "") ? "list-search-hint" : undefined
+            }
             aria-label="Search scripts"
             placeholder="Search scripts"
             value={search.q ?? ""}
@@ -181,7 +183,7 @@ export function ScriptLibraryPage() {
               )
             }
           />
-          <SearchHint />
+          {/[*?]/.test(search.q ?? "") && <SearchHint />}
           <span className="kbd">/</span>
         </label>
       </ShellSlot>

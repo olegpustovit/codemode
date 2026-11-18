@@ -106,11 +106,31 @@ export function DataList({
       setRenameError("")
     }
   }
+  function openRow(id: string) {
+    onOpen(id)
+    if (
+      typeof window.requestAnimationFrame !== "function" ||
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+    )
+      return
+    const index = rows.findIndex((row) => row.id === id)
+    const row = document.getElementById(`${prefix}-${index}`)
+    requestAnimationFrame(() => {
+      if (!row?.isConnected) return
+      row.animate?.(
+        [
+          { backgroundPosition: "100% 0", backgroundImage: "var(--row-sweep)" },
+          { backgroundPosition: "0 0", backgroundImage: "var(--row-sweep)" },
+        ],
+        { duration: 700, easing: "cubic-bezier(.22, 1, .36, 1)" }
+      )
+    })
+  }
   const { onKeyDown, choose } = useListNavigation(
     rows.map((row) => row.id),
     rows[active]?.id,
     onSelect,
-    onOpen,
+    openRow,
     onBack,
     {
       selection,
@@ -258,7 +278,7 @@ export function DataList({
                       choose(row.id, "toggle")
                     else {
                       choose(row.id)
-                      onOpen(row.id)
+                      openRow(row.id)
                     }
                   }}
                 >

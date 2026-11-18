@@ -21,7 +21,6 @@ import { Route as AuthenticatedSessionsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedTokensRouteImport } from './routes/_authenticated.tokens'
 import { Route as AuthenticatedEndpointsIndexRouteImport } from './routes/_authenticated.endpoints.index'
 import { Route as AuthenticatedEndpointsSplatRouteImport } from './routes/_authenticated.endpoints.$'
-import { Route as AuthenticatedExecutionsIndexRouteImport } from './routes/_authenticated.executions.index'
 import { Route as AuthenticatedExecutionsExecutionIdRouteImport } from './routes/_authenticated.executions.$executionId'
 import { Route as AuthenticatedSourcesIndexRouteImport } from './routes/_authenticated.sources.index'
 import { Route as AuthenticatedSourcesSourceIdRouteImport } from './routes/_authenticated.sources.$sourceId'
@@ -95,12 +94,6 @@ const AuthenticatedEndpointsSplatRoute =
   AuthenticatedEndpointsSplatRouteImport.update({
     id: '/endpoints/$',
     path: '/endpoints/$',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedExecutionsIndexRoute =
-  AuthenticatedExecutionsIndexRouteImport.update({
-    id: '/executions/',
-    path: '/executions/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedExecutionsExecutionIdRoute =
@@ -192,7 +185,6 @@ export interface FileRoutesByFullPath {
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
   '/endpoints/': typeof AuthenticatedEndpointsIndexRoute
-  '/executions/': typeof AuthenticatedExecutionsIndexRoute
   '/sources/': typeof AuthenticatedSourcesIndexRoute
   '/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
   '/sources/$sourceId/accounts': typeof AuthenticatedSourcesSourceIdAccountsRoute
@@ -218,7 +210,6 @@ export interface FileRoutesByTo {
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
   '/endpoints': typeof AuthenticatedEndpointsIndexRoute
-  '/executions': typeof AuthenticatedExecutionsIndexRoute
   '/sources': typeof AuthenticatedSourcesIndexRoute
   '/workspaces': typeof AuthenticatedWorkspacesIndexRoute
   '/sources/$sourceId/accounts': typeof AuthenticatedSourcesSourceIdAccountsRoute
@@ -246,7 +237,6 @@ export interface FileRoutesById {
   '/_authenticated/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/_authenticated/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
   '/_authenticated/endpoints/': typeof AuthenticatedEndpointsIndexRoute
-  '/_authenticated/executions/': typeof AuthenticatedExecutionsIndexRoute
   '/_authenticated/sources/': typeof AuthenticatedSourcesIndexRoute
   '/_authenticated/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
   '/_authenticated/sources/$sourceId_/accounts': typeof AuthenticatedSourcesSourceIdAccountsRoute
@@ -274,7 +264,6 @@ export interface FileRouteTypes {
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
     | '/endpoints/'
-    | '/executions/'
     | '/sources/'
     | '/workspaces/'
     | '/sources/$sourceId/accounts'
@@ -300,7 +289,6 @@ export interface FileRouteTypes {
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
     | '/endpoints'
-    | '/executions'
     | '/sources'
     | '/workspaces'
     | '/sources/$sourceId/accounts'
@@ -327,7 +315,6 @@ export interface FileRouteTypes {
     | '/_authenticated/workspaces/$workspaceId'
     | '/_authenticated/workspaces/new'
     | '/_authenticated/endpoints/'
-    | '/_authenticated/executions/'
     | '/_authenticated/sources/'
     | '/_authenticated/workspaces/'
     | '/_authenticated/sources/$sourceId_/accounts'
@@ -427,13 +414,6 @@ declare module '@tanstack/react-router' {
       path: '/endpoints/$'
       fullPath: '/endpoints/$'
       preLoaderRoute: typeof AuthenticatedEndpointsSplatRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/executions/': {
-      id: '/_authenticated/executions/'
-      path: '/executions'
-      fullPath: '/executions/'
-      preLoaderRoute: typeof AuthenticatedExecutionsIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/executions/$executionId': {
@@ -538,7 +518,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedWorkspacesWorkspaceIdRoute: typeof AuthenticatedWorkspacesWorkspaceIdRoute
   AuthenticatedWorkspacesNewRoute: typeof AuthenticatedWorkspacesNewRoute
   AuthenticatedEndpointsIndexRoute: typeof AuthenticatedEndpointsIndexRoute
-  AuthenticatedExecutionsIndexRoute: typeof AuthenticatedExecutionsIndexRoute
   AuthenticatedSourcesIndexRoute: typeof AuthenticatedSourcesIndexRoute
   AuthenticatedWorkspacesIndexRoute: typeof AuthenticatedWorkspacesIndexRoute
   AuthenticatedSourcesSourceIdAccountsRoute: typeof AuthenticatedSourcesSourceIdAccountsRoute
@@ -565,7 +544,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedWorkspacesWorkspaceIdRoute,
   AuthenticatedWorkspacesNewRoute: AuthenticatedWorkspacesNewRoute,
   AuthenticatedEndpointsIndexRoute: AuthenticatedEndpointsIndexRoute,
-  AuthenticatedExecutionsIndexRoute: AuthenticatedExecutionsIndexRoute,
   AuthenticatedSourcesIndexRoute: AuthenticatedSourcesIndexRoute,
   AuthenticatedWorkspacesIndexRoute: AuthenticatedWorkspacesIndexRoute,
   AuthenticatedSourcesSourceIdAccountsRoute:

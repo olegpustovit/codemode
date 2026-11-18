@@ -2,7 +2,7 @@
 
 ## Current release — UX prototype Wave 4, schema 27
 
-Deployed on 2026-11-18 at https://codemode.microapps.space from commit `98b36e8c7f30747bd9cc7b311511deeb989971c3`. The ARM SHA-256 is `f443d30b0432e558830bd7c31f1228ff24d7c9b3585a8cb772185ca57dbd66cb` and the UI fingerprint is `19fb5b05d5e3`. The restored-backup preflight preserved 28 tables. All 83 public UI files match staging. Eight smoke tasks, two large aggregation tasks, and agent script save and replay passed the live Codex gate. See [the implementation ledger](ux-iteration/implementation.md) for all four release builds, browser measurements and visual qualification limits.
+Deployed on 2026-11-18 at https://codemode.microapps.space from commit `a589dbb1061383def58c505cb044ebec39073446`. The ARM SHA-256 is `3e7c235d332c648798ce164258dbf50ef2ec31dca31a0826bca8b5300f7b9ad9` and the UI fingerprint is `f6c408fc15ea`. The restored-backup preflight preserved 28 tables. All 83 public UI files match staging. Eight smoke tasks, two large aggregation tasks, and agent script save and replay passed the live Codex gate. See [the implementation ledger](ux-iteration/implementation.md) for all four release builds, browser measurements and visual qualification limits.
 
 ## Previous release — Codemode v7 aggregation update, schema 25
 

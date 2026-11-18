@@ -24,7 +24,7 @@ OAuth-app client settings are encrypted, tenant-private and write-only. The regi
 
 ## Status
 
-Current release (2026-11-18) is UX prototype Wave 4, schema **27**, source **98b36e8c7f30747bd9cc7b311511deeb989971c3**, UI **19fb5b05d5e3**. Restored-backup preflight preserved 28 tables. The live Codex gate passed eight smoke tasks, two large aggregation tasks, and agent script save and replay. See `docs/status.md` and `docs/ux-iteration/implementation.md`.
+Current release (2026-11-18) is UX prototype Wave 4, schema **27**, source **a589dbb1061383def58c505cb044ebec39073446**, UI **f6c408fc15ea**. Restored-backup preflight preserved 28 tables. The live Codex gate passed eight smoke tasks, two large aggregation tasks, and agent script save and replay. See `docs/status.md` and `docs/ux-iteration/implementation.md`.
 
 The final-v5 proposal and all twelve control-plane fixes are implemented and deployed on `oracle-vm` under smdctl, loopback `127.0.0.1:2093`, at `https://codemode.microapps.space`. Historical schema: **20**. Release build: **d45e6106a3a6**, [source commit d45e610](https://github.com/olegpustovit/codemode/commit/d45e6106a3a67a1456975f8421f814cfdb316d70). Release SHA-256: `f03d44a766ad41da3f0f1128a61eb7a26be44c14814f040a9958af4e8e7093f2`. UI fingerprint: **e16dc707d79d**. The React frontend is embedded in this Rust binary.
 

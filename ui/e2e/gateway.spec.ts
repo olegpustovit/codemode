@@ -3024,6 +3024,10 @@ test("integrations: add a namespaced login to the selected workspace", async ({
   }, workspace)
   expect(linked).not.toBe("")
   expect(membership).toContain(linked)
+  await pane
+    .getByRole("button", { name: "Add another login", exact: true })
+    .click()
+  await pane.getByLabel("Namespace", { exact: true }).fill("side_project")
   await page.setViewportSize({ width: 1440, height: 900 })
   await capture(page, "ux-prototype-logins-1440x900.png")
   await page.setViewportSize({ width: 390, height: 844 })
@@ -3140,6 +3144,10 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page.getByRole("tab", { name: /^Needs attention/ }).click()
   await expect.poll(types).toContain("filter")
   await capture(page, "ux-prototype-empty-1440x900.png")
+  await page.getByRole("link", { name: "Workspaces", exact: true }).click()
+  await expect(
+    page.getByRole("heading", { name: "All sources", exact: true })
+  ).toBeVisible()
   await page
     .getByRole("button", { name: "Switch workspace", exact: true })
     .click()

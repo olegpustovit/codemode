@@ -2,7 +2,7 @@
 
 [Owner prototype and implementation plan](https://artifacts.microapps.space/a/gema4jxq4n60)
 
-## Wave 1 work in progress
+## Wave 1
 
 - The desktop rail toggles with its footer control or Backslash and remembers the choice in browser storage. The mobile rail stays horizontal.
 - Execution traces put expandable tool calls before Python and output. The waterfall uses recorded start times, and Python tool paths open their first matching call. Printed flat JSON objects can be viewed as a table or raw text.
@@ -12,18 +12,31 @@
 - Section navigation uses typed browser view transitions for upward and downward movement. Sessions animate pane open, close, push, pop, swap and tab changes. The focus cursor breathes, opening a row triggers a light pass, and entering a detail pane draws its edge. Reduced motion bypasses the snapshot transitions.
 - Empty lists center their content and actions. Search hints appear when a query contains a wildcard.
 
-The focused execution-title and session naming tests passed through `cargo t`. The session test covers repeated namespaces, built-ins, overflow count, and manual rename priority. The UI build, bundle budget, and 36 UI unit tests passed. An earlier browser run stopped at the staged-asset check because the source changed during the optimized build. The optimized desktop trace, OpenAPI, Sessions, and Integrations workflows passed on the prior Wave 1 UI snapshot. Integrations measured 59.7 ms p95 against the prototype’s 100 ms budget. The workspaces header and integration detail refinements still need browser verification on the staged release. Full motion, visual review, and deployment remain pending.
+The focused execution-title and session naming tests passed through `cargo t`. The session test covers repeated namespaces, built-ins, overflow count, and manual rename priority. The UI build, bundle budget, and 36 UI unit tests passed. An earlier browser run stopped at the staged-asset check because the source changed during the optimized build. The optimized desktop trace, OpenAPI, Sessions, and Integrations workflows passed on the prior Wave 1 UI snapshot. Integrations measured 59.7 ms p95 against the prototype’s 100 ms budget. Subsequent release qualification is recorded below.
 
-## Wave 2 work in progress
+## Wave 2
 
 Workspace selection carries through authenticated URLs. The shell menu exposes workspace URLs and workspace actions. Consent preselects a workspace only when the current tenant can see it, and both code exchange and refresh require the grant's canonical resource. Explicit MCP URLs are checked against the token's workspace.
 
 The wave plan anticipated no migration. Schema 25 has no OAuth grant resource field, so this wave adds a nullable resource column in migration 0026. Existing grants retain their plain MCP resource binding. The script and administration migration planned for Wave 4 moves to 0027.
 
-Local UI type checking and 37 unit tests passed before rebasing onto the latest Wave 1 work. Browser, release, and live client verification are pending.
+Local UI type checking and 37 unit tests passed before rebasing onto the latest Wave 1 work. The release and live gateway checks passed. Owner-only external client verification remains pending.
 
-## Wave 3 and Wave 4 work in progress
+## Wave 3 and Wave 4
 
 The Wave 3 namespaced-login browser workflow passed with provider OAuth stubbed. It verifies the created source, workspace membership, and grouped integration row. Search results label tools from providers with multiple connections.
 
 Wave 4 adds migration 0027 for global scripts, provenance, and explicit per-token administration. Saved scripts continue to run under the calling workspace's policies. The separate administration route is retired, and the broker handles its ten operations with the existing administration audit. The eval gate can also require a Codex run that saves a workspace script and replays it by ID.
+
+## Deployed builds
+
+| Wave | Pull request | Production commit | Schema |
+| --- | --- | --- | --- |
+| 1 | [#5](https://github.com/olegpustovit/codemode/pull/5) | `f4039e3` | 25 |
+| 2 | [#6](https://github.com/olegpustovit/codemode/pull/6) | `cdfbf7f` | 26 |
+| 3 | [#7](https://github.com/olegpustovit/codemode/pull/7) | `232a388` | 26 |
+| 4 | [#8](https://github.com/olegpustovit/codemode/pull/8) | `98b36e8c7f30747bd9cc7b311511deeb989971c3` | 27 |
+
+All four restored-backup checks preserved 28 pre-existing tables. Each live Codex gate passed eight smoke tasks and two large aggregation tasks. Wave 4 additionally passed the live agent save and replay task in three MCP calls. Local qualification passed 163 native cases, 39 UI tests and seven targeted optimized-binary Chromium workflows. All 83 public UI files match staging. Production uses ARM SHA-256 `f443d30b0432e558830bd7c31f1228ff24d7c9b3585a8cb772185ca57dbd66cb` and UI fingerprint `19fb5b05d5e3`.
+
+The optimized Chromium run measured 60.6 ms pane click-to-paint p95, 2.20 ms 300-row key-script p95 and 2.40 ms with scope checkboxes. The longest reported task at 4× CPU throttle was 50 ms. A prior instrumented run measured 55 ms. Software WebGL uses a half-resolution backing buffer to reduce rendering load. Desktop and mobile captures cover all eight prototype scenes, with differences in fixture data, displayed state and software-rendered backdrop. Full one-to-one visual parity remains unverified. Provider consent and external Claude Code and Codex connection acceptance remain owner-only.

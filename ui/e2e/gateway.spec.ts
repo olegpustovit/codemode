@@ -409,6 +409,45 @@ async function capture(page: Page, file: string) {
         painted: true,
         hueSettled: true,
       })
+    const geometry = await page.evaluate(async () => {
+      await Promise.allSettled(
+        document
+          .getAnimations()
+          .filter(({ effect }) =>
+            Number.isFinite(effect?.getComputedTiming().endTime)
+          )
+          .map((animation) => animation.finished)
+      )
+      const boxes: Record<string, number[]> = {}
+      for (const selector of [
+        ".shell-top",
+        ".section-rail",
+        "main",
+        ".status-bar",
+        ".list-heading",
+        ".tab-bar",
+        ".pane-stack",
+        ".detail-pane",
+        ".execution-pane",
+        ".consent",
+        ".list-empty",
+        ".workspace-menu",
+      ]) {
+        const element = Array.from(document.querySelectorAll(selector)).find(
+          (node) => node.checkVisibility({ visibilityProperty: true })
+        )
+        if (!element) continue
+        const { x, y, width, height } = element.getBoundingClientRect()
+        boxes[selector] = [x, y, width, height].map(
+          (value) => Math.round(value * 100) / 100
+        )
+      }
+      return boxes
+    })
+    writeFileSync(
+      resolve(output, file.replace(/\.png$/, ".geometry.json")),
+      JSON.stringify(geometry, null, 2) + "\n"
+    )
   }
   await page.screenshot({
     path: resolve(output, file),

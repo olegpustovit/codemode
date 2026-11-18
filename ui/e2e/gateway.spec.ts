@@ -3039,7 +3039,17 @@ test("script scope promotion exposes a global script in a second workspace", asy
   page,
 }) => {
   await login(page, "/scripts")
-  const fixture = await page.evaluate(async () => {
+  const fixture = await page.evaluate(async (url) => {
+    const source = await fetch("/api/sources", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        slug: "script_policy",
+        kind: "mcp_http",
+        url,
+        requiresAccount: false,
+      }),
+    }).then((response) => response.json())
     const workspaces = await fetch("/api/workspaces").then((response) =>
       response.json()
     )
@@ -3049,7 +3059,10 @@ test("script scope promotion exposes a global script in a second workspace", asy
     const other = await fetch("/api/workspaces", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Global script fixture", sourceIds: [] }),
+      body: JSON.stringify({
+        name: "Global script fixture",
+        sourceIds: [source.id],
+      }),
     }).then((response) => response.json())
     const script = await fetch(`/api/workspaces/${main}/scripts`, {
       method: "POST",
@@ -3057,11 +3070,39 @@ test("script scope promotion exposes a global script in a second workspace", asy
       body: JSON.stringify({
         name: "Scope browser script",
         description: "",
-        code: "return 17",
+        code: "try:\n    return await tools.script_policy.echo(value='probe')\nexcept PermissionError as error:\n    return str(error)",
       }),
     }).then((response) => response.json())
-    return { main, other: other.id, script: script.id }
-  })
+    const issued = await fetch("/api/tokens", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Script policy fixture",
+        workspaceId: other.id,
+      }),
+    }).then((response) => response.json())
+    return {
+      main,
+      other: other.id,
+      script: script.id,
+      source: source.id,
+      token: issued.token,
+    }
+  }, fixtureUrl)
+  const policyPath = `/api/workspaces/${fixture.other}/policies` as const
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async ({ path, id }) => {
+          const policies = await fetch(path).then((response) => response.json())
+          return policies.tools.some(
+            (tool: { sourceId: string }) => tool.sourceId === id
+          )
+        },
+        { path: policyPath, id: fixture.source }
+      )
+    )
+    .toBe(true)
   await page.goto(
     `/scripts?workspace=${fixture.main}&selected=${fixture.script}&detail=open`
   )
@@ -3080,6 +3121,49 @@ test("script scope promotion exposes a global script in a second workspace", asy
       exact: true,
     })
   ).toBeVisible()
+  const block = await page.evaluate(
+    async ({ path, id }) => {
+      const source = await fetch(`/api/sources/${id}`).then((response) =>
+        response.json()
+      )
+      return (
+        await fetch(path, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            sourceId: id,
+            sourceRevision: source.revision,
+            upstreamName: "echo",
+            action: "block",
+          }),
+        })
+      ).status
+    },
+    { path: policyPath, id: fixture.source }
+  )
+  expect(block).toBe(204)
+  const execution = await page.request.post(`${loopback}/mcp`, {
+    headers: {
+      host: hostname,
+      Authorization: `Bearer ${fixture.token}`,
+      Accept: "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2025-11-25",
+    },
+    data: {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "execute", arguments: { scriptId: fixture.script } },
+    },
+  })
+  expect(execution.ok()).toBe(true)
+  const executionBody = await execution.json()
+  expect(executionBody.error).toBeUndefined()
+  const run = JSON.parse(executionBody.result.content[0].text)
+  expect(run.status, JSON.stringify(run)).toBe("completed")
+  expect(run.result).toContain(
+    `script_policy.echo is blocked in workspace ${fixture.other}`
+  )
   await page.setViewportSize({ width: 1440, height: 900 })
   await capture(page, "ux-prototype-script-scope-1440x900.png")
   await page.setViewportSize({ width: 390, height: 844 })

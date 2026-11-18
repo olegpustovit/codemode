@@ -48,6 +48,7 @@ Wave 4 adds migration 0027 for global scripts, provenance, and explicit per-toke
 | Trace call fade | [#8](https://github.com/olegpustovit/codemode/pull/8) | `adab4c83ba22ddfae5f9863956822bbd05562bf1` | 27 |
 | Focus cursor glow | [#8](https://github.com/olegpustovit/codemode/pull/8) | `0c4f946ce9c9b3cb9688bd3559870453c8047279` | 27 |
 | Status and control motion | [#8](https://github.com/olegpustovit/codemode/pull/8) | `6f7ee5b18a72baa86b99b0a794910b1e11021cd7` | 27 |
+| Workspace menu guidance | [#8](https://github.com/olegpustovit/codemode/pull/8) | `1bdd8c86aa5335f653b34f3b79aa5199e813a98f` | 27 |
 
 All four restored-backup checks preserved 28 pre-existing tables. Each live Codex gate passed eight smoke tasks and two large aggregation tasks. Wave 4 additionally passed the live agent save and replay task in three MCP calls. Local qualification passed 163 native cases, 39 UI tests and seven targeted optimized-binary Chromium workflows. All 83 public UI files match staging. The initial Wave 4 release used UI fingerprint `19fb5b05d5e3`.
 
@@ -111,3 +112,5 @@ The focus cursor release restores the prototype’s softer midpoint shadow durin
 The motion workflow observes the Linear row’s active Web Animation immediately after selection. Chromium confirmed that the sweep runs for 700 ms and moves the background from 100% to 0%, matching the prototype’s sweep keyframes. The workflow passes with the released UI, including the existing reduced-motion check.
 
 The status and control motion release restores the workspace notice’s 420 ms fade and matches the prototype’s rail, brand, row, tab and consent checkbox transition declarations. The prototype motion and workspace consent workflows passed. The 300-row workflow recorded a 53 ms task at 4× CPU throttle and passed on rerun. The restored-backup preflight preserved 28 tables, all 84 public UI assets matched staging and all 11 live Codex cases passed. UI fingerprint `7d5c741be474`, ARM SHA-256 `916eaf295173c7e8dc25de1e0f52219af620c24ca9afdf254ebf0f7d73220d21`.
+
+The workspace menu release restores the prototype’s authorization guidance. The focused Chromium workflows and live Codex gate passed. UI fingerprint `56669d6ac5f8`, ARM SHA-256 `5ac8816d2b95c8952b7c616a5413aeeb2df8879f5265802e749486e7518c93b9`.

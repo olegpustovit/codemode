@@ -22,6 +22,8 @@ import {
   sourcesQuery,
   accountsQuery,
   oauthAppsQuery,
+  workspacesQuery,
+  workspaceQuery,
 } from "./queries"
 import type { Integration } from "./queries"
 import { Facts } from "@/components/facts"
@@ -34,6 +36,7 @@ import { ConfirmAction } from "@/components/confirm-action"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { useWorkspace } from "@/components/workspace-context"
 import { useStatus } from "@/components/status-bar"
 import {
   created,
@@ -53,6 +56,14 @@ const methodNames = {
   local: "Local",
 }
 export function integrationState(entry: Integration) {
+  if (entry.connections.length > 1) {
+    const state = entry.connections.some(
+      (connection) => connection.state === "ready"
+    )
+      ? "Linked"
+      : "Needs link"
+    return `${state} · ${entry.connections.length} logins`
+  }
   if (!entry.sourceId) return "Available"
   if (entry.state === "ready") return "Linked"
   if (entry.state === "needs_link") return "Needs link"
@@ -509,6 +520,14 @@ function IntegrationDetails({
   const sources = useSuspenseQuery(sourcesQuery).data
   const accounts = useSuspenseQuery(accountsQuery).data
   const apps = useSuspenseQuery(oauthAppsQuery).data
+  const workspaces = useSuspenseQuery(workspacesQuery).data
+  const workspace = useWorkspace()
+  const [target, setTarget] = useState(workspace ?? workspaces[0]?.id ?? "")
+  const [namespace, setNamespace] = useState("")
+  const [showLogin, setShowLogin] = useState(false)
+  const createdLogin = useRef<{ namespace: string; id: string } | undefined>(
+    undefined
+  )
   const source = sources.find((source) => source.id === entry.sourceId)
   const linked = accounts.some((account) => account.sourceId === entry.sourceId)
   const cache = useQueryClient()
@@ -556,6 +575,51 @@ function IntegrationDetails({
       )
       if (authorizationUrl) window.location.assign(authorizationUrl)
     },
+    onError: (error) => report(message(error), "error"),
+  })
+  const extraLogin = useMutation({
+    mutationFn: async () => {
+      const id =
+        createdLogin.current?.namespace === namespace
+          ? createdLogin.current.id
+          : (
+              await write(
+                `/api/integrations/${entry.slug}`,
+                "POST",
+                { namespace },
+                created
+              )
+            ).id
+      createdLogin.current = { namespace, id }
+      if (target) {
+        const scope = await cache.fetchQuery({
+          ...workspaceQuery(target),
+          staleTime: 0,
+        })
+        if (!scope.allSources && !scope.sourceIds.includes(id)) {
+          await write(
+            `/api/workspaces/${target}`,
+            "PUT",
+            { name: scope.name, sourceIds: [...scope.sourceIds, id] },
+            nothing
+          )
+        }
+      }
+      return (
+        await write(
+          `/api/accounts/${id}/oauth`,
+          "POST",
+          undefined,
+          z.object({ authorizationUrl: httpUrl })
+        )
+      ).authorizationUrl
+    },
+    onSuccess: (url) => window.location.assign(url),
+    onSettled: () =>
+      Promise.all([
+        refresh(),
+        cache.invalidateQueries({ queryKey: ["workspaces"] }),
+      ]),
     onError: (error) => report(message(error), "error"),
   })
   const id = entry.sourceId
@@ -686,6 +750,88 @@ function IntegrationDetails({
                 </Button>
               )}
           </form>
+        )}
+        {entry.connections.length > 0 && entry.url && (
+          <section className="integration-logins" aria-label="Logins">
+            <h3>Logins</h3>
+            <ul>
+              {entry.connections.map((login) => (
+                <li key={login.sourceId}>
+                  <Link
+                    to="/sources/$sourceId"
+                    params={{ sourceId: login.sourceId }}
+                  >
+                    {login.name}
+                  </Link>
+                  <code>{login.slug}</code>
+                  <span>
+                    {login.state === "ready"
+                      ? "Linked"
+                      : login.state.replaceAll("_", " ")}{" "}
+                    · {login.toolCount} tools
+                  </span>
+                  <small>
+                    {workspaces
+                      .filter(
+                        (scope) =>
+                          scope.allSources ||
+                          scope.sourceIds.includes(login.sourceId)
+                      )
+                      .map((scope) => scope.name)
+                      .join(", ")}
+                  </small>
+                </li>
+              ))}
+            </ul>
+            {entry.methods.some(
+              (item) => item === "one_click" || item === "oauth_app"
+            ) &&
+              (showLogin ? (
+                <form
+                  className="connection-form"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    extraLogin.mutate()
+                  }}
+                >
+                  <label htmlFor="integration-namespace">Namespace</label>
+                  <div className="flex items-center gap-2">
+                    <code>{entry.slug}_</code>
+                    <Input
+                      id="integration-namespace"
+                      value={namespace}
+                      onChange={(event) => setNamespace(event.target.value)}
+                      pattern="[a-z][a-z0-9_]{0,30}"
+                      required
+                    />
+                  </div>
+                  <code>
+                    tools.{entry.slug}_{namespace || "suffix"}.&lt;tool&gt;(…)
+                  </code>
+                  <label htmlFor="integration-workspace">
+                    Add to workspace
+                  </label>
+                  <NativeSelect
+                    id="integration-workspace"
+                    value={target}
+                    onChange={(event) => setTarget(event.target.value)}
+                  >
+                    {workspaces.map((scope) => (
+                      <NativeSelectOption value={scope.id} key={scope.id}>
+                        {scope.name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                  <Button type="submit" disabled={extraLogin.isPending}>
+                    Connect login
+                  </Button>
+                </form>
+              ) : (
+                <Button variant="outline" onClick={() => setShowLogin(true)}>
+                  Add another login
+                </Button>
+              ))}
+          </section>
         )}
         <div className="detail-actions">
           {entry.docs && (

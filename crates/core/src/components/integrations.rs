@@ -1,5 +1,5 @@
 pub use super::providers::{Entry, Method, registry};
-use super::sources::{Source, Sources, Transport};
+use super::sources::{Record, Source, SourceInput, Sources, Transport};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -9,13 +9,55 @@ pub struct Integration {
     #[serde(flatten)]
     pub entry: Entry,
     pub source_id: Option<Uuid>,
+    pub connections: Vec<Connection>,
     pub state: String,
     pub tool_count: i64,
     pub tool_names: Vec<String>,
     pub error: Option<String>,
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Connection {
+    pub source_id: Uuid,
+    pub slug: String,
+    pub name: String,
+    pub state: String,
+    pub tool_count: i64,
+    pub error: Option<String>,
+}
+
+impl From<&Record> for Connection {
+    fn from(source: &Record) -> Self {
+        Self {
+            source_id: source.id,
+            slug: source.source.slug.clone(),
+            name: source.name.clone(),
+            state: source.status.clone(),
+            tool_count: source.tool_count,
+            error: source.last_error.clone(),
+        }
+    }
+}
+
+fn matches_entry(source: &Record, entry: &Entry) -> bool {
+    matches!(&source.source.transport, Transport::McpHttp { url, .. } if url.trim_end_matches('/') == entry.url.trim_end_matches('/'))
+}
+
+fn valid_namespace(namespace: &str) -> bool {
+    let mut bytes = namespace.bytes();
+    namespace.len() <= 31
+        && bytes.next().is_some_and(|b| b.is_ascii_lowercase())
+        && bytes.all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(
+        "namespace must start with a lowercase letter and contain at most 31 lowercase letters, numbers, or underscores"
+    )]
+    Namespace,
+    #[error("That namespace is taken")]
+    NamespaceTaken,
     #[error("integration not found")]
     NotFound,
     #[error(transparent)]
@@ -28,18 +70,28 @@ pub async fn list(managed: &Sources) -> Result<Vec<Integration>, Error> {
     let mut result = Vec::new();
     let mut matched = std::collections::BTreeSet::new();
     for entry in registry()? {
-        let source = sources.iter().find(|record| matches!(&record.source.transport, Transport::McpHttp { url, .. } if url.trim_end_matches('/') == entry.url.trim_end_matches('/')));
-        if let Some(source) = source {
+        let mut connections: Vec<_> = sources
+            .iter()
+            .filter(|source| matches_entry(source, &entry))
+            .collect();
+        connections.sort_by_key(|source| source.source.slug != entry.slug);
+        let source = connections.first().copied();
+        let mut tool_names = Vec::new();
+        for source in &connections {
             matched.insert(source.id);
+            if source.status == "ready" {
+                tool_names.extend(managed.tool_names(source.id).await);
+            }
         }
         result.push(Integration {
             source_id: source.map(|s| s.id),
+            connections: connections
+                .iter()
+                .map(|source| Connection::from(*source))
+                .collect(),
             state: source.map_or("available", |s| s.status.as_str()).into(),
-            tool_count: source.map_or(0, |s| s.tool_count),
-            tool_names: match source {
-                Some(source) if source.status == "ready" => managed.tool_names(source.id).await,
-                _ => Vec::new(),
-            },
+            tool_count: connections.iter().map(|s| s.tool_count).sum(),
+            tool_names,
             error: source.and_then(|s| s.last_error.clone()),
             entry,
         });
@@ -50,6 +102,7 @@ pub async fn list(managed: &Sources) -> Result<Vec<Integration>, Error> {
     {
         let local = matches!(source.source.transport, Transport::McpStdio { .. });
         result.push(Integration {
+            connections: vec![Connection::from(&source)],
             tool_names: if source.status == "ready" {
                 managed.tool_names(source.id).await
             } else {
@@ -92,32 +145,63 @@ pub async fn list(managed: &Sources) -> Result<Vec<Integration>, Error> {
     Ok(result)
 }
 
-pub async fn add(sources: &Sources, slug: &str) -> Result<Uuid, Error> {
+pub async fn add(sources: &Sources, slug: &str, namespace: Option<&str>) -> Result<Uuid, Error> {
     let entry = registry()?
         .into_iter()
         .find(|entry| entry.slug == slug)
         .ok_or(Error::NotFound)?;
-    // Repeating a browser click reuses the user's existing connection to this vendor.
-    if let Some(existing) = sources.list().await?.into_iter().find(|record| matches!(&record.source.transport, Transport::McpHttp { url, .. } if url.trim_end_matches('/') == entry.url.trim_end_matches('/'))) {
-        return Ok(existing.id);
-    }
-    Ok(sources
-        .save(
+    let (slug, name) = if let Some(namespace) = namespace {
+        if !valid_namespace(namespace) {
+            return Err(Error::Namespace);
+        }
+        (
+            format!("{}_{namespace}", entry.slug),
+            Some(format!("{} ({namespace})", entry.name)),
+        )
+    } else {
+        if let Some(existing) = sources
+            .list()
+            .await?
+            .into_iter()
+            .find(|record| matches_entry(record, &entry))
+        {
+            return Ok(existing.id);
+        }
+        (entry.slug, None)
+    };
+    sources
+        .save_input(
             None,
-            Source {
-                slug: entry.slug,
-                requires_account: !entry.methods.contains(&Method::Open),
-                transport: Transport::McpHttp {
-                    url: entry.url,
-                    bearer_env: None,
+            SourceInput {
+                source: Source {
+                    slug,
+                    requires_account: !entry.methods.contains(&Method::Open),
+                    transport: Transport::McpHttp {
+                        url: entry.url,
+                        bearer_env: None,
+                    },
                 },
+                name,
+                icon: None,
             },
         )
-        .await?)
+        .await
+        .map_err(|error| match error {
+            super::sources::Error::Conflict if namespace.is_some() => Error::NamespaceTaken,
+            other => Error::Source(other),
+        })
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn namespace_is_a_bounded_python_identifier_suffix() {
+        assert!(valid_namespace("personal_2"));
+        assert!(valid_namespace(&"a".repeat(31)));
+        for invalid in ["", "_personal", "2nd", "Personal", "a-b", &"a".repeat(32)] {
+            assert!(!valid_namespace(invalid));
+        }
+    }
     #[test]
     fn registry_uses_unique_lowercase_names_and_safe_remote_addresses() {
         let entries = registry().unwrap();

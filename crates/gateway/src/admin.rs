@@ -1176,6 +1176,13 @@ impl From<integrations::Error> for ApiError {
                 Self::Message(StatusCode::NOT_FOUND, "integration not found")
             }
             integrations::Error::Source(error) => error.into(),
+            integrations::Error::Namespace => Self::Message(
+                StatusCode::BAD_REQUEST,
+                "Use a lowercase namespace suffix of 1–31 letters, digits or underscores, starting with a letter",
+            ),
+            integrations::Error::NamespaceTaken => {
+                Self::Message(StatusCode::CONFLICT, "That namespace is taken")
+            }
             other => unavailable(other),
         }
     }
@@ -1185,11 +1192,23 @@ async fn integration_list(
 ) -> Result<Json<Vec<integrations::Integration>>, ApiError> {
     Ok(Json(integrations::list(&state.sources).await?))
 }
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AddIntegration {
+    namespace: Option<String>,
+}
+
 async fn add_integration(
     AxumState(state): AxumState<State>,
     Path(slug): Path<String>,
+    input: Option<Json<AddIntegration>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let id = integrations::add(&state.sources, &slug).await?;
+    let id = integrations::add(
+        &state.sources,
+        &slug,
+        input.and_then(|Json(input)| input.namespace).as_deref(),
+    )
+    .await?;
     state.sources.wake();
     Ok(Json(serde_json::json!({"id":id})))
 }

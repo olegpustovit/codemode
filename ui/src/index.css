@@ -928,3 +928,9 @@ mark {
 .workspace-switch b { view-transition-name: ws-name; }
 :active-view-transition-type(ws)::view-transition-new(main) { animation: codemode-fade-in var(--enter) var(--e-soft) 60ms both; }
 @keyframes workspace-menu-enter { from { opacity: 0; transform: translateY(-4px); } }
+
+.integration-logins { display: grid; gap: var(--s-3); }
+.integration-logins > h3 { font-size: var(--fs-1); letter-spacing: .1em; text-transform: uppercase; color: var(--c-text-3); }
+.integration-logins li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-1) var(--s-3); border-top: 1px solid var(--c-line); padding-block: var(--s-2); }
+.integration-logins li code, .integration-logins li small { color: var(--c-text-3); overflow-wrap: anywhere; }
+.integration-logins > button { justify-self: start; }

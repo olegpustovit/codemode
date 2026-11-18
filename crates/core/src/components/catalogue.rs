@@ -181,7 +181,7 @@ impl Catalogue {
             regexp_replace(websearch_to_tsquery('simple',$7)::text,
               $pattern$'([[:alnum:]]+)'$pattern$, $replacement$'\1':*$replacement$, 'g')::tsquery AS prefix
         ), ranked AS (
-          SELECT t.path,t.description,t.stub_brief,t.stub_full,
+          SELECT t.path,t.description,t.stub_brief,t.stub_full,t.source_id,
           CASE WHEN t.observed_revision=s.revision THEN t.observed_shape END AS observed_shape,
           EXISTS(SELECT 1 FROM tool_policies p WHERE p.endpoint_id=$6 AND p.source_id=t.source_id AND p.upstream_name=t.upstream_name AND p.action='block') AS blocked,
           CASE WHEN btrim($1)='' THEN 0::real ELSE (2*(t.path=$1 OR t.upstream_name=$1)::int
@@ -195,10 +195,14 @@ impl Catalogue {
         ), paged AS (
           SELECT * FROM ranked WHERE $3::real IS NULL OR rank < $3 OR (rank=$3 AND path>$4)
           ORDER BY rank DESC,path LIMIT 11
-        ) SELECT path,description,
+        ) SELECT path,
+          CASE WHEN s.kind='mcp_http' AND EXISTS (
+            SELECT 1 FROM sources sibling WHERE sibling.tenant_id=s.tenant_id AND sibling.id<>s.id
+              AND sibling.kind=s.kind AND rtrim(sibling.config->>'url','/')=rtrim(s.config->>'url','/')
+          ) THEN s.name || ': ' || paged.description ELSE paged.description END AS "description!",
           (CASE WHEN $2 AND row_number() OVER(ORDER BY rank DESC,path)<=3 THEN stub_full ELSE stub_brief END
             || COALESCE(E'\n# Observed result shape: ' || observed_shape,'')) AS "signature!",
-          rank AS "rank!",blocked AS "blocked!" FROM paged ORDER BY rank DESC,path"#,
+          rank AS "rank!",blocked AS "blocked!" FROM paged JOIN sources s ON s.id=paged.source_id ORDER BY rank DESC,path"#,
             query,full,rank,path,allowed,workspace,prefix).fetch_all(&self.db.0).await.map_err(Error::from)?;
         let mut page = page(rows, query, full)?;
         if page.tools.is_empty() && cursor.is_none() && !prefix.is_empty() {

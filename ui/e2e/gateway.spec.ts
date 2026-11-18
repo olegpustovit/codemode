@@ -2961,3 +2961,56 @@ test("bulk panes: custom sync, revision-safe script deletion and token revocatio
     }, owned)
   }
 })
+
+test("integrations: add a namespaced login to the selected workspace", async ({
+  page,
+}) => {
+  await login(page, "/integrations")
+  const workspace = await page.evaluate(async () => {
+    const response = await fetch("/api/workspaces", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Login fixture", sourceIds: [] }),
+    })
+    return (await response.json()).id as string
+  })
+  await page.evaluate(async () => {
+    await fetch("/api/integrations/linear", { method: "POST" })
+  })
+  await page.goto(
+    `/integrations?workspace=${workspace}&selected=linear&detail=open`
+  )
+  const pane = page.getByRole("region", {
+    name: "Integration details",
+    exact: true,
+  })
+  await pane
+    .getByRole("button", { name: "Add another login", exact: true })
+    .click()
+  await pane.getByLabel("Namespace", { exact: true }).fill("browser_fixture")
+  await expect(
+    pane.getByLabel("Add to workspace", { exact: true })
+  ).toHaveValue(workspace)
+  await expect(
+    pane.getByText("tools.linear_browser_fixture.<tool>(…)", { exact: true })
+  ).toBeVisible()
+  let linked = ""
+  await page.route("**/api/accounts/*/oauth", async (route) => {
+    linked = new URL(route.request().url()).pathname.split("/")[3]
+    await route.fulfill({
+      json: {
+        authorizationUrl: `${origin}/integrations?workspace=${workspace}&selected=linear&detail=open`,
+      },
+    })
+  })
+  await pane.getByRole("button", { name: "Connect login", exact: true }).click()
+  await expect(
+    pane.getByText("Linear (browser_fixture)", { exact: true })
+  ).toBeVisible()
+  const membership = await page.evaluate(async (id) => {
+    const response = await fetch(`/api/workspaces/${id}`)
+    return (await response.json()).sourceIds as string[]
+  }, workspace)
+  expect(linked).not.toBe("")
+  expect(membership).toContain(linked)
+})

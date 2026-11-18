@@ -196,6 +196,18 @@ export const integrationSchema = z.object({
       scopes: z.array(z.string()),
     })
     .optional(),
+  connections: z
+    .array(
+      z.object({
+        sourceId: z.uuid(),
+        slug: z.string(),
+        name: z.string(),
+        state: z.string(),
+        toolCount: z.number(),
+        error: z.string().nullable(),
+      })
+    )
+    .default([]),
   sourceId: z.uuid().nullable(),
   state: z.string(),
   toolCount: z.number(),

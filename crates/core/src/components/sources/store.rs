@@ -78,7 +78,7 @@ impl Sources {
             .into_iter()
             .map(|row| {
                 let needs_link = row.config.0.requires_account && !linked.contains(&row.id);
-                let preset = presets.iter().find(|entry| matches!(&row.config.0.transport,Transport::McpHttp{url,..} if entry.url.trim_end_matches('/') == url.trim_end_matches('/')));
+                let preset = presets.iter().find(|entry| matches!(&row.config.0.transport,Transport::McpHttp{url,..} if entry.url.trim_end_matches('/') == url.trim_end_matches('/') && !row.config.0.slug.starts_with(&format!("{}_", entry.slug))));
                 Record {
                     id: row.id,
                     name: preset.map_or(row.name, |entry| entry.name.clone()),
@@ -126,7 +126,7 @@ impl Sources {
             icon,
         } = input;
         if (name.is_some() || icon.is_some())
-            && matches!(&source.transport,Transport::McpHttp{url,..} if super::super::providers::registry().map_err(|_| Error::Config("invalid provider registry".into()))?.iter().any(|entry| entry.url.trim_end_matches('/') == url.trim_end_matches('/')))
+            && matches!(&source.transport,Transport::McpHttp{url,..} if super::super::providers::registry().map_err(|_| Error::Config("invalid provider registry".into()))?.iter().any(|entry| entry.url.trim_end_matches('/') == url.trim_end_matches('/') && !source.slug.starts_with(&format!("{}_", entry.slug))))
         {
             return Err(Error::Display(
                 "preset names and icons are fixed; add this provider from Integrations",
@@ -235,7 +235,10 @@ impl Sources {
             if super::super::providers::registry()
                 .map_err(|_| Error::Config("invalid provider registry".into()))?
                 .iter()
-                .any(|entry| entry.url.trim_end_matches('/') == url.trim_end_matches('/'))
+                .any(|entry| {
+                    entry.url.trim_end_matches('/') == url.trim_end_matches('/')
+                        && !record.source.slug.starts_with(&format!("{}_", entry.slug))
+                })
             {
                 return Err(Error::Display("preset names and icons are fixed"));
             }

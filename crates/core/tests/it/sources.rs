@@ -199,8 +199,11 @@ async fn integrations_reuse_connections_and_merge_only_the_current_tenants_link_
     use codemode_core::components::integrations;
     let db = database(&pool).await;
     let sources = managed_sources(db.clone(), Catalogue::new(db.clone()));
-    let github = integrations::add(&sources, "github").await.unwrap();
-    assert_eq!(integrations::add(&sources, "github").await.unwrap(), github);
+    let github = integrations::add(&sources, "github", None).await.unwrap();
+    assert_eq!(
+        integrations::add(&sources, "github", None).await.unwrap(),
+        github
+    );
     assert_eq!(sources.list().await.unwrap().len(), 1);
     let row = integrations::list(&sources)
         .await
@@ -215,7 +218,10 @@ async fn integrations_reuse_connections_and_merge_only_the_current_tenants_link_
         .link_bearer(github, "fixture-integration-token".into())
         .await
         .unwrap();
-    assert_eq!(integrations::add(&sources, "github").await.unwrap(), github);
+    assert_eq!(
+        integrations::add(&sources, "github", None).await.unwrap(),
+        github
+    );
     assert_eq!(accounts.list().await.unwrap().len(), 1);
     let row = integrations::list(&sources)
         .await
@@ -224,6 +230,49 @@ async fn integrations_reuse_connections_and_merge_only_the_current_tenants_link_
         .find(|entry| entry.entry.slug == "github")
         .unwrap();
     assert_eq!(row.state, "pending");
+    let second = integrations::add(&sources, "github", Some("personal"))
+        .await
+        .unwrap();
+    assert_ne!(second, github);
+    assert!(matches!(
+        integrations::add(&sources, "github", Some("personal")).await,
+        Err(integrations::Error::NamespaceTaken)
+    ));
+    let grouped = integrations::list(&sources)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|row| row.entry.slug == "github")
+        .unwrap();
+    assert_eq!(grouped.source_id, Some(github));
+    assert_eq!(grouped.connections[1].source_id, second);
+    assert_eq!(grouped.connections[1].name, "GitHub (personal)");
+    let catalogue = Catalogue::new(db.clone());
+    let revision = sources.get(second).await.unwrap().unwrap().revision;
+    catalogue
+        .replace(
+            second,
+            &[codemode_core::components::catalogue::Definition {
+                upstream_name: "read_issue".into(),
+                path: "github_personal.read_issue".into(),
+                description: "Read an issue".into(),
+                input_schema: serde_json::json!({"type":"object"}),
+                output_schema: None,
+                read_only: true,
+                destructive: false,
+            }],
+            revision,
+        )
+        .await
+        .unwrap();
+    let results = catalogue
+        .search("read_issue", false, None, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        results.tools[0].description,
+        "GitHub (personal): Read an issue"
+    );
     let tenant: Uuid = sqlx::query_scalar("INSERT INTO tenants DEFAULT VALUES RETURNING id")
         .fetch_one(&pool)
         .await
@@ -239,7 +288,7 @@ async fn integrations_reuse_connections_and_merge_only_the_current_tenants_link_
     assert_eq!(row.source_id, None);
     assert_eq!(row.state, "available");
     assert!(matches!(
-        integrations::add(&other, "missing").await,
+        integrations::add(&other, "missing", None).await,
         Err(integrations::Error::NotFound)
     ));
     assert!(other.list().await.unwrap().is_empty());
@@ -326,7 +375,7 @@ async fn oauth_apps_are_sealed_tenant_private_and_independent_of_linked_accounts
     let db = global.for_tenant(Uuid::nil()).await.unwrap();
     let sources = managed_sources(db.clone(), Catalogue::new(db.clone()));
     let accounts = Accounts::new(db.clone(), Some([73; 32]), "test".into()).unwrap();
-    let source = integrations::add(&sources, "github").await.unwrap();
+    let source = integrations::add(&sources, "github", None).await.unwrap();
     let app = |id: &str, secret: &str| OAuthAppInput {
         client_id: id.to_owned().into(),
         client_secret: secret.to_owned().into(),

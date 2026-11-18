@@ -870,7 +870,7 @@ mark {
 @keyframes codemode-settle-right { from { opacity: 0; transform: translateX(-12px); } }
 .data-cursor { transition: transform var(--enter) var(--e-soft), height var(--enter) var(--e-soft); }
 .data-grid:focus .data-cursor::before { animation: codemode-breathe 3.2s ease-in-out infinite; }
-@keyframes codemode-breathe { 50% { opacity: .55; box-shadow: 0 0 2px rgba(var(--hue), .3); } }
+@keyframes codemode-breathe { 50% { opacity: .55; } }
 :active-view-transition-type(filter)::view-transition-new(main) { animation: codemode-fade-in var(--enter) linear both; }
 
 .data-row {

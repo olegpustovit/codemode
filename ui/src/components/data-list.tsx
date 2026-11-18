@@ -195,11 +195,19 @@ export function DataList({
   useLayoutEffect(() => {
     const place = () => {
       const row = document.getElementById(`${prefix}-${active}`)
-      if (!row || !cursor.current) return
-      cursor.current.style.transform = `translateY(${row.offsetTop}px)`
-      cursor.current.style.height = `${row.offsetHeight}px`
-      if (document.activeElement === root.current)
+      const body = row?.parentElement
+      if (!row || !body || !cursor.current) return
+      const top = row.offsetTop
+      const height = row.offsetHeight
+      if (
+        document.activeElement === root.current &&
+        (top < body.scrollTop ||
+          top + height > body.scrollTop + body.clientHeight)
+      ) {
         row.scrollIntoView?.({ block: "nearest" })
+      }
+      cursor.current.style.transform = `translateY(${top}px)`
+      cursor.current.style.height = `${height}px`
     }
     place()
     window.addEventListener("resize", place)

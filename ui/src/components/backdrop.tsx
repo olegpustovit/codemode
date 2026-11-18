@@ -96,9 +96,21 @@ export function Backdrop() {
     const current = [...target.current]
     let previous = started
     let paintedHue = ""
+    const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info")
+    const renderer = rendererInfo
+      ? String(gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL))
+      : ""
+    // A smaller backing buffer keeps the same scene moving on software WebGL.
+    const software = /swiftshader|llvmpipe|software rasterizer/i.test(renderer)
+    let paintedAt = -Infinity
     const frame = (now: number) => {
       raf = 0
       if (document.hidden || lost) return
+      if (software && !motion.matches && now - paintedAt < 1000 / 24) {
+        raf = requestAnimationFrame(frame)
+        return
+      }
+      paintedAt = now
       const blend = motion.matches
         ? 1
         : 1 - Math.exp(-Math.min(now - previous, 100) / 270)
@@ -119,23 +131,19 @@ export function Backdrop() {
     const kick = () => {
       if (!raf && !document.hidden && !lost) raf = requestAnimationFrame(frame)
     }
-    const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info")
-    const renderer = rendererInfo
-      ? String(gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL))
-      : ""
-    // A smaller backing buffer keeps the same scene moving on software WebGL.
-    const software = /swiftshader|llvmpipe|software rasterizer/i.test(renderer)
     const size = () => {
       const scale = software ? 0.4 : Math.min(devicePixelRatio || 1, 2)
       cv.width = Math.max(1, Math.round(innerWidth * scale))
       cv.height = Math.max(1, Math.round(innerHeight * scale))
       gl.viewport(0, 0, cv.width, cv.height)
+      paintedAt = -Infinity
       kick()
     }
     const visibility = () => {
       cancelAnimationFrame(raf)
       raf = 0
       previous = performance.now()
+      paintedAt = -Infinity
       kick()
     }
     const contextLost = () => {

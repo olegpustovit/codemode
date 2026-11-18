@@ -12,7 +12,9 @@ let reduced: boolean
 let hidden: boolean
 let motionChange: EventListener | undefined
 const gl = {
-  getExtension: vi.fn<() => { UNMASKED_RENDERER_WEBGL: number } | null>(() => null),
+  getExtension: vi.fn<() => { UNMASKED_RENDERER_WEBGL: number } | null>(
+    () => null
+  ),
   getParameter: vi.fn(() => "SwiftShader"),
   createProgram: vi.fn(() => ({})),
   createBuffer: vi.fn(() => ({})),
@@ -39,10 +41,10 @@ const gl = {
   deleteBuffer: vi.fn(),
   deleteProgram: vi.fn(),
 }
-function draw() {
+function draw(now = performance.now()) {
   const pending = [...frames.values()]
   frames.clear()
-  pending.forEach((frame) => frame(performance.now()))
+  pending.forEach((frame) => frame(now))
 }
 beforeEach(() => {
   vi.clearAllMocks()
@@ -122,12 +124,16 @@ test("context loss stops rendering and reveals the fallback", () => {
   expect(canvas.style.visibility).toBe("hidden")
 })
 
-test("uses a smaller backing buffer on software WebGL", () => {
+test("uses a smaller backing buffer and caps software WebGL frames", () => {
   gl.getExtension.mockReturnValue({ UNMASKED_RENDERER_WEBGL: 1 })
   const view = render(<Backdrop />)
   expect(view.container.querySelector("canvas")?.width).toBe(
     Math.round(innerWidth * 0.4)
   )
-  draw()
+  const first = performance.now()
+  draw(first)
+  draw(first + 16)
   expect(gl.drawArrays).toHaveBeenCalledOnce()
+  draw(first + 50)
+  expect(gl.drawArrays).toHaveBeenCalledTimes(2)
 })

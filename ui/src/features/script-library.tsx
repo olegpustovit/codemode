@@ -272,7 +272,7 @@ export function ScriptLibraryPage() {
               listRef={list}
               busy={scripts.isFetching}
               selectedId={selected?.id}
-              columns={["Script", "Description", "Scope", "Saved"]}
+              columns={["Script", "Scope", "Saved"]}
               rows={rows.map((s) => ({
                 id: s.id,
                 label: s.name,
@@ -283,8 +283,13 @@ export function ScriptLibraryPage() {
                   <span key="name" className="font-mono">
                     <MatchText query={search.q ?? ""}>{s.name}</MatchText>
                   </span>,
-                  s.description || "—",
-                  s.workspaceId ? workspace?.name : "Global",
+                  <span
+                    key="scope"
+                    className="script-scope"
+                    data-global={!s.workspaceId}
+                  >
+                    {s.workspaceId ? workspace?.name : "Global"}
+                  </span>,
                   <time
                     key="saved"
                     dateTime={s.updatedAt}
@@ -435,9 +440,16 @@ export function ScriptLibraryPage() {
                       items={[
                         {
                           label: "Scope",
-                          value: detail.data.workspaceId
-                            ? workspace.name
-                            : "Global",
+                          value: (
+                            <span
+                              className="script-scope"
+                              data-global={!detail.data.workspaceId}
+                            >
+                              {detail.data.workspaceId
+                                ? `${workspace.name} only`
+                                : "Global"}
+                            </span>
+                          ),
                         },
                         ...(detail.data.savedBy
                           ? [

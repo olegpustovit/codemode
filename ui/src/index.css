@@ -384,8 +384,12 @@
 .tab-bar { flex-shrink: 0; overflow-x: auto; }
 .tab-bar > button { flex-shrink: 0; }
 @media (max-width: 1000px) { .workspace-screen { --list-columns: minmax(0,1fr) 100px; } .workspace-screen .data-extra:nth-child(2) { display: none; } }
-.scripts-screen { --list-columns: minmax(0,1fr) minmax(0,1.3fr) 110px 110px; }
-@media (max-width: 1000px) { .scripts-screen { --list-columns: minmax(0,1fr) 110px; } .scripts-screen .data-extra:nth-child(2), .scripts-screen .data-extra:nth-child(4) { display: none; } }
+.scripts-screen, .scripts-screen .pane-stack[data-open="true"] .list-pane { --list-columns: minmax(0,1fr) 110px 110px; }
+.scripts-screen .pane-stack[data-open="true"] .list-pane .data-extra:nth-child(2) { display: block; }
+@media (max-width: 1000px) {
+  .scripts-screen { --list-columns: minmax(0,1fr) 110px; }
+  .scripts-screen .data-extra:nth-child(3) { display: none; }
+}
 .tokens-screen { --list-columns: minmax(0,1fr) 130px 120px 120px; }
 .tokens-screen .pane-stack[data-open="true"] .list-pane { --list-columns: minmax(0,1fr) 100px; }
 .tokens-screen .pane-stack[data-open="true"] .list-pane .data-extra:nth-child(3) { display: none; }
@@ -919,8 +923,24 @@ mark {
 .integration-logins { display: grid; gap: var(--s-3); }
 .integration-logins > h3 { font-size: var(--fs-1); letter-spacing: .1em; text-transform: uppercase; color: var(--c-text-3); }
 .integration-logins li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-1) var(--s-3); border-top: 1px solid var(--c-line); padding-block: var(--s-2); }
-.integration-logins li code, .integration-logins li small { color: var(--c-text-3); overflow-wrap: anywhere; }
+.integration-logins li code, .integration-logins li small { overflow-wrap: anywhere; }
 .integration-logins > button { justify-self: start; }
+.integration-logins li code { grid-area: 1 / 1; }
+.integration-logins li a { grid-area: 2 / 1; color: var(--c-text-3); }
+.integration-login-state { grid-area: 1 / 2; }
+.integration-login-workspaces { grid-area: 2 / 2; }
+.integration-login-state, .integration-login-workspaces { font-size: var(--fs-2); text-align: right; color: var(--c-text-2); }
+.integration-login-form { display: grid; gap: var(--s-2); padding-block: var(--s-3); border-block: 1px solid var(--c-line); }
+.integration-login-form button { justify-self: start; }
+.integration-namespace { display: flex; align-items: center; border: 1px solid var(--c-line-2); height: 32px; font: var(--fs-3) var(--f-mono); padding-left: var(--s-2); }
+.integration-namespace > code { color: var(--c-text-3); }
+.integration-namespace > input { flex: 1; min-width: 0; height: 100%; border: 0; border-radius: 0; padding-left: 0; background: transparent; font: inherit; }
+.integration-namespace-preview { font: var(--fs-2) var(--f-mono); color: var(--c-text-2); }
+.integration-namespace-preview code { color: var(--c-accent-text); }
+.integration-login-destination { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); color: var(--c-text-3); font-size: var(--fs-2); }
+.script-scope { text-transform: uppercase; font-size: var(--fs-2); letter-spacing: .04em; color: var(--c-text-2); }
+.script-scope[data-global="true"] { color: var(--c-accent-text); }
+
 
 .app-shell .tab-underline { transition: transform var(--enter) var(--e-soft), width var(--enter) var(--e-soft); }
 .app-shell .workspace-check { view-transition-name: ws-check; }

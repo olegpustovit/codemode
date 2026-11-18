@@ -701,11 +701,24 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await expect(page.locator(".trace-return dd")).toHaveText(
     JSON.stringify(execution.result)
   )
+  await page
+    .getByRole("button", {
+      name: `tools.${source.pythonName}.echo`,
+      exact: true,
+    })
+    .click()
   await page.setViewportSize({ width: 1440, height: 900 })
   await capture(page, "ux-prototype-trace-1440x900.png")
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
   await capture(page, "ux-prototype-trace-390x844.png")
+  await page.goto("/sessions")
+  await expect(
+    page.getByRole("grid", { name: "Sessions", exact: true })
+  ).toBeVisible()
+  await capture(page, "ux-prototype-sessions-390x844.png")
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await capture(page, "ux-prototype-sessions-1440x900.png")
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto(`/sources/${sourceId}/accounts`)
   await page
@@ -1309,9 +1322,9 @@ test("Saved scripts: CRUD, stale-edit protection and both MCP eras", async ({
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...original,
-        id: undefined,
-        updatedAt: undefined,
+        name: original.name,
+        description: original.description,
+        revision: original.revision,
         code: "return 43",
       }),
     })
@@ -3143,6 +3156,10 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     "data-rail",
     "collapsed"
   )
+  await page.getByRole("link", { name: "Tokens", exact: true }).click()
+  await expect(
+    page.getByRole("heading", { name: "Tokens", exact: true })
+  ).toBeVisible()
   await capture(page, "ux-prototype-collapsed-rail-1440x900.png")
   await page.setViewportSize({ width: 390, height: 844 })
   await capture(page, "ux-prototype-collapsed-rail-390x844.png")
@@ -3152,11 +3169,6 @@ test("prototype motion carries transition types and honors reduced motion", asyn
     .click()
   await page.getByRole("link", { name: "Sessions", exact: true }).click()
   await expect.poll(types).toContain("up")
-  await capture(page, "ux-prototype-sessions-1440x900.png")
-  await page.setViewportSize({ width: 390, height: 844 })
-  await capture(page, "ux-prototype-sessions-390x844.png")
-  await page.setViewportSize({ width: 1440, height: 900 })
-
   await page.emulateMedia({ reducedMotion: "reduce" })
   const before = await types()
   await page.getByRole("link", { name: "Integrations", exact: true }).click()

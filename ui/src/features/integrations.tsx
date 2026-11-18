@@ -533,7 +533,7 @@ function IntegrationDetails({
   const workspace = useWorkspace()
   const [target, setTarget] = useState(workspace ?? workspaces[0]?.id ?? "")
   const [namespace, setNamespace] = useState("")
-  const [showLogin, setShowLogin] = useState(false)
+  const [showLogin, setShowLogin] = useState(entry.state === "ready")
   const createdLogin = useRef<{ namespace: string; id: string } | undefined>(
     undefined
   )
@@ -738,6 +738,104 @@ function IntegrationDetails({
         )}
         <VendorGlyph name={entry.icon} label={entry.name} large />
         <p>{entry.description}</p>
+        {entry.connections.length > 0 && entry.url && (
+          <section className="integration-logins" aria-label="Logins">
+            <h3>Logins</h3>
+            <ul>
+              {entry.connections.map((login) => (
+                <li key={login.sourceId}>
+                  <code>tools.{login.slug}</code>
+                  <Link
+                    to="/sources/$sourceId"
+                    params={{ sourceId: login.sourceId }}
+                  >
+                    {login.name}
+                  </Link>
+                  <span className="integration-login-state">
+                    {login.state === "ready"
+                      ? `${login.toolCount} tools`
+                      : login.state === "needs_link"
+                        ? "Needs link"
+                        : "Failed"}
+                  </span>
+                  <small className="integration-login-workspaces">
+                    {workspaces
+                      .filter(
+                        (scope) =>
+                          scope.allSources ||
+                          scope.sourceIds.includes(login.sourceId)
+                      )
+                      .map((scope) => scope.name)
+                      .join(", ")}
+                  </small>
+                </li>
+              ))}
+            </ul>
+            {entry.methods.some(
+              (item) => item === "one_click" || item === "oauth_app"
+            ) &&
+              (showLogin ? (
+                <form
+                  className="integration-login-form"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    extraLogin.mutate()
+                  }}
+                >
+                  <label htmlFor="integration-namespace">Namespace</label>
+                  <div className="integration-namespace">
+                    <code>{entry.slug}_</code>
+                    <Input
+                      id="integration-namespace"
+                      value={namespace}
+                      onChange={(event) => setNamespace(event.target.value)}
+                      aria-describedby="integration-namespace-hint integration-namespace-preview"
+                      autoComplete="off"
+                      spellCheck={false}
+                      pattern="[a-z][a-z0-9_]{0,30}"
+                      required
+                    />
+                  </div>
+                  <p id="integration-namespace-hint" className="form-hint">
+                    Each login gets its own namespace. Approve access on{" "}
+                    {entry.name}’s page.
+                  </p>
+                  <p
+                    id="integration-namespace-preview"
+                    className="integration-namespace-preview"
+                  >
+                    Agents will call{" "}
+                    <code>
+                      tools.{entry.slug}_{namespace || "suffix"}.&lt;tool&gt;(…)
+                    </code>
+                  </p>
+                  <div className="integration-login-destination">
+                    <label htmlFor="integration-workspace">
+                      Add to workspace
+                    </label>
+                    <NativeSelect
+                      id="integration-workspace"
+                      value={target}
+                      onChange={(event) => setTarget(event.target.value)}
+                    >
+                      {workspaces.map((scope) => (
+                        <NativeSelectOption value={scope.id} key={scope.id}>
+                          {scope.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                  <Button type="submit" disabled={extraLogin.isPending}>
+                    Connect login
+                  </Button>
+                </form>
+              ) : (
+                <Button variant="outline" onClick={() => setShowLogin(true)}>
+                  Add another login
+                </Button>
+              ))}
+          </section>
+        )}
         <Facts
           items={[
             {
@@ -764,88 +862,6 @@ function IntegrationDetails({
               : []),
           ]}
         />
-        {entry.connections.length > 0 && entry.url && (
-          <section className="integration-logins" aria-label="Logins">
-            <h3>Logins</h3>
-            <ul>
-              {entry.connections.map((login) => (
-                <li key={login.sourceId}>
-                  <Link
-                    to="/sources/$sourceId"
-                    params={{ sourceId: login.sourceId }}
-                  >
-                    {login.name}
-                  </Link>
-                  <code>tools.{login.slug}</code>
-                  <span>
-                    {login.state === "ready"
-                      ? "Linked"
-                      : login.state.replaceAll("_", " ")}{" "}
-                    · {login.toolCount} tools
-                  </span>
-                  <small>
-                    {workspaces
-                      .filter(
-                        (scope) =>
-                          scope.allSources ||
-                          scope.sourceIds.includes(login.sourceId)
-                      )
-                      .map((scope) => scope.name)
-                      .join(", ")}
-                  </small>
-                </li>
-              ))}
-            </ul>
-            {entry.methods.some(
-              (item) => item === "one_click" || item === "oauth_app"
-            ) &&
-              (showLogin ? (
-                <form
-                  className="connection-form"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    extraLogin.mutate()
-                  }}
-                >
-                  <label htmlFor="integration-namespace">Namespace</label>
-                  <div className="flex items-center gap-2">
-                    <code>{entry.slug}_</code>
-                    <Input
-                      id="integration-namespace"
-                      value={namespace}
-                      onChange={(event) => setNamespace(event.target.value)}
-                      pattern="[a-z][a-z0-9_]{0,30}"
-                      required
-                    />
-                  </div>
-                  <code>
-                    tools.{entry.slug}_{namespace || "suffix"}.&lt;tool&gt;(…)
-                  </code>
-                  <label htmlFor="integration-workspace">
-                    Add to workspace
-                  </label>
-                  <NativeSelect
-                    id="integration-workspace"
-                    value={target}
-                    onChange={(event) => setTarget(event.target.value)}
-                  >
-                    {workspaces.map((scope) => (
-                      <NativeSelectOption value={scope.id} key={scope.id}>
-                        {scope.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                  <Button type="submit" disabled={extraLogin.isPending}>
-                    Connect login
-                  </Button>
-                </form>
-              ) : (
-                <Button variant="outline" onClick={() => setShowLogin(true)}>
-                  Add another login
-                </Button>
-              ))}
-          </section>
-        )}
         <div className="detail-actions">
           {entry.docs && (
             <a href={entry.docs} target="_blank" rel="noreferrer">

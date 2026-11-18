@@ -3495,8 +3495,24 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   await page
     .getByRole("button", { name: "Switch workspace", exact: true })
     .click()
-  await capture(page, "ux-prototype-workspace-menu-1440x900.png")
   const workspaceMenu = page.getByRole("menu", { name: "Workspaces" })
+  const entrance = await workspaceMenu.evaluate((menu) => {
+    const animation = menu.getAnimations().find(
+      (candidate) =>
+        candidate instanceof CSSAnimation &&
+        candidate.animationName === "workspace-menu-enter"
+    )
+    const effect = animation?.effect as KeyframeEffect | undefined
+    return {
+      duration: effect?.getTiming().duration,
+      initial: effect?.getKeyframes()[0],
+    }
+  })
+  expect(entrance).toMatchObject({
+    duration: 320,
+    initial: { opacity: "0", transform: "translateY(-4px)" },
+  })
+  await capture(page, "ux-prototype-workspace-menu-1440x900.png")
   expect(await workspaceMenu.boundingBox()).toMatchObject({
     x: 240,
     y: 44,
@@ -3508,6 +3524,24 @@ test("prototype motion carries transition types and honors reduced motion", asyn
   expect(mobileMenu!.x).toBeGreaterThanOrEqual(0)
   expect(mobileMenu!.x + mobileMenu!.width).toBeLessThanOrEqual(390)
   await page.setViewportSize({ width: 1440, height: 900 })
+  await workspaceMenu.evaluate((menu) => {
+    menu.addEventListener(
+      "transitionrun",
+      (event) => {
+        if ((event as TransitionEvent).propertyName === "opacity") {
+          document.documentElement.dataset.workspaceMenuExit =
+            getComputedStyle(menu).transitionDuration
+        }
+      }
+    )
+  })
+  await page.keyboard.press("Escape")
+  await expect(workspaceMenu).toBeHidden()
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-workspace-menu-exit",
+    "0.16s"
+  )
+  await page.getByRole("button", { name: "Switch workspace", exact: true }).click()
   const workspaceOption = page.getByRole("menuitemradio", {
     name: /Acme/,
   })

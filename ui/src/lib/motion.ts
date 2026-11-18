@@ -18,10 +18,15 @@ export function move(type: string, update: () => void) {
   }
 
   active?.skipTransition()
-  const transition = document.startViewTransition({
-    types: [type],
-    update: () => flushSync(update),
-  })
+  type TransitionScope = Element & {
+    startViewTransition?: Document["startViewTransition"]
+  }
+  const scope = document.querySelector?.<TransitionScope>(".pane-stack")
+  const options = { types: [type], update: () => flushSync(update) }
+  const transition =
+    scope?.startViewTransition?.(options) ??
+    document.startViewTransition(options)
+  void transition.ready?.catch(() => {})
   active = transition
   const clear = () => {
     if (active === transition) active = undefined

@@ -12,6 +12,8 @@ let reduced: boolean
 let hidden: boolean
 let motionChange: EventListener | undefined
 const gl = {
+  getExtension: vi.fn<() => { UNMASKED_RENDERER_WEBGL: number } | null>(() => null),
+  getParameter: vi.fn(() => "SwiftShader"),
   createProgram: vi.fn(() => ({})),
   createBuffer: vi.fn(() => ({})),
   createShader: vi.fn(() => ({})),
@@ -44,6 +46,7 @@ function draw() {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  gl.getExtension.mockReturnValue(null)
   frames = new Map()
   sequence = 0
   reduced = false
@@ -117,4 +120,14 @@ test("context loss stops rendering and reveals the fallback", () => {
   canvas.dispatchEvent(new Event("webglcontextlost"))
   expect(frames.size).toBe(0)
   expect(canvas.style.visibility).toBe("hidden")
+})
+
+test("uses a smaller backing buffer on software WebGL", () => {
+  gl.getExtension.mockReturnValue({ UNMASKED_RENDERER_WEBGL: 1 })
+  const view = render(<Backdrop />)
+  expect(view.container.querySelector("canvas")?.width).toBe(
+    Math.round(innerWidth / 2)
+  )
+  draw()
+  expect(gl.drawArrays).toHaveBeenCalledOnce()
 })

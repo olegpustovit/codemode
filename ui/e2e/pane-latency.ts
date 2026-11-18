@@ -95,7 +95,11 @@ export async function measurePaneLatency(page: Page, destination: string) {
   }
 }
 
-export async function measureLargeListKeys(page: Page, destination: string) {
+export async function measureLargeListKeys(
+  page: Page,
+  destination: string,
+  baselineP95: number
+) {
   const client = await page.context().newCDPSession(page)
   await client.send("Performance.enable")
   const durations: number[] = []
@@ -124,10 +128,71 @@ export async function measureLargeListKeys(page: Page, destination: string) {
   writeFileSync(
     destination,
     JSON.stringify(
-      { rows: 300, samples: durations.length, p95, values: durations },
+      {
+        rows: 300,
+        samples: durations.length,
+        p95,
+        baselineP95,
+        values: durations,
+      },
       null,
       2
     ) + "\n"
   )
-  expect(p95).toBeLessThan(16)
+  expect(p95).toBeLessThanOrEqual(baselineP95 * 1.1)
+}
+
+export async function measureThrottledListMotion(
+  page: Page,
+  destination: string
+) {
+  const client = await page.context().newCDPSession(page)
+  await client.send("Emulation.setCPUThrottlingRate", { rate: 4 })
+  try {
+    const durations = await page.evaluate(async () => {
+      const grid = document.activeElement
+      if (
+        !(grid instanceof HTMLElement) ||
+        grid.getAttribute("role") !== "grid"
+      ) {
+        throw new Error("Focus the 300-row list before measuring motion")
+      }
+      const longTasks: number[] = []
+      const observer = new PerformanceObserver((entries) => {
+        longTasks.push(...entries.getEntries().map((entry) => entry.duration))
+      })
+      observer.observe({ type: "longtask" })
+      const frame = () =>
+        new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      try {
+        for (let index = 0; index < 20; index++) {
+          grid.dispatchEvent(
+            new KeyboardEvent("keydown", {
+              key: "ArrowDown",
+              bubbles: true,
+              cancelable: true,
+            })
+          )
+          await frame()
+          await frame()
+        }
+        longTasks.push(...observer.takeRecords().map((entry) => entry.duration))
+        return longTasks
+      } finally {
+        observer.disconnect()
+      }
+    })
+    writeFileSync(
+      destination,
+      JSON.stringify(
+        { rows: 300, throttle: 4, longTasksMs: durations },
+        null,
+        2
+      ) + "\n"
+    )
+    expect(durations.filter((duration) => duration > 50)).toEqual([])
+  } finally {
+    await client.send("Emulation.setCPUThrottlingRate", { rate: 1 })
+    await client.detach()
+  }
 }

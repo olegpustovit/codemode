@@ -9,10 +9,33 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 function CallPreview({ preview }: { preview: string }) {
   const [expanded, setExpanded] = useState(false)
   const lines = prettyJson(preview).split("\n")
+  const text = (expanded ? lines : lines.slice(0, 24)).join("\n")
+  const parts = text.split(
+    /("(?:\\.|[^"\\])*"|-?\b\d+(?:\.\d+)?(?:e[+-]?\d+)?\b)/gi
+  )
   return (
     <>
       <pre className="trace-preview">
-        <code>{(expanded ? lines : lines.slice(0, 24)).join("\n")}</code>
+        <code>
+          {parts.map((part, index) =>
+            index % 2 === 0 ? (
+              part
+            ) : (
+              <span
+                key={index}
+                className={
+                  parts[index + 1]?.startsWith(":")
+                    ? "code-builtin"
+                    : part.startsWith('"')
+                      ? "code-string"
+                      : "code-number"
+                }
+              >
+                {part}
+              </span>
+            )
+          )}
+        </code>
       </pre>
       {lines.length > 24 && (
         <button
@@ -91,6 +114,8 @@ export function ExecutionContent({
   execution: ExecutionDetail
   action?: ReactNode
 }) {
+  const printedLines = execution.output?.trimEnd().split("\n").length ?? 0
+  const callCount = execution.calls.length
   const callList = useRef<HTMLDivElement>(null)
   const totalToolTime = execution.calls.reduce(
     (total, call) => total + call.durationMs,
@@ -126,8 +151,11 @@ export function ExecutionContent({
         <h2>{execution.title ?? "No tool calls"}</h2>
         <StateBadge state={execution.status} />
         <p>
-          Started {date(execution.startedAt)} · {totalToolTime} ms ·{" "}
-          {execution.calls.length} calls
+          {date(execution.startedAt)} · {totalToolTime} ms in tools ·{" "}
+          {callCount} tool {callCount === 1 ? "call" : "calls"} ·{" "}
+          {execution.result === null ? "returned nothing" : "returned a value"}
+          {!!printedLines &&
+            ` · printed ${printedLines} ${printedLines === 1 ? "line" : "lines"}`}
         </p>
       </header>
       {execution.error && (
@@ -140,7 +168,8 @@ export function ExecutionContent({
         <h3>
           Tool calls{" "}
           <span>
-            {execution.calls.length} calls · {totalToolTime} ms
+            {callCount} {callCount === 1 ? "call" : "calls"} · {totalToolTime}{" "}
+            ms · open a row for arguments and result
           </span>
         </h3>
         <div className="trace-calls" ref={callList}>
@@ -155,7 +184,7 @@ export function ExecutionContent({
               <details
                 className="trace-call"
                 data-path={call.path}
-                key={call.seq}
+                key={`${execution.id}:${call.seq}`}
               >
                 <summary>
                   <span className="trace-index">{index + 1}</span>
@@ -189,7 +218,16 @@ export function ExecutionContent({
                   )}
                   {call.preview !== null && (
                     <>
-                      <h4>Result</h4>
+                      <h4>
+                        Result{" "}
+                        <span>
+                          preview ·{" "}
+                          {(
+                            new TextEncoder().encode(call.preview).length / 1024
+                          ).toFixed(1)}{" "}
+                          KB shown
+                        </span>
+                      </h4>
                       <CallPreview preview={call.preview} />
                     </>
                   )}

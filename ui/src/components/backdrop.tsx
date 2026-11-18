@@ -95,6 +95,7 @@ export function Backdrop() {
     const started = performance.now()
     const current = [...target.current]
     let previous = started
+    let paintedHue = ""
     const frame = (now: number) => {
       raf = 0
       if (document.hidden || lost) return
@@ -104,10 +105,11 @@ export function Backdrop() {
       previous = now
       for (let i = 0; i < 3; i++)
         current[i] += (target.current[i] - current[i]) * blend
-      document.documentElement.style.setProperty(
-        "--hue",
-        current.map((v) => Math.round(v * 255)).join(",")
-      )
+      const cssHue = current.map((v) => Math.round(v * 255)).join(",")
+      if (cssHue !== paintedHue) {
+        document.documentElement.style.setProperty("--hue", cssHue)
+        paintedHue = cssHue
+      }
       gl.uniform2f(resolution, cv.width, cv.height)
       gl.uniform1f(time, motion.matches ? 20 : (now - started) / 1000)
       gl.uniform3f(hue, current[0], current[1], current[2])
@@ -117,8 +119,14 @@ export function Backdrop() {
     const kick = () => {
       if (!raf && !document.hidden && !lost) raf = requestAnimationFrame(frame)
     }
+    const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info")
+    const renderer = rendererInfo
+      ? String(gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL))
+      : ""
+    // A smaller backing buffer keeps the same scene moving on software WebGL.
+    const software = /swiftshader|llvmpipe|software rasterizer/i.test(renderer)
     const size = () => {
-      const scale = Math.min(devicePixelRatio || 1, 2)
+      const scale = software ? 0.5 : Math.min(devicePixelRatio || 1, 2)
       cv.width = Math.max(1, Math.round(innerWidth * scale))
       cv.height = Math.max(1, Math.round(innerHeight * scale))
       gl.viewport(0, 0, cv.width, cv.height)

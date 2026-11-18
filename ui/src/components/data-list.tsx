@@ -1,5 +1,5 @@
 /* oxlint-disable jsx-a11y/no-noninteractive-element-to-interactive-role -- The WAI-ARIA grid pattern uses native table cells and one active-descendant focus. */
-import { Fragment, useId, useLayoutEffect, useRef, useState } from "react"
+import { Fragment, memo, useId, useLayoutEffect, useRef, useState } from "react"
 import type { ReactNode, RefObject } from "react"
 import {
   useListNavigation,
@@ -45,6 +45,45 @@ export type ListRow = {
   cells: ReactNode[]
   renameable?: boolean
 }
+const StaticRow = memo(function StaticRow({
+  row,
+  id,
+  first,
+  columns,
+  active,
+  selected,
+}: {
+  row: ListRow
+  id: string
+  first: boolean
+  columns: number
+  active: boolean
+  selected: boolean
+}) {
+  return (
+    <>
+      {first && (
+        <tr className="data-group">
+          <td colSpan={columns}>{row.group}</td>
+        </tr>
+      )}
+      <tr
+        id={id}
+        className="data-row"
+        aria-label={row.label}
+        aria-selected={selected}
+        data-active={active}
+      >
+        {row.cells.map((cell, index) => (
+          <td className={index ? "data-extra" : "data-name"} key={index}>
+            {cell}
+          </td>
+        ))}
+      </tr>
+    </>
+  )
+})
+
 export function DataList({
   rows,
   columns,
@@ -92,6 +131,7 @@ export function DataList({
   const active = selected < 0 ? 0 : selected
   const ownSelection = useListSelection(selectionScope)
   const selection = sharedSelection ?? ownSelection
+  const selectedRows = new Set(selection.value.ids)
   const [touchSelection, setTouchSelection] = useState(false)
   const [rename, setRename] = useState<{ id: string; value: string } | null>(
     null
@@ -214,6 +254,26 @@ export function DataList({
         tabIndex={0}
         ref={root}
         onKeyDown={onKeyDown}
+        onClick={(event) => {
+          if (
+            !(event.target instanceof Element) ||
+            event.target.closest("button,a,input,select,textarea")
+          )
+            return
+          const element = event.target.closest(".data-row")
+          if (!element || element.closest("table") !== event.currentTarget)
+            return
+          const row = rows[Number(element.id.slice(prefix.length + 1))]
+          if (!row) return
+          root.current?.focus()
+          if (event.shiftKey) choose(row.id, "range")
+          else if (event.metaKey || event.ctrlKey || touchSelection)
+            choose(row.id, "toggle")
+          else {
+            choose(row.id)
+            openRow(row.id)
+          }
+        }}
         onScrollCapture={(event) => {
           const body = event.target
           if (
@@ -247,6 +307,22 @@ export function DataList({
           ) : null}
           {rows.map((row, index) => {
             const first = index === 0 || rows[index - 1].group !== row.group
+            const selected =
+              selection.value.allMatching ||
+              (selectedRows.size ? selectedRows.has(row.id) : index === active)
+            if (!touchSelection && rename?.id !== row.id) {
+              return (
+                <StaticRow
+                  key={row.id}
+                  row={row}
+                  id={`${prefix}-${index}`}
+                  first={first}
+                  columns={columns.length}
+                  active={index === active}
+                  selected={selected}
+                />
+              )
+            }
             return (
               <Fragment key={row.id}>
                 {first && (
@@ -258,29 +334,8 @@ export function DataList({
                   id={`${prefix}-${index}`}
                   className="data-row"
                   aria-label={row.label}
-                  aria-selected={
-                    selection.value.allMatching ||
-                    (selection.value.ids.length
-                      ? selection.value.ids.includes(row.id)
-                      : index === active)
-                  }
+                  aria-selected={selected}
                   data-active={index === active}
-                  onKeyDown={onKeyDown}
-                  onClick={(event) => {
-                    if (
-                      event.target instanceof Element &&
-                      event.target.closest("button,a,input,select,textarea")
-                    )
-                      return
-                    root.current?.focus()
-                    if (event.shiftKey) choose(row.id, "range")
-                    else if (event.metaKey || event.ctrlKey || touchSelection)
-                      choose(row.id, "toggle")
-                    else {
-                      choose(row.id)
-                      openRow(row.id)
-                    }
-                  }}
                 >
                   {row.cells.map((cell, i) => (
                     <td className={i ? "data-extra" : "data-name"} key={i}>

@@ -72,7 +72,7 @@ export function ScriptsPage({ workspaceId }: { workspaceId: string }) {
                 </p>
               </div>
               <p className="text-sm text-muted-foreground">
-                Updated{" "}
+                {script.workspaceId ? workspace.name : "Global"} · Updated{" "}
                 <time
                   dateTime={script.updatedAt}
                   title={date(script.updatedAt)}

@@ -15,7 +15,11 @@ import {
 } from "node:fs"
 import { resolve } from "node:path"
 import { once } from "node:events"
-import { measurePaneLatency, measureLargeListKeys } from "./pane-latency"
+import {
+  measurePaneLatency,
+  measureLargeListKeys,
+  measureThrottledListMotion,
+} from "./pane-latency"
 import type axe from "axe-core"
 declare global {
   interface Window {
@@ -551,7 +555,7 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
       .locator(".code-panel")
       .filter({ hasText: "codex mcp add codemode --url" })
   ).toContainText(
-    "https://codemode.microapps.space/mcp --bearer-token-env-var CODEMODE_TOKEN"
+    `https://codemode.microapps.space/mcp?workspace=${workspaceId} --bearer-token-env-var CODEMODE_TOKEN`
   )
   await expect(
     page
@@ -697,7 +701,12 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
   await expect(page.locator(".trace-return dd")).toHaveText(
     JSON.stringify(execution.result)
   )
-  await capture(page, "desktop-execution.png")
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await capture(page, "ux-prototype-trace-1440x900.png")
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  await capture(page, "ux-prototype-trace-390x844.png")
+  await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto(`/sources/${sourceId}/accounts`)
   await page
     .getByLabel("Bearer token", { exact: true })
@@ -1741,10 +1750,11 @@ test("workspace bookmarks, preset connection and opt-in administration authoriza
   await page
     .getByRole("checkbox", { name: "Also allow administration tools" })
     .click()
-  await capture(page, "workspace-admin-consent-desktop.png")
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await capture(page, "ux-prototype-consent-1440x900.png")
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
-  await capture(page, "workspace-admin-consent-mobile.png")
+  await capture(page, "ux-prototype-consent-390x844.png")
   await page
     .getByRole("button", {
       name: "Authorize All sources with administration",
@@ -2674,7 +2684,20 @@ test("control-plane fixes: case, icons, stable scripts, desktop bulk editing, 30
       await expect(tools.locator(".data-row")).toHaveCount(expected)
     }
     await tools.focus()
-    await measureLargeListKeys(page, resolve(output, "large-list-latency.json"))
+    const baseline = JSON.parse(
+      readFileSync(
+        resolve(
+          root,
+          "docs/measurements/control-plane-fixes-qualification.json"
+        ),
+        "utf8"
+      )
+    )
+    await measureLargeListKeys(
+      page,
+      resolve(output, "large-list-latency.json"),
+      baseline.largeListKeyScriptMs.p95
+    )
     await expect(
       page.getByRole("button", { name: "Next page", exact: true })
     ).toHaveCount(0)
@@ -2704,7 +2727,12 @@ test("control-plane fixes: case, icons, stable scripts, desktop bulk editing, 30
     await tools.focus()
     await measureLargeListKeys(
       page,
-      resolve(output, "large-scoped-list-latency.json")
+      resolve(output, "large-scoped-list-latency.json"),
+      baseline.largeScopedListKeyScriptMs.p95
+    )
+    await measureThrottledListMotion(
+      page,
+      resolve(output, "large-list-motion.json")
     )
     await page.goto(`/scripts?workspace=${owned.empty.id}`)
     await expect(
@@ -3037,9 +3065,9 @@ test("prototype motion carries transition types and honors reduced motion", asyn
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.addInitScript(() => {
-    const start = document.startViewTransition?.bind(document)
-    if (!start) return
-    document.startViewTransition = (options) => {
+    const record = (
+      options?: ViewTransitionUpdateCallback | StartViewTransitionOptions
+    ) => {
       if (options && typeof options === "object" && options.types?.length) {
         document.documentElement.dataset.transitionTypes = [
           document.documentElement.dataset.transitionTypes,
@@ -3048,17 +3076,64 @@ test("prototype motion carries transition types and honors reduced motion", asyn
           .filter(Boolean)
           .join(" ")
       }
-      return start(options)
     }
+    const documentStart = document.startViewTransition?.bind(document)
+    if (documentStart)
+      document.startViewTransition = (options) => {
+        record(options)
+        return documentStart(options)
+      }
+    const prototype = Element.prototype as Element & {
+      startViewTransition?: Document["startViewTransition"]
+    }
+    const scopedStart = prototype.startViewTransition
+    if (scopedStart)
+      prototype.startViewTransition = function (options) {
+        record(options)
+        return scopedStart.call(this, options)
+      }
   })
   await login(page, "/sessions")
+  await page.evaluate(() =>
+    fetch("/api/workspaces", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Motion workspace", sourceIds: [] }),
+    })
+  )
+  await page.reload()
   const types = () => page.locator("html").getAttribute("data-transition-types")
   await page.getByRole("link", { name: "Integrations", exact: true }).click()
   await expect.poll(types).toContain("down")
   await page.getByRole("row", { name: "Linear", exact: true }).click()
+  await expect(
+    page.getByRole("heading", { name: "Linear", exact: true })
+  ).toBeVisible()
   await expect.poll(types).toContain("open")
+  await page.getByRole("row", { name: "Notion", exact: true }).click()
+  await expect.poll(types).toContain("swap")
   await page.getByRole("button", { name: /^Close/ }).click()
   await expect.poll(types).toContain("close")
+  await page.getByRole("tab", { name: /^Needs attention/ }).click()
+  await expect.poll(types).toContain("filter")
+  await capture(page, "ux-prototype-empty-1440x900.png")
+  await page
+    .getByRole("button", { name: "Switch workspace", exact: true })
+    .click()
+  await capture(page, "ux-prototype-workspace-menu-1440x900.png")
+  await page.getByRole("menuitemradio", { name: /Motion workspace/ }).click()
+  await expect.poll(types).toContain("ws")
+  await page
+    .getByRole("button", { name: "Collapse sidebar", exact: true })
+    .click()
+  await expect(page.locator(".app-shell")).toHaveAttribute(
+    "data-rail",
+    "collapsed"
+  )
+  await capture(page, "ux-prototype-collapsed-rail-1440x900.png")
+  await page
+    .getByRole("button", { name: "Expand sidebar", exact: true })
+    .click()
   await page.getByRole("link", { name: "Sessions", exact: true }).click()
   await expect.poll(types).toContain("up")
   await capture(page, "ux-prototype-sessions-1440x900.png")

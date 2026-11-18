@@ -45,6 +45,7 @@ Wave 4 adds migration 0027 for global scripts, provenance, and explicit per-toke
 | Layout follow-up | [#8](https://github.com/olegpustovit/codemode/pull/8) | `fca4df1112c03811692b3b83e73c0a511777a41e` | 27 |
 | Mobile rail | [#8](https://github.com/olegpustovit/codemode/pull/8) | `c147bb0fc1278d76710e538868f24bd9477107c4` | 27 |
 | Workspace menu and consent | [#8](https://github.com/olegpustovit/codemode/pull/8) | `bbf04fd409598fa8f78490a0298e2d56461a1112` | 27 |
+| Trace call fade | [#8](https://github.com/olegpustovit/codemode/pull/8) | `adab4c83ba22ddfae5f9863956822bbd05562bf1` | 27 |
 
 All four restored-backup checks preserved 28 pre-existing tables. Each live Codex gate passed eight smoke tasks and two large aggregation tasks. Wave 4 additionally passed the live agent save and replay task in three MCP calls. Local qualification passed 163 native cases, 39 UI tests and seven targeted optimized-binary Chromium workflows. All 83 public UI files match staging. The initial Wave 4 release used UI fingerprint `19fb5b05d5e3`.
 
@@ -100,3 +101,5 @@ The consent capture now exercises a real OAuth grant requested for Acme through 
 The workspace menu motion check reads the entrance animation’s active keyframes in Chromium and observes the opacity transition when Escape dismisses the popup. It confirms the prototype’s 320 ms entrance from opacity zero and a 4 px upward offset, followed on dismissal by a 160 ms fade. The reduced-motion branch continues to require zero running animations. This verifies the menu animation parameters and dismissal path. It does not compare every rendered motion frame.
 
 The Chromium transition observer now checks exact directional movement against the prototype. It verifies that the 420 ms animations start at ±8 px vertically or ±12 px horizontally, finish at zero, and use neither scaling nor blur. The Sessions and prototype motion workflows passed with those stricter checks, including execution pane push and pop, section navigation, and detail pane open and swap.
+
+The trace call release uses the prototype’s 420 ms linear opacity transition and retains the eased block-size transition. The desktop trace and prototype motion Chromium workflows passed. The restored-backup preflight preserved 28 tables, all 84 public UI assets matched staging and all 11 live Codex cases passed. UI fingerprint `ed21e0820ee7`, ARM SHA-256 `4852be1246e80a65de7c39729a10d4f857478180e392ca0cc73734ed383c3bad`.

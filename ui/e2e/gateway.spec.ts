@@ -794,6 +794,17 @@ test("desktop: real sources, endpoint scope, one-time token, credentials, consen
     })
     .click()
   await page.setViewportSize({ width: 1440, height: 900 })
+  const traceCallMotion = page.locator(".trace-call[open]").first()
+  const traceFade = () =>
+    traceCallMotion.evaluate((call) => {
+      const style = getComputedStyle(call, "::details-content")
+      const index = style.transitionProperty.split(", ").indexOf("opacity")
+      return {
+        duration: style.transitionDuration.split(", ")[index],
+        easing: style.transitionTimingFunction.split(/, (?![^()]*\))/)[index],
+      }
+    })
+  expect(await traceFade()).toEqual({ duration: "0.42s", easing: "linear" })
   await capture(page, "ux-prototype-trace-1440x900.png")
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)

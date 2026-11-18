@@ -794,7 +794,7 @@ mark {
 .trace-output th { width: 40%; font-weight: var(--w-reg); color: var(--c-text-3); }
 @supports (interpolate-size: allow-keywords) {
   .trace-call { interpolate-size: allow-keywords; }
-  .trace-call::details-content { block-size: 0; opacity: 0; overflow: clip; transition: block-size .42s cubic-bezier(.22,1,.36,1), opacity .42s cubic-bezier(.22,1,.36,1), content-visibility .42s allow-discrete; }
+  .trace-call::details-content { block-size: 0; opacity: 0; overflow: clip; transition: block-size var(--enter) var(--e-soft), opacity var(--enter) linear, content-visibility var(--enter) allow-discrete; }
   .trace-call[open]::details-content { block-size: auto; opacity: 1; }
   @media (prefers-reduced-motion: reduce) {
     .trace-call::details-content { transition: none; }

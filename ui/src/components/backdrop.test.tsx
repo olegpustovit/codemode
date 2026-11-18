@@ -3,9 +3,10 @@ import { cleanup, render } from "@testing-library/react"
 import { Backdrop } from "./backdrop"
 
 vi.mock("@tanstack/react-router", () => ({
-  useRouterState: () => "/sources",
+  useRouterState: () => path,
 }))
 
+let path: string
 let frames: Map<number, FrameRequestCallback>
 let sequence: number
 let reduced: boolean
@@ -49,6 +50,7 @@ function draw(now = performance.now()) {
 beforeEach(() => {
   vi.clearAllMocks()
   gl.getExtension.mockReturnValue(null)
+  path = "/sources"
   frames = new Map()
   sequence = 0
   reduced = false
@@ -136,4 +138,22 @@ test("uses a smaller backing buffer and caps software WebGL frames", () => {
   expect(gl.drawArrays).toHaveBeenCalledOnce()
   draw(first + 50)
   expect(gl.drawArrays).toHaveBeenCalledTimes(2)
+})
+
+test("blends the UI hue with the shader after navigation", () => {
+  const view = render(<Backdrop />)
+  const first = performance.now()
+  const hue = () => document.documentElement.style.getPropertyValue("--hue")
+  draw(first)
+  const before = hue()
+  path = "/workspaces"
+  view.rerender(<Backdrop />)
+  expect(hue()).toBe(before)
+  draw(first + 100)
+  expect(hue()).not.toBe(before)
+  expect(hue()).not.toBe("10,102,107")
+  view.container
+    .querySelector("canvas")
+    ?.dispatchEvent(new Event("webglcontextlost"))
+  expect(hue()).toBe("10,102,107")
 })

@@ -13,7 +13,7 @@ const hues = {
 export function Backdrop() {
   const path = useRouterState({ select: (state) => state.location.pathname })
   const target = useRef(hues.sessions)
-  const wake = useRef<() => void>(() => {})
+  const wake = useRef<(() => void) | null>(null)
   useEffect(() => {
     target.current = path.includes("scripts")
       ? hues.scripts
@@ -24,11 +24,14 @@ export function Backdrop() {
           : /^\/(sources|accounts|integrations)/.test(path)
             ? hues.integrations
             : hues.sessions
-    document.documentElement.style.setProperty(
-      "--hue",
-      target.current.map((v) => Math.round(v * 255)).join(",")
-    )
-    wake.current()
+    if (wake.current) {
+      wake.current()
+    } else {
+      document.documentElement.style.setProperty(
+        "--hue",
+        target.current.map((v) => Math.round(v * 255)).join(",")
+      )
+    }
   }, [path])
   const canvas = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
@@ -151,6 +154,11 @@ export function Backdrop() {
       cancelAnimationFrame(raf)
       raf = 0
       cv.style.visibility = "hidden"
+      wake.current = null
+      document.documentElement.style.setProperty(
+        "--hue",
+        target.current.map((v) => Math.round(v * 255)).join(",")
+      )
     }
     wake.current = kick
     size()
@@ -159,7 +167,7 @@ export function Backdrop() {
     motion.addEventListener("change", visibility)
     cv.addEventListener("webglcontextlost", contextLost)
     return () => {
-      wake.current = () => {}
+      wake.current = null
       window.removeEventListener("resize", size)
       document.removeEventListener("visibilitychange", visibility)
       motion.removeEventListener("change", visibility)

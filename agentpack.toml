@@ -6,6 +6,6 @@ version = "0.0.1"
 [dependencies]
 "github.com/olegpustovit/agent-configs/skills/build-rust-stack" = "dev"
 "github.com/dietrichgebert/ponytail" = {}
-"github.com/olegpustovit/agent-configs/skills/smdctl-deploy" = "dev"
+"github.com/olegpustovit/aquifer/skills/aquifer-deploy" = "dev"
 "github.com/olegpustovit/agent-configs/plugins/react-dev" = "dev"
 # "github.com/owner/repo/path" = {}

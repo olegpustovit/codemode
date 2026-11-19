@@ -151,3 +151,11 @@ If the pool fails these, the fallback is `deno_core` with TypeScript in a worker
 - The replacement proposal removes paused execution storage and snapshot signing. Historical paused runs finish as failed during migration and are never replayed.
 - Phase 0 measured the per-worker memory cap and worker-failure containment; keep the regression checks when changing the pool.
 - Clearly named eval fixtures are permitted in production: the `eval-smoke@microapps.space` tenant, its `eval-codex*` tokens and linked eval-account sources, and `eval-seed-*`/`eval-run-*` data in the apps. They are owned by the eval harness in `../codemode-evals` (gate: `CODEMODE_EVAL_GATE=../codemode-evals tools/deploy.sh`). Never create other production fixtures.
+
+## Deploy (Aquifer)
+
+Production runs on `oracle-vm` as the Aquifer app `codemode`. Use the `aquifer-deploy` skill:
+build locally, `scp` the artifact to `oracle-vm:/tmp/`, then `ssh oracle-vm aq deploy codemode /tmp/<file>`.
+Env vars: `printf %s "$VALUE" | ssh oracle-vm aq secret set codemode NAME`. Logs, status and rollback:
+`ssh oracle-vm aq logs|status|rollback codemode`. Writable state lives in `/home/apps/data/`.
+smdctl, its units and `/home/snowbear/ci/...` are retired: do not deploy there.
